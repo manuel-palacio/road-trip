@@ -534,7 +534,30 @@
       flex-direction: column;
       gap: 16px;
     }
-    .meta-field { display: block; }
+    .meta-field { display: block; min-width: 0; }
+    .meta-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .km-input::-webkit-outer-spin-button,
+    .km-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .km-input { -moz-appearance: textfield; appearance: textfield; }
+    .meta-field-suffix {
+      position: relative;
+    }
+    .meta-field-suffix .suffix {
+      position: absolute;
+      right: 0;
+      bottom: 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .meta-field-suffix input { padding-right: 28px; }
     .meta-label {
       display: block;
       font-family: var(--mono);
@@ -1065,10 +1088,17 @@
       </div>
 
       <div class="builder-meta">
-        <label class="meta-field">
-          <span class="meta-label">Start date</span>
-          <input id="trip-start-date" class="trip-date-input" type="date" />
-        </label>
+        <div class="meta-row">
+          <label class="meta-field">
+            <span class="meta-label">Start date</span>
+            <input id="trip-start-date" class="trip-date-input" type="date" />
+          </label>
+          <label class="meta-field meta-field-suffix">
+            <span class="meta-label">Max / day</span>
+            <input id="trip-max-km" class="trip-date-input km-input" type="number" min="100" max="2000" step="50" inputmode="numeric" />
+            <span class="suffix">km</span>
+          </label>
+        </div>
         <label class="meta-field">
           <span class="meta-label">Description</span>
           <textarea id="trip-description" class="trip-desc-input" rows="2" placeholder="A note for yourself…"></textarea>
@@ -1307,7 +1337,7 @@
     /* ───── Builder ───── */
 
     function newBuilderState() {
-      return { tripId: null, name: '', coverEmoji: '🚗', startDate: '', description: '', stops: [], markers: [] };
+      return { tripId: null, name: '', coverEmoji: '🚗', startDate: '', description: '', maxKmPerDay: 600, stops: [], markers: [] };
     }
 
     function flagEmoji(cc) {
@@ -1395,6 +1425,7 @@
 
     function computeDays(stops) {
       if (stops.length === 0) return;
+      const maxKm = (builderState && builderState.maxKmPerDay) || 600;
       let day = 1;
       let dayKm = 0;
       stops.forEach((stop, i) => {
@@ -1404,7 +1435,7 @@
           return;
         }
         const seg = stop.kmFromPrevious || 0;
-        if (dayKm + seg > 600) {
+        if (dayKm + seg > maxKm) {
           day++;
           dayKm = seg;
         } else {
@@ -1663,6 +1694,7 @@
       document.getElementById('trip-name').value = builderState.name || '';
       document.getElementById('trip-emoji-btn').textContent = builderState.coverEmoji || '🚗';
       document.getElementById('trip-start-date').value = builderState.startDate || '';
+      document.getElementById('trip-max-km').value = builderState.maxKmPerDay || 600;
       document.getElementById('trip-description').value = builderState.description || '';
       renderStops();
       renderSummary();
@@ -1703,6 +1735,7 @@
           coverEmoji: trip.coverEmoji || '🚗',
           startDate: trip.startDate || '',
           description: trip.description || '',
+          maxKmPerDay: typeof trip.maxKmPerDay === 'number' && trip.maxKmPerDay > 0 ? trip.maxKmPerDay : 600,
           stops: Array.isArray(trip.stops) ? trip.stops.map((s) => ({ ...s })) : [],
           markers: [],
           polylines: [],
@@ -1740,6 +1773,7 @@
         name: (builderState.name || '').trim() || 'Untitled trip',
         coverEmoji: builderState.coverEmoji || '🚗',
         startDate: builderState.startDate || null,
+        maxKmPerDay: builderState.maxKmPerDay || 600,
         description: builderState.description || '',
         countries,
         totalKm,
@@ -1790,6 +1824,19 @@
 
       const date = document.getElementById('trip-start-date');
       date.addEventListener('input', () => { if (builderState) builderState.startDate = date.value; });
+
+      const maxKm = document.getElementById('trip-max-km');
+      maxKm.addEventListener('input', () => {
+        if (!builderState) return;
+        const n = parseInt(maxKm.value, 10);
+        builderState.maxKmPerDay = (Number.isFinite(n) && n > 0) ? n : 600;
+        // Recompute days only — distances/paths haven't changed
+        computeDays(builderState.stops);
+        refreshMarkers();
+        refreshPolylines();
+        renderStops();
+        renderSummary();
+      });
 
       const desc = document.getElementById('trip-description');
       desc.addEventListener('input', () => { if (builderState) builderState.description = desc.value; });
