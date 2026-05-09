@@ -781,6 +781,7 @@
     }
 
     /* Emoji popover */
+    .emoji-popover[hidden] { display: none; }
     .emoji-popover {
       position: absolute;
       top: 70px;
@@ -1259,6 +1260,17 @@
       );
     }
 
+    function requestGeolocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { timeout: 5000, maximumAge: 5 * 60 * 1000 },
+        );
+      });
+    }
+
     function fitMapToStops() {
       if (!mapInstance || builderState.stops.length === 0) return;
       if (builderState.stops.length === 1) {
@@ -1362,8 +1374,14 @@
         await ensureMap();
         // Trigger resize so the map paints correctly when first shown
         google.maps.event.trigger(mapInstance, 'resize');
-        mapInstance.setCenter({ lat: 60, lng: 18 });
-        mapInstance.setZoom(4);
+        const loc = await requestGeolocation();
+        if (loc) {
+          mapInstance.setCenter(loc);
+          mapInstance.setZoom(10);
+        } else {
+          mapInstance.setCenter({ lat: 60, lng: 18 });
+          mapInstance.setZoom(4);
+        }
       } catch (err) {
         console.error('openBuilderForNew failed', err);
         alert('Could not load the map. Check the Google Maps API key + referrer restrictions.');
