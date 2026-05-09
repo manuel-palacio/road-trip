@@ -738,6 +738,63 @@
     }
     .stop-remove:hover { color: var(--accent); background: var(--accent-soft); }
 
+    /* Stop card: distance chip + day badge */
+    .stop-meta {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .stop-route-info {
+      color: var(--text-dim);
+    }
+    .stop-route-info .arrow { color: var(--text-muted); margin-right: 4px; }
+    .stop-route-info .num { color: var(--text); font-weight: 500; margin-right: 2px; }
+    .stop-route-info.routing-failed { color: var(--accent); }
+    .stop-day-badge {
+      padding: 3px 7px;
+      border-radius: 999px;
+      color: var(--bg);
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+    }
+
+    /* Summary bar (above save) */
+    .builder-summary {
+      border-top: 1px solid var(--line);
+      padding: 12px 24px 10px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      background: var(--surface);
+    }
+    .summary-stat {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .summary-stat .num {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .summary-flags {
+      margin-left: auto;
+      font-family: var(--sans);
+      font-size: 14px;
+      letter-spacing: 0.06em;
+    }
+
     .builder-actions {
       border-top: 1px solid var(--line);
       padding: 14px 24px;
@@ -778,7 +835,50 @@
       width: 100%;
       height: 100%;
       background: #13151a;
+      position: relative;
     }
+    #builder-map { width: 100%; height: 100%; }
+
+    /* Map loading bar (drifting terracotta) */
+    .map-loading {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: rgba(231, 111, 81, 0.06);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .map-loading[hidden] { display: none; }
+    .map-loading::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      left: 0;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: drift 1.4s ease-in-out infinite;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      max-width: 360px;
+      z-index: 200;
+      box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.5);
+      animation: rise 0.3s var(--ease);
+    }
+    .toast[hidden] { display: none; }
 
     /* Emoji popover */
     .emoji-popover[hidden] { display: none; }
@@ -988,16 +1088,27 @@
         <p id="stops-empty" class="stops-empty" hidden>Search above to add your first stop.</p>
       </div>
 
+      <div class="builder-summary">
+        <span class="summary-stat"><span class="num" id="summary-km">0</span><span>km</span></span>
+        <span class="summary-stat"><span class="num" id="summary-days">0</span><span id="summary-days-unit">days</span></span>
+        <span class="summary-flags" id="summary-flags"></span>
+      </div>
+
       <footer class="builder-actions">
         <button id="builder-cancel" class="btn-ghost" type="button">Cancel</button>
         <button id="builder-save" class="btn-primary" type="button">Save trip</button>
       </footer>
     </aside>
 
-    <div id="builder-map" class="builder-map"></div>
+    <div class="builder-map">
+      <div id="map-loading" class="map-loading" hidden></div>
+      <div id="builder-map"></div>
+    </div>
 
     <div id="emoji-popover" class="emoji-popover" hidden></div>
   </section>
+
+  <div id="toast" class="toast" hidden></div>
 
   <!-- ───────────────── Access denied ───────────────── -->
   <section id="screen-access-denied" class="screen screen-centered">
@@ -1030,7 +1141,27 @@
     let mapsLoadPromise = null;
     let mapInstance = null;
     let mapAutocomplete = null;
+    let directionsService = null;
     let builderState = null;
+    const directionsCache = new Map();
+    let toastTimer = null;
+
+    /* Custom day color palette — muted inks that fit the editorial cartography
+       palette better than the spec's Material defaults. Cycles past 10. */
+    const DAY_COLORS = [
+      '#e76f51', // terracotta — matches accent
+      '#2a7484', // deep teal
+      '#d4a44a', // ochre
+      '#7a9a72', // sage
+      '#b97a8a', // dusty rose
+      '#5a76a3', // slate blue
+      '#a47045', // caramel
+      '#8a5d7e', // plum
+      '#7a8a4a', // olive
+      '#7a8a99', // steel
+    ];
+
+    function dayColor(n) { return DAY_COLORS[((n || 1) - 1) % DAY_COLORS.length]; }
 
     const TRAVEL_EMOJIS = ['🚗','🚙','🛻','🏎️','🚐','🛵','🚲','⛺','🏕️','🏔️','🏖️','🏝️','🗺️','🧭','🌅','🌲','🛣️','⛰️','🌊','🐪'];
 
@@ -1226,17 +1357,169 @@
           types: ['geocode'],
         });
         mapAutocomplete.addListener('place_changed', onPlaceSelected);
+
+        directionsService = new maps.DirectionsService();
       }
       return mapInstance;
     }
 
-    function makeMarkerIcon(num) {
-      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='42' height='42' viewBox='0 0 42 42'><circle cx='21' cy='21' r='14' fill='#f3ecde' stroke='#0d0e11' stroke-width='2.5'/><text x='21' y='25.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='13' font-weight='600' fill='#0d0e11'>${num}</text></svg>`;
+    function makeMarkerIcon(num, color) {
+      const ring = color || '#f3ecde';
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><circle cx='22' cy='22' r='15' fill='${ring}'/><circle cx='22' cy='22' r='11' fill='#f3ecde'/><text x='22' y='26.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='600' fill='#0d0e11'>${num}</text></svg>`;
       return {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-        anchor: new google.maps.Point(21, 21),
-        scaledSize: new google.maps.Size(42, 42),
+        anchor: new google.maps.Point(22, 22),
+        scaledSize: new google.maps.Size(44, 44),
       };
+    }
+
+    function formatDuration(seconds) {
+      if (!seconds || seconds <= 0) return '';
+      const hours = seconds / 3600;
+      if (hours < 1) return `${Math.round(seconds / 60)}m`;
+      return `~${hours.toFixed(1)}h`;
+    }
+
+    function showToast(message) {
+      const t = document.getElementById('toast');
+      t.textContent = message;
+      t.hidden = false;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { t.hidden = true; }, 4500);
+    }
+
+    function showMapLoading(on) {
+      document.getElementById('map-loading').hidden = !on;
+    }
+
+    function computeDays(stops) {
+      if (stops.length === 0) return;
+      let day = 1;
+      let dayKm = 0;
+      stops.forEach((stop, i) => {
+        if (i === 0) {
+          stop.dayNumber = 1;
+          dayKm = 0;
+          return;
+        }
+        const seg = stop.kmFromPrevious || 0;
+        if (dayKm + seg > 600) {
+          day++;
+          dayKm = seg;
+        } else {
+          dayKm += seg;
+        }
+        stop.dayNumber = day;
+        // Overnight ends the day — next stop opens a new one
+        if (stop.type === 'overnight' && i < stops.length - 1) {
+          day++;
+          dayKm = 0;
+        }
+      });
+    }
+
+    async function fetchSegment(from, to) {
+      const key = `${from.id}-${to.id}`;
+      if (directionsCache.has(key)) return directionsCache.get(key);
+      const result = await directionsService.route({
+        origin: { lat: from.lat, lng: from.lng },
+        destination: { lat: to.lat, lng: to.lng },
+        travelMode: google.maps.TravelMode.DRIVING,
+      });
+      const leg = result.routes[0].legs[0];
+      const data = {
+        km: Math.round(leg.distance.value / 1000),
+        durationSeconds: leg.duration.value,
+        path: result.routes[0].overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() })),
+      };
+      directionsCache.set(key, data);
+      return data;
+    }
+
+    async function recomputeRoutes() {
+      if (!builderState) return;
+      const stops = builderState.stops;
+
+      if (stops.length === 0) {
+        refreshMarkers();
+        refreshPolylines();
+        renderStops();
+        renderSummary();
+        return;
+      }
+
+      // First stop has no incoming segment
+      stops[0].kmFromPrevious = 0;
+      stops[0].durationFromPrevious = '';
+      stops[0].path = null;
+      stops[0].routingFailed = false;
+
+      if (stops.length < 2) {
+        computeDays(stops);
+        refreshMarkers();
+        refreshPolylines();
+        renderStops();
+        renderSummary();
+        return;
+      }
+
+      showMapLoading(true);
+      try {
+        for (let i = 1; i < stops.length; i++) {
+          const from = stops[i - 1];
+          const to = stops[i];
+          try {
+            const seg = await fetchSegment(from, to);
+            to.kmFromPrevious = seg.km;
+            to.durationFromPrevious = formatDuration(seg.durationSeconds);
+            to.path = seg.path;
+            to.routingFailed = false;
+          } catch (err) {
+            console.error('Directions failed', err);
+            to.kmFromPrevious = 0;
+            to.durationFromPrevious = '';
+            to.path = null;
+            to.routingFailed = true;
+            showToast(`Couldn't route ${from.label || 'stop'} → ${to.label || 'stop'}`);
+          }
+        }
+        computeDays(stops);
+        refreshMarkers();
+        refreshPolylines();
+        renderStops();
+        renderSummary();
+      } finally {
+        showMapLoading(false);
+      }
+    }
+
+    function refreshPolylines() {
+      if (!builderState.polylines) builderState.polylines = [];
+      builderState.polylines.forEach((p) => p.setMap(null));
+      builderState.polylines = [];
+      for (let i = 1; i < builderState.stops.length; i++) {
+        const stop = builderState.stops[i];
+        if (!stop.path || !stop.path.length) continue;
+        const polyline = new google.maps.Polyline({
+          path: stop.path,
+          map: mapInstance,
+          strokeColor: dayColor(stop.dayNumber),
+          strokeOpacity: 0.85,
+          strokeWeight: 4,
+        });
+        builderState.polylines.push(polyline);
+      }
+    }
+
+    function renderSummary() {
+      const stops = builderState.stops;
+      const totalKm = stops.reduce((s, x) => s + (x.kmFromPrevious || 0), 0);
+      const totalDays = stops.length === 0 ? 0 : Math.max(...stops.map((s) => s.dayNumber || 1));
+      const flags = [...new Set(stops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))].join(' ');
+      document.getElementById('summary-km').textContent = totalKm.toLocaleString('en-US');
+      document.getElementById('summary-days').textContent = totalDays;
+      document.getElementById('summary-days-unit').textContent = totalDays === 1 ? 'day' : 'days';
+      document.getElementById('summary-flags').textContent = flags;
     }
 
     function reassignStopTypes() {
@@ -1254,7 +1537,7 @@
         new google.maps.Marker({
           position: { lat: stop.lat, lng: stop.lng },
           map: mapInstance,
-          icon: makeMarkerIcon(i + 1),
+          icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber)),
           title: stop.label || stop.name,
         }),
       );
@@ -1302,26 +1585,37 @@
       };
       builderState.stops.push(stop);
       reassignStopTypes();
-      renderStops();
-      refreshMarkers();
-      fitMapToStops();
       document.getElementById('stop-search').value = '';
+      recomputeRoutes().then(fitMapToStops);
     }
 
     function removeStop(stopId) {
       builderState.stops = builderState.stops.filter((s) => s.id !== stopId);
       reassignStopTypes();
-      renderStops();
-      refreshMarkers();
-      fitMapToStops();
+      recomputeRoutes().then(fitMapToStops);
     }
 
     function stopRowNode(stop, i) {
       const flag = flagEmoji(stop.countryCode);
       const opt = (val, label) => el('option', { value: val, selected: stop.type === val }, label);
+      const numStyle = `background:${dayColor(stop.dayNumber)};color:#0d0e11;`;
+      const dayBadgeStyle = `background:${dayColor(stop.dayNumber)};`;
+
+      const routeInfo = i > 0
+        ? (stop.routingFailed
+            ? el('span', { class: 'stop-route-info routing-failed' }, 'no route')
+            : (stop.kmFromPrevious
+                ? el('span', { class: 'stop-route-info' },
+                    el('span', { class: 'arrow' }, '↗'),
+                    el('span', { class: 'num' }, String(stop.kmFromPrevious)), 'km',
+                    stop.durationFromPrevious ? ' · ' + stop.durationFromPrevious : null,
+                  )
+                : null))
+        : null;
+
       return el('div', { class: `stop-row is-${stop.type}`, dataset: { stopId: stop.id } },
         el('span', { class: 'stop-handle', aria: { hidden: 'true' }, title: 'Reorder (slice 07)' }, '⠿'),
-        el('div', { class: 'stop-num' }, String(i + 1)),
+        el('div', { class: 'stop-num', style: numStyle }, String(i + 1)),
         el('div', { class: 'stop-info' },
           el('div', { class: 'stop-label-row' },
             el('span', { class: 'stop-label' }, stop.label || stop.name),
@@ -1332,7 +1626,11 @@
               class: 'stop-type-select',
               onchange: (ev) => {
                 stop.type = ev.target.value;
+                computeDays(builderState.stops);
+                refreshMarkers();
+                refreshPolylines();
                 renderStops();
+                renderSummary();
               },
             },
               opt('start', 'Start'),
@@ -1340,6 +1638,8 @@
               opt('waypoint', 'Waypoint'),
               opt('destination', 'Destination'),
             ),
+            routeInfo,
+            el('span', { class: 'stop-day-badge', style: dayBadgeStyle }, `Day ${stop.dayNumber || 1}`),
           ),
         ),
         el('button', {
@@ -1364,6 +1664,7 @@
       document.getElementById('trip-start-date').value = builderState.startDate || '';
       document.getElementById('trip-description').value = builderState.description || '';
       renderStops();
+      renderSummary();
     }
 
     async function openBuilderForNew() {
@@ -1403,12 +1704,13 @@
           description: trip.description || '',
           stops: Array.isArray(trip.stops) ? trip.stops.map((s) => ({ ...s })) : [],
           markers: [],
+          polylines: [],
         };
         syncBuilderUI();
         showScreen('builder');
         await ensureMap();
         google.maps.event.trigger(mapInstance, 'resize');
-        refreshMarkers();
+        await recomputeRoutes();
         fitMapToStops();
       } catch (err) {
         console.error('openBuilderForEdit failed', err);
@@ -1420,21 +1722,28 @@
     function cancelBuilder() {
       // Slice 07 will add: confirm if unsaved changes
       if (builderState?.markers) builderState.markers.forEach((m) => m.setMap(null));
+      if (builderState?.polylines) builderState.polylines.forEach((p) => p.setMap(null));
       builderState = null;
       showScreen('dashboard');
     }
 
     async function saveBuilder() {
+      const stops = builderState.stops;
       const countries = [...new Set(
-        builderState.stops.map((s) => flagEmoji(s.countryCode)).filter(Boolean),
+        stops.map((s) => flagEmoji(s.countryCode)).filter(Boolean),
       )];
+      const totalKm = stops.reduce((sum, s) => sum + (s.kmFromPrevious || 0), 0);
+      const totalDays = stops.length === 0 ? 0 : Math.max(...stops.map((s) => s.dayNumber || 1));
+
       const payload = {
         name: (builderState.name || '').trim() || 'Untitled trip',
         coverEmoji: builderState.coverEmoji || '🚗',
         startDate: builderState.startDate || null,
         description: builderState.description || '',
         countries,
-        stops: builderState.stops.map((s) => ({
+        totalKm,
+        totalDays,
+        stops: stops.map((s) => ({
           id: s.id,
           name: s.name,
           label: s.label,
@@ -1446,6 +1755,7 @@
           highlights: s.highlights || [],
           kmFromPrevious: s.kmFromPrevious || 0,
           durationFromPrevious: s.durationFromPrevious || '',
+          // intentionally omits `path` (large polyline data — re-fetched on edit)
         })),
       };
       const btn = document.getElementById('builder-save');
