@@ -461,6 +461,380 @@
       color: var(--text-dim);
     }
 
+    /* ───────────────── Builder ───────────────── */
+    #screen-builder.active { display: grid; }
+    .builder {
+      grid-template-columns: 380px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .builder-panel {
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .builder-settings {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .builder-back {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text-dim);
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 6px;
+      transition: color 200ms var(--ease), border-color 200ms var(--ease);
+    }
+    .builder-back:hover { color: var(--text); border-color: var(--text-dim); }
+    .emoji-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      width: 44px;
+      height: 44px;
+      font-size: 24px;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: border-color 200ms var(--ease), background 200ms var(--ease);
+    }
+    .emoji-btn:hover { border-color: var(--accent); }
+    .emoji-btn.is-open { border-color: var(--accent); background: var(--accent-soft); }
+    .trip-name-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      color: var(--text);
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 26px;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      padding: 4px 0;
+      outline: none;
+      min-width: 0;
+    }
+    .trip-name-input::placeholder { color: var(--text-muted); font-style: italic; }
+
+    .builder-meta {
+      padding: 18px 24px 6px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .meta-field { display: block; }
+    .meta-label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .trip-date-input,
+    .trip-desc-input {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      padding: 5px 0;
+      outline: none;
+      transition: border-color 200ms var(--ease);
+    }
+    .trip-date-input::-webkit-calendar-picker-indicator {
+      filter: invert(0.78) sepia(0.1) saturate(0.6);
+      cursor: pointer;
+      opacity: 0.65;
+    }
+    .trip-date-input:focus,
+    .trip-desc-input:focus { border-bottom-color: var(--accent); }
+    .trip-desc-input {
+      resize: none;
+      min-height: 38px;
+      font-family: var(--serif);
+      font-style: italic;
+      color: var(--text-dim);
+    }
+    .trip-desc-input::placeholder { color: var(--text-muted); font-style: italic; }
+
+    .builder-stops {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 18px 0 0;
+    }
+    .stops-eyebrow {
+      padding: 0 24px 12px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .stops-eyebrow .num {
+      color: var(--text);
+      font-weight: 500;
+    }
+    .search-wrap {
+      position: relative;
+      padding: 0 24px 14px;
+    }
+    .stop-search {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      padding: 11px 14px 11px 38px;
+      outline: none;
+      transition: border-color 200ms var(--ease);
+    }
+    .stop-search:focus { border-color: var(--accent); }
+    .stop-search::placeholder { color: var(--text-muted); }
+    .search-icon {
+      position: absolute;
+      left: 38px;
+      top: calc(50% - 7px);
+      color: var(--text-muted);
+      pointer-events: none;
+      font-size: 14px;
+      transform: translateY(-1px);
+    }
+
+    .stops-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 24px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stops-list::-webkit-scrollbar { width: 8px; }
+    .stops-list::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+    .stops-empty {
+      padding: 20px 24px;
+      text-align: center;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .stop-row {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 28px 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-left: 2px solid var(--line);
+      border-radius: 6px;
+      transition: border-color 200ms var(--ease);
+    }
+    .stop-row:hover { border-color: var(--line-strong); }
+    .stop-row.is-start        { border-left-color: var(--accent); }
+    .stop-row.is-destination  { border-left-color: var(--text); }
+    .stop-row.is-waypoint     { border-left-color: var(--text-muted); }
+    .stop-handle {
+      font-family: var(--mono);
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: grab;
+      flex-shrink: 0;
+      user-select: none;
+      padding-top: 2px;
+    }
+    .stop-num {
+      width: 22px;
+      height: 22px;
+      background: var(--text);
+      color: var(--bg);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .stop-info { flex: 1; min-width: 0; }
+    .stop-label-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .stop-label {
+      font-size: 14px;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    .stop-flag { font-size: 14px; line-height: 1; }
+    .stop-controls {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stop-type-select {
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 3px 18px 3px 6px;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path fill='%239b9080' d='M0 0l4 5 4-5z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 6px center;
+    }
+    .stop-type-select:hover { border-color: var(--text-dim); color: var(--text); }
+    .stop-type-select:focus { outline: none; border-color: var(--accent); }
+    .stop-remove {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: transparent;
+      border: 0;
+      color: var(--text-muted);
+      font-size: 16px;
+      width: 22px;
+      height: 22px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .stop-remove:hover { color: var(--accent); background: var(--accent-soft); }
+
+    .builder-actions {
+      border-top: 1px solid var(--line);
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      border: 0;
+      border-radius: 4px;
+      padding: 10px 20px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), background 180ms var(--ease);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px -6px rgba(231, 111, 81, 0.5);
+    }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary[disabled] {
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .builder-map {
+      width: 100%;
+      height: 100%;
+      background: #13151a;
+    }
+
+    /* Emoji popover */
+    .emoji-popover {
+      position: absolute;
+      top: 70px;
+      left: 70px;
+      background: var(--bg);
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      z-index: 50;
+      box-shadow: 0 16px 40px -10px rgba(0,0,0,0.6);
+    }
+    .emoji-option {
+      background: transparent;
+      border: 0;
+      font-size: 22px;
+      width: 36px;
+      height: 36px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 150ms;
+    }
+    .emoji-option:hover { background: var(--surface-2); }
+
+    /* Restyle Google Places Autocomplete dropdown */
+    .pac-container {
+      background: var(--bg) !important;
+      border: 1px solid var(--line-strong) !important;
+      border-radius: 6px !important;
+      margin-top: 4px;
+      font-family: var(--sans);
+      box-shadow: 0 16px 40px -10px rgba(0,0,0,0.6) !important;
+      padding: 4px 0;
+    }
+    .pac-container::after { display: none !important; } /* removes "powered by Google" */
+    .pac-item {
+      padding: 9px 14px;
+      border-top: 1px solid var(--line);
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+    .pac-item:first-child { border-top: 0; }
+    .pac-item:hover, .pac-item-selected { background: var(--surface); }
+    .pac-item-query {
+      color: var(--text);
+      font-size: 14px;
+      padding-right: 4px;
+    }
+    .pac-matched { color: var(--accent); }
+    .pac-icon { display: none; }
+
     /* ───────────────── Access denied ───────────────── */
     .denied-card {
       max-width: 480px;
@@ -580,6 +954,50 @@
     </main>
   </section>
 
+  <!-- ───────────────── Builder ───────────────── -->
+  <section id="screen-builder" class="screen builder">
+    <aside class="builder-panel">
+      <div class="builder-settings">
+        <button id="builder-back" class="builder-back" type="button" aria-label="Back to dashboard">←</button>
+        <button id="trip-emoji-btn" class="emoji-btn" type="button" aria-label="Cover emoji">🚗</button>
+        <input id="trip-name" class="trip-name-input" type="text" placeholder="Untitled trip" maxlength="80" />
+      </div>
+
+      <div class="builder-meta">
+        <label class="meta-field">
+          <span class="meta-label">Start date</span>
+          <input id="trip-start-date" class="trip-date-input" type="date" />
+        </label>
+        <label class="meta-field">
+          <span class="meta-label">Description</span>
+          <textarea id="trip-description" class="trip-desc-input" rows="2" placeholder="A note for yourself…"></textarea>
+        </label>
+      </div>
+
+      <div class="builder-stops">
+        <div class="stops-eyebrow">
+          Stops <span class="num" id="stop-count">0</span>
+        </div>
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="stop-search" class="stop-search" type="text"
+                 placeholder="Search for a city or place…" autocomplete="off" />
+        </div>
+        <div id="stops-list" class="stops-list"></div>
+        <p id="stops-empty" class="stops-empty" hidden>Search above to add your first stop.</p>
+      </div>
+
+      <footer class="builder-actions">
+        <button id="builder-cancel" class="btn-ghost" type="button">Cancel</button>
+        <button id="builder-save" class="btn-primary" type="button">Save trip</button>
+      </footer>
+    </aside>
+
+    <div id="builder-map" class="builder-map"></div>
+
+    <div id="emoji-popover" class="emoji-popover" hidden></div>
+  </section>
+
   <!-- ───────────────── Access denied ───────────────── -->
   <section id="screen-access-denied" class="screen screen-centered">
     <div class="denied-card">
@@ -607,8 +1025,37 @@
     } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
 
     let firebaseAuth = null;
+    let mapsApiKey = null;
+    let mapsLoadPromise = null;
+    let mapInstance = null;
+    let mapAutocomplete = null;
+    let builderState = null;
 
-    const SCREENS = ['loading', 'login', 'dashboard', 'access-denied'];
+    const TRAVEL_EMOJIS = ['🚗','🚙','🛻','🏎️','🚐','🛵','🚲','⛺','🏕️','🏔️','🏖️','🏝️','🗺️','🧭','🌅','🌲','🛣️','⛰️','🌊','🐪'];
+
+    const MAP_STYLE = [
+      { elementType: 'geometry', stylers: [{ color: '#15171c' }] },
+      { elementType: 'labels.text.stroke', stylers: [{ color: '#0d0e11' }] },
+      { elementType: 'labels.text.fill', stylers: [{ color: '#9b9080' }] },
+      { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+      { featureType: 'administrative', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
+      { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#3d3e44' }] },
+      { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#a89e8a' }] },
+      { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
+      { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1c1f25' }] },
+      { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1c1f25' }] },
+      { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#5d564d' }] },
+      { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#272a32' }] },
+      { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#3d3e44' }] },
+      { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#9b9080' }] },
+      { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0c10' }] },
+      { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5d564d' }] },
+      { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#13151a' }] },
+    ];
+
+    const SCREENS = ['loading', 'login', 'dashboard', 'builder', 'access-denied'];
     function showScreen(name) {
       for (const s of SCREENS) {
         document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
@@ -671,7 +1118,7 @@
         const action = ev.target.closest('[data-action]')?.dataset.action;
         if (!action) return;
         const id = card.dataset.tripId;
-        if (action === 'edit') alert('Builder coming in Slice 05.');
+        if (action === 'edit') openBuilderForEdit(id);
         else if (action === 'view') alert('Viewer coming in Slice 08.');
         else if (action === 'delete') card.classList.add('confirming');
         else if (action === 'delete-no') card.classList.remove('confirming');
@@ -711,14 +1158,7 @@
     }
 
     async function onNewTrip() {
-      try {
-        const res = await apiFetch('/api/trips', { method: 'POST', body: JSON.stringify({}) });
-        if (!res.ok) throw new Error(`POST /api/trips ${res.status}`);
-        await loadTrips();
-      } catch (err) {
-        console.error('onNewTrip failed', err);
-        alert('Could not create trip. Try again.');
-      }
+      await openBuilderForNew();
     }
 
     async function deleteTrip(id) {
@@ -730,6 +1170,332 @@
         console.error('deleteTrip failed', err);
         alert('Could not delete trip.');
       }
+    }
+
+    /* ───── Builder ───── */
+
+    function newBuilderState() {
+      return { tripId: null, name: '', coverEmoji: '🚗', startDate: '', description: '', stops: [], markers: [] };
+    }
+
+    function flagEmoji(cc) {
+      if (!cc || cc.length !== 2) return '';
+      return String.fromCodePoint(...cc.toUpperCase().split('').map((c) => c.charCodeAt(0) + 127397));
+    }
+
+    function extractCountryCode(components) {
+      if (!components) return '';
+      const c = components.find((x) => x.types.includes('country'));
+      return c?.short_name || '';
+    }
+
+    function loadMapsSdk() {
+      if (window.google?.maps) return Promise.resolve(window.google.maps);
+      if (mapsLoadPromise) return mapsLoadPromise;
+      mapsLoadPromise = new Promise((resolve, reject) => {
+        if (!mapsApiKey) { reject(new Error('Maps key missing')); return; }
+        const cbName = '__mapsCb' + Date.now();
+        window[cbName] = () => { delete window[cbName]; resolve(window.google.maps); };
+        const s = document.createElement('script');
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsApiKey)}&libraries=places&callback=${cbName}&loading=async&language=en`;
+        s.async = true;
+        s.onerror = () => reject(new Error('Failed to load Google Maps SDK'));
+        document.body.appendChild(s);
+      });
+      return mapsLoadPromise;
+    }
+
+    async function ensureMap() {
+      const maps = await loadMapsSdk();
+      if (!mapInstance) {
+        mapInstance = new maps.Map(document.getElementById('builder-map'), {
+          center: { lat: 60, lng: 18 },
+          zoom: 4,
+          styles: MAP_STYLE,
+          disableDefaultUI: true,
+          zoomControl: true,
+          gestureHandling: 'greedy',
+          backgroundColor: '#13151a',
+          clickableIcons: false,
+        });
+
+        const searchInput = document.getElementById('stop-search');
+        mapAutocomplete = new maps.places.Autocomplete(searchInput, {
+          fields: ['name', 'formatted_address', 'geometry.location', 'address_components'],
+          types: ['geocode'],
+        });
+        mapAutocomplete.addListener('place_changed', onPlaceSelected);
+      }
+      return mapInstance;
+    }
+
+    function makeMarkerIcon(num) {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='42' height='42' viewBox='0 0 42 42'><circle cx='21' cy='21' r='14' fill='#f3ecde' stroke='#0d0e11' stroke-width='2.5'/><text x='21' y='25.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='13' font-weight='600' fill='#0d0e11'>${num}</text></svg>`;
+      return {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+        anchor: new google.maps.Point(21, 21),
+        scaledSize: new google.maps.Size(42, 42),
+      };
+    }
+
+    function reassignStopTypes() {
+      const n = builderState.stops.length;
+      builderState.stops.forEach((s, i) => {
+        if (i === 0) s.type = 'start';
+        else if (i === n - 1) s.type = 'destination';
+        else if (s.type !== 'waypoint') s.type = 'overnight';
+      });
+    }
+
+    function refreshMarkers() {
+      builderState.markers.forEach((m) => m.setMap(null));
+      builderState.markers = builderState.stops.map((stop, i) =>
+        new google.maps.Marker({
+          position: { lat: stop.lat, lng: stop.lng },
+          map: mapInstance,
+          icon: makeMarkerIcon(i + 1),
+          title: stop.label || stop.name,
+        }),
+      );
+    }
+
+    function fitMapToStops() {
+      if (!mapInstance || builderState.stops.length === 0) return;
+      if (builderState.stops.length === 1) {
+        const s = builderState.stops[0];
+        mapInstance.setCenter({ lat: s.lat, lng: s.lng });
+        mapInstance.setZoom(10);
+        return;
+      }
+      const bounds = new google.maps.LatLngBounds();
+      builderState.stops.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
+      mapInstance.fitBounds(bounds, 80);
+    }
+
+    function onPlaceSelected() {
+      const place = mapAutocomplete.getPlace();
+      if (!place?.geometry?.location) return;
+      const stop = {
+        id: crypto.randomUUID(),
+        name: place.formatted_address || place.name || '',
+        label: place.name || place.formatted_address || '',
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng(),
+        countryCode: extractCountryCode(place.address_components),
+        type: 'overnight',
+        dayNumber: 1,
+        highlights: [],
+        kmFromPrevious: 0,
+        durationFromPrevious: '',
+      };
+      builderState.stops.push(stop);
+      reassignStopTypes();
+      renderStops();
+      refreshMarkers();
+      fitMapToStops();
+      document.getElementById('stop-search').value = '';
+    }
+
+    function removeStop(stopId) {
+      builderState.stops = builderState.stops.filter((s) => s.id !== stopId);
+      reassignStopTypes();
+      renderStops();
+      refreshMarkers();
+      fitMapToStops();
+    }
+
+    function stopRowNode(stop, i) {
+      const flag = flagEmoji(stop.countryCode);
+      const opt = (val, label) => el('option', { value: val, selected: stop.type === val }, label);
+      return el('div', { class: `stop-row is-${stop.type}`, dataset: { stopId: stop.id } },
+        el('span', { class: 'stop-handle', aria: { hidden: 'true' }, title: 'Reorder (slice 07)' }, '⠿'),
+        el('div', { class: 'stop-num' }, String(i + 1)),
+        el('div', { class: 'stop-info' },
+          el('div', { class: 'stop-label-row' },
+            el('span', { class: 'stop-label' }, stop.label || stop.name),
+            flag ? el('span', { class: 'stop-flag', aria: { label: 'country' } }, flag) : null,
+          ),
+          el('div', { class: 'stop-controls' },
+            el('select', {
+              class: 'stop-type-select',
+              onchange: (ev) => {
+                stop.type = ev.target.value;
+                renderStops();
+              },
+            },
+              opt('start', 'Start'),
+              opt('overnight', 'Overnight'),
+              opt('waypoint', 'Waypoint'),
+              opt('destination', 'Destination'),
+            ),
+          ),
+        ),
+        el('button', {
+          class: 'stop-remove', type: 'button', 'aria-label': 'Remove stop',
+          onclick: () => removeStop(stop.id),
+        }, '×'),
+      );
+    }
+
+    function renderStops() {
+      const list = document.getElementById('stops-list');
+      const empty = document.getElementById('stops-empty');
+      const isEmpty = builderState.stops.length === 0;
+      document.getElementById('stop-count').textContent = String(builderState.stops.length);
+      empty.hidden = !isEmpty;
+      list.replaceChildren(...builderState.stops.map((s, i) => stopRowNode(s, i)));
+    }
+
+    function syncBuilderUI() {
+      document.getElementById('trip-name').value = builderState.name || '';
+      document.getElementById('trip-emoji-btn').textContent = builderState.coverEmoji || '🚗';
+      document.getElementById('trip-start-date').value = builderState.startDate || '';
+      document.getElementById('trip-description').value = builderState.description || '';
+      renderStops();
+    }
+
+    async function openBuilderForNew() {
+      builderState = newBuilderState();
+      syncBuilderUI();
+      showScreen('builder');
+      try {
+        await ensureMap();
+        // Trigger resize so the map paints correctly when first shown
+        google.maps.event.trigger(mapInstance, 'resize');
+        mapInstance.setCenter({ lat: 60, lng: 18 });
+        mapInstance.setZoom(4);
+      } catch (err) {
+        console.error('openBuilderForNew failed', err);
+        alert('Could not load the map. Check the Google Maps API key + referrer restrictions.');
+        showScreen('dashboard');
+      }
+    }
+
+    async function openBuilderForEdit(tripId) {
+      showScreen('loading');
+      try {
+        const res = await apiFetch('/api/trips/' + encodeURIComponent(tripId));
+        if (!res.ok) throw new Error('load failed');
+        const trip = await res.json();
+        builderState = {
+          tripId: trip.id,
+          name: trip.name || '',
+          coverEmoji: trip.coverEmoji || '🚗',
+          startDate: trip.startDate || '',
+          description: trip.description || '',
+          stops: Array.isArray(trip.stops) ? trip.stops.map((s) => ({ ...s })) : [],
+          markers: [],
+        };
+        syncBuilderUI();
+        showScreen('builder');
+        await ensureMap();
+        google.maps.event.trigger(mapInstance, 'resize');
+        refreshMarkers();
+        fitMapToStops();
+      } catch (err) {
+        console.error('openBuilderForEdit failed', err);
+        alert('Could not load trip.');
+        showScreen('dashboard');
+      }
+    }
+
+    function cancelBuilder() {
+      // Slice 07 will add: confirm if unsaved changes
+      if (builderState?.markers) builderState.markers.forEach((m) => m.setMap(null));
+      builderState = null;
+      showScreen('dashboard');
+    }
+
+    async function saveBuilder() {
+      const countries = [...new Set(
+        builderState.stops.map((s) => flagEmoji(s.countryCode)).filter(Boolean),
+      )];
+      const payload = {
+        name: (builderState.name || '').trim() || 'Untitled trip',
+        coverEmoji: builderState.coverEmoji || '🚗',
+        startDate: builderState.startDate || null,
+        description: builderState.description || '',
+        countries,
+        stops: builderState.stops.map((s) => ({
+          id: s.id,
+          name: s.name,
+          label: s.label,
+          lat: s.lat,
+          lng: s.lng,
+          countryCode: s.countryCode || '',
+          type: s.type,
+          dayNumber: s.dayNumber || 1,
+          highlights: s.highlights || [],
+          kmFromPrevious: s.kmFromPrevious || 0,
+          durationFromPrevious: s.durationFromPrevious || '',
+        })),
+      };
+      const btn = document.getElementById('builder-save');
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Saving…';
+      try {
+        const res = builderState.tripId
+          ? await apiFetch(`/api/trips/${encodeURIComponent(builderState.tripId)}`, {
+              method: 'PUT', body: JSON.stringify(payload),
+            })
+          : await apiFetch('/api/trips', {
+              method: 'POST', body: JSON.stringify(payload),
+            });
+        if (!res.ok) throw new Error('save failed');
+        if (builderState.markers) builderState.markers.forEach((m) => m.setMap(null));
+        builderState = null;
+        showScreen('dashboard');
+        await loadTrips();
+      } catch (err) {
+        console.error('saveBuilder failed', err);
+        alert('Could not save trip.');
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    }
+
+    function wireBuilderInputs() {
+      const name = document.getElementById('trip-name');
+      name.addEventListener('input', () => { if (builderState) builderState.name = name.value; });
+
+      const date = document.getElementById('trip-start-date');
+      date.addEventListener('input', () => { if (builderState) builderState.startDate = date.value; });
+
+      const desc = document.getElementById('trip-description');
+      desc.addEventListener('input', () => { if (builderState) builderState.description = desc.value; });
+
+      document.getElementById('builder-back').addEventListener('click', cancelBuilder);
+      document.getElementById('builder-cancel').addEventListener('click', cancelBuilder);
+      document.getElementById('builder-save').addEventListener('click', saveBuilder);
+
+      const emojiBtn = document.getElementById('trip-emoji-btn');
+      const popover = document.getElementById('emoji-popover');
+      if (!popover.children.length) {
+        TRAVEL_EMOJIS.forEach((emoji) => {
+          popover.appendChild(el('button', {
+            class: 'emoji-option', type: 'button', title: emoji,
+            onclick: () => {
+              if (builderState) builderState.coverEmoji = emoji;
+              emojiBtn.textContent = emoji;
+              popover.hidden = true;
+              emojiBtn.classList.remove('is-open');
+            },
+          }, emoji));
+        });
+      }
+      emojiBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const wasOpen = !popover.hidden;
+        popover.hidden = wasOpen;
+        emojiBtn.classList.toggle('is-open', !wasOpen);
+      });
+      document.addEventListener('click', (ev) => {
+        if (popover.hidden) return;
+        if (popover.contains(ev.target) || emojiBtn.contains(ev.target)) return;
+        popover.hidden = true;
+        emojiBtn.classList.remove('is-open');
+      });
     }
 
     function showLoginError(msg) {
@@ -784,10 +1550,12 @@
         return;
       }
 
+      mapsApiKey = cfg.mapsApiKey || null;
       const app = initializeApp(cfg.firebaseConfig);
       const auth = getAuth(app);
       firebaseAuth = auth;
       const provider = new GoogleAuthProvider();
+      wireBuilderInputs();
 
       document.getElementById('btn-signin').addEventListener('click', async () => {
         showLoginError('');
