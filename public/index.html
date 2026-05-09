@@ -1,24 +1,575 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d0e11" />
   <title>Road Trip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@300..600&family=Geist+Mono:wght@400..500&display=swap" />
   <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
+    :root {
+      --bg: #0d0e11;
+      --surface: #16181c;
+      --surface-2: #1c1f25;
+      --text: #f3ecde;
+      --text-dim: #9b9080;
+      --text-muted: #5d564d;
+      --accent: #e76f51;
+      --accent-soft: rgba(231, 111, 81, 0.14);
+      --line: rgba(243, 236, 222, 0.08);
+      --line-strong: rgba(243, 236, 222, 0.16);
+      --serif: 'Fraunces', Georgia, serif;
+      --sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+      --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* Subtle grain overlay — paper texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>");
+      opacity: 0.05;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      z-index: 1000;
+    }
+
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ───────────────── Screen router ───────────────── */
+    .screen { display: none; min-height: 100vh; position: relative; }
+    .screen.active { display: block; }
+    .screen-centered { padding: 32px; }
+    .screen-centered.active { display: flex; align-items: center; justify-content: center; }
+
+    /* ───────────────── Loading ───────────────── */
+    #screen-loading {
+      background: radial-gradient(ellipse 80% 60% at center, #15171c 0%, #0a0b0e 70%);
+    }
+    .loading-stack {
+      display: flex; flex-direction: column; align-items: center; gap: 28px;
+    }
+    .loading-line {
+      position: relative;
+      width: 220px;
+      height: 1px;
+      background: var(--line);
+      overflow: hidden;
+    }
+    .loading-line::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      transform: translateX(-100%);
+      animation: drift 1.6s var(--ease) infinite;
+    }
+    @keyframes drift {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    .loading-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ───────────────── Login ───────────────── */
+    .login-card {
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+    }
+    .brand {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(54px, 9vw, 92px);
+      letter-spacing: -0.025em;
+      line-height: 0.95;
+      color: var(--text);
+      animation: rise 0.8s 0.05s var(--ease) both;
+    }
+    .brand .accent {
+      color: var(--accent);
+    }
+    .tagline {
+      margin-top: 18px;
+      font-size: 15px;
+      color: var(--text-dim);
+      animation: rise 0.8s 0.18s var(--ease) both;
+    }
+    .route-mark {
+      margin: 36px auto 32px;
+      width: 92px;
+      height: 1px;
+      background: repeating-linear-gradient(
+        to right,
+        var(--accent) 0,
+        var(--accent) 5px,
+        transparent 5px,
+        transparent 12px
+      );
+      animation: rise 0.8s 0.32s var(--ease) both, route-pulse 3s ease-in-out 1.4s infinite;
+    }
+    @keyframes route-pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
+    .btn-google {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 22px 13px 18px;
+      background: var(--text);
+      color: #1a1a1a;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.005em;
+      transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
+      animation: rise 0.8s 0.46s var(--ease) both;
+    }
+    .btn-google:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 30px -8px rgba(231, 111, 81, 0.35);
+    }
+    .btn-google:active { transform: translateY(0); }
+    .btn-google svg { display: block; }
+    .private-note {
+      margin-top: 28px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      animation: rise 0.8s 0.6s var(--ease) both;
+    }
+    .private-note .dot { color: var(--accent); margin: 0 4px; }
+
+    .login-error {
+      margin-top: 24px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      min-height: 14px;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ───────────────── Dashboard ───────────────── */
+    .dash-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-      color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      justify-content: space-between;
+      padding: 20px 36px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(13, 14, 17, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 50;
     }
-    h1 { font-weight: 600; letter-spacing: 0.02em; }
+    .dash-brand {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .dash-brand .accent { color: var(--accent); }
+
+    .dash-user {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .plan-badge {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 5px 9px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--text-dim);
+    }
+    .plan-badge.pro {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .user-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--surface-2);
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--line);
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .avatar-fallback {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+    }
+    .user-name {
+      font-size: 14px;
+      color: var(--text);
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text-dim);
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      transition: border-color 180ms var(--ease), color 180ms var(--ease);
+    }
+    .btn-ghost:hover {
+      border-color: var(--text-dim);
+      color: var(--text);
+    }
+
+    .dash-main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 140px 36px 80px;
+    }
+    .dash-eyebrow {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+    .dash-eyebrow .dot { color: var(--accent); margin: 0 6px; }
+    .dash-heading {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(48px, 7vw, 76px);
+      letter-spacing: -0.025em;
+      line-height: 1;
+      color: var(--text);
+    }
+    .dash-empty {
+      margin-top: 36px;
+      padding: 48px 40px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .dash-empty p {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      color: var(--text-dim);
+      max-width: 360px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    /* ───────────────── Access denied ───────────────── */
+    .denied-card {
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+    .denied-eyebrow {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 18px;
+      animation: rise 0.7s 0.05s var(--ease) both;
+    }
+    .denied-title {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(48px, 8vw, 72px);
+      letter-spacing: -0.025em;
+      line-height: 1;
+      color: var(--text);
+      animation: rise 0.7s 0.15s var(--ease) both;
+    }
+    .denied-rule {
+      margin: 28px auto;
+      width: 60px;
+      height: 1px;
+      background: repeating-linear-gradient(
+        to right,
+        var(--text-muted) 0,
+        var(--text-muted) 4px,
+        transparent 4px,
+        transparent 9px
+      );
+      animation: rise 0.7s 0.28s var(--ease) both;
+    }
+    .denied-body {
+      font-size: 15px;
+      color: var(--text-dim);
+      line-height: 1.65;
+      animation: rise 0.7s 0.4s var(--ease) both;
+    }
+    .denied-actions {
+      margin-top: 36px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      animation: rise 0.7s 0.5s var(--ease) both;
+    }
+
+    /* Mobile tightening */
+    @media (max-width: 640px) {
+      .dash-header { padding: 16px 20px; }
+      .dash-main { padding: 110px 20px 60px; }
+      .user-name { display: none; }
+    }
   </style>
 </head>
 <body>
-  <h1>Road Trip</h1>
+
+  <!-- ───────────────── Loading ───────────────── -->
+  <section id="screen-loading" class="screen screen-centered active">
+    <div class="loading-stack">
+      <div class="loading-line"></div>
+      <div class="loading-label">Plotting route</div>
+    </div>
+  </section>
+
+  <!-- ───────────────── Login ───────────────── -->
+  <section id="screen-login" class="screen screen-centered">
+    <div class="login-card">
+      <h1 class="brand">Road <span class="accent">Trip</span></h1>
+      <p class="tagline">Build your road trip. Share the adventure.</p>
+      <div class="route-mark" aria-hidden="true"></div>
+      <button id="btn-signin" class="btn-google" type="button">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.836.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+          <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+        </svg>
+        Continue with Google
+      </button>
+      <div id="login-error" class="login-error" aria-live="polite"></div>
+      <p class="private-note">Private beta <span class="dot">·</span> invite-only</p>
+    </div>
+  </section>
+
+  <!-- ───────────────── Dashboard ───────────────── -->
+  <section id="screen-dashboard" class="screen">
+    <header class="dash-header">
+      <div class="dash-brand">Road <span class="accent">Trip</span></div>
+      <div class="dash-user">
+        <span id="plan-badge" class="plan-badge">free</span>
+        <div class="user-block">
+          <div class="avatar">
+            <img id="user-avatar-img" alt="" />
+            <span id="user-avatar-fallback" class="avatar-fallback">··</span>
+          </div>
+          <span id="user-name" class="user-name">—</span>
+        </div>
+        <button id="btn-logout" class="btn-ghost" type="button">Sign out</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="dash-eyebrow">Workspace <span class="dot">·</span> trips</div>
+      <h2 class="dash-heading">Your trips</h2>
+      <div class="dash-empty">
+        <p>Your road trips will live here. Start building one — you'll have a map, a route, and a story by the end.</p>
+      </div>
+    </main>
+  </section>
+
+  <!-- ───────────────── Access denied ───────────────── -->
+  <section id="screen-access-denied" class="screen screen-centered">
+    <div class="denied-card">
+      <div class="denied-eyebrow">Access · denied</div>
+      <h1 class="denied-title">Not on the list.</h1>
+      <div class="denied-rule" aria-hidden="true"></div>
+      <p class="denied-body">
+        This site is in private beta. Only invited Google accounts can sign in.
+        If you think you should have access, ping the owner.
+      </p>
+      <div class="denied-actions">
+        <button id="btn-retry" class="btn-ghost" type="button">Try a different account</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js';
+    import {
+      getAuth,
+      signInWithPopup,
+      signOut,
+      GoogleAuthProvider,
+      onAuthStateChanged,
+    } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
+
+    const SCREENS = ['loading', 'login', 'dashboard', 'access-denied'];
+    function showScreen(name) {
+      for (const s of SCREENS) {
+        document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
+      }
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg || '';
+    }
+
+    function initials(nameOrEmail) {
+      if (!nameOrEmail) return '··';
+      const parts = nameOrEmail.split(/[\s@.]+/).filter(Boolean);
+      const a = (parts[0] || '')[0] || '';
+      const b = (parts[1] || '')[0] || '';
+      return (a + b).toUpperCase() || '··';
+    }
+
+    function renderUser(me) {
+      const name = me.displayName || me.email || '';
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-avatar-fallback').textContent = initials(name);
+
+      const img = document.getElementById('user-avatar-img');
+      const fallback = document.getElementById('user-avatar-fallback');
+      if (me.photoURL) {
+        img.src = me.photoURL;
+        img.style.display = 'block';
+        fallback.style.display = 'none';
+        img.onerror = () => { img.style.display = 'none'; fallback.style.display = 'flex'; };
+      } else {
+        img.style.display = 'none';
+        fallback.style.display = 'flex';
+      }
+
+      const badge = document.getElementById('plan-badge');
+      badge.textContent = me.plan || 'free';
+      badge.classList.toggle('pro', me.plan === 'pro');
+    }
+
+    async function bootstrap() {
+      let cfg;
+      try {
+        cfg = await fetch('/config').then((r) => r.json());
+      } catch (err) {
+        console.error('Failed to load /config', err);
+        showScreen('login');
+        showLoginError('Could not load app config. Refresh to retry.');
+        return;
+      }
+
+      if (!cfg.firebaseConfig || !cfg.firebaseConfig.apiKey) {
+        showScreen('login');
+        showLoginError('Firebase is not configured on the server.');
+        return;
+      }
+
+      const app = initializeApp(cfg.firebaseConfig);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+
+      document.getElementById('btn-signin').addEventListener('click', async () => {
+        showLoginError('');
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (err) {
+          if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+          console.error('Sign-in failed', err);
+          showLoginError(err.message || 'Sign-in failed.');
+        }
+      });
+
+      document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+      document.getElementById('btn-retry').addEventListener('click', async () => {
+        await signOut(auth);
+        showScreen('login');
+      });
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          showScreen('login');
+          return;
+        }
+
+        showScreen('loading');
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch('/api/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (res.status === 403) {
+            await signOut(auth);
+            showScreen('access-denied');
+            return;
+          }
+          if (!res.ok) {
+            await signOut(auth);
+            showScreen('login');
+            showLoginError('Could not load your profile. Try again.');
+            return;
+          }
+
+          const me = await res.json();
+          renderUser(me);
+          showScreen('dashboard');
+        } catch (err) {
+          console.error('Bootstrap error', err);
+          await signOut(auth);
+          showScreen('login');
+          showLoginError('Something went wrong. Try again.');
+        }
+      });
+    }
+
+    bootstrap();
+  </script>
 </body>
 </html>
