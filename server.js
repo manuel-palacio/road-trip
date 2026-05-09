@@ -5,6 +5,7 @@ const express = require('express');
 
 const configRouter = require('./routes/config');
 const meRouter = require('./routes/me');
+const tripsRouter = require('./routes/trips');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -17,6 +18,7 @@ app.get(['/health', '/actuator/health'], (req, res) => {
 
 app.use(configRouter);
 app.use(meRouter);
+app.use(tripsRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 

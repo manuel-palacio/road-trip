@@ -295,21 +295,170 @@
       line-height: 1;
       color: var(--text);
     }
-    .dash-empty {
-      margin-top: 36px;
-      padding: 48px 40px;
-      border: 1px dashed var(--line-strong);
-      border-radius: 8px;
-      text-align: center;
+    /* ───────────────── Trip cards ───────────────── */
+    .trips-grid {
+      margin-top: 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 20px;
     }
-    .dash-empty p {
+    .trip-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 26px 26px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      transition: border-color 200ms var(--ease), transform 200ms var(--ease);
+      min-height: 240px;
+    }
+    .trip-card:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-2px);
+    }
+    .trip-emoji {
+      font-size: 40px;
+      line-height: 1;
+    }
+    .trip-name {
       font-family: var(--serif);
       font-style: italic;
-      font-size: 18px;
+      font-weight: 400;
+      font-size: 26px;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    .trip-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
       color: var(--text-dim);
-      max-width: 360px;
-      margin: 0 auto;
-      line-height: 1.5;
+    }
+    .trip-meta .num {
+      color: var(--text);
+      font-weight: 500;
+      margin-right: 4px;
+    }
+    .trip-flags {
+      font-size: 16px;
+      letter-spacing: 0.1em;
+      min-height: 20px;
+      color: var(--text);
+    }
+    .trip-actions, .trip-confirm {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .trip-confirm {
+      display: none;
+      border-top-style: dashed;
+      border-top-color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .trip-card.confirming .trip-actions { display: none; }
+    .trip-card.confirming .trip-confirm  { display: flex; }
+    .trip-action-btn {
+      background: transparent;
+      border: 0;
+      color: var(--text-dim);
+      font-family: var(--sans);
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      padding: 5px 8px;
+      border-radius: 3px;
+      transition: color 150ms;
+    }
+    .trip-action-btn:hover { color: var(--text); }
+    .trip-action-btn.danger { color: var(--text-dim); }
+    .trip-action-btn.danger:hover { color: var(--accent); }
+    .trip-action-btn.primary {
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .trip-action-spacer { flex: 1; }
+
+    /* New-trip tile */
+    .trip-new {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      min-height: 240px;
+      padding: 30px;
+      background: transparent;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 200ms var(--ease), background 200ms var(--ease), color 200ms var(--ease);
+      font-family: inherit;
+      color: inherit;
+    }
+    .trip-new:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .trip-new-mark {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 60px;
+      line-height: 0.6;
+      color: var(--accent);
+    }
+    .trip-new-rule {
+      width: 60px;
+      height: 1px;
+      background: repeating-linear-gradient(
+        to right, var(--accent) 0, var(--accent) 4px, transparent 4px, transparent 9px
+      );
+      opacity: 0.65;
+    }
+    .trip-new-label {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .trip-new:hover .trip-new-label { color: var(--text); }
+
+    /* Adaptive: hero CTA when no trips yet */
+    .trips-grid.is-empty .trip-new {
+      grid-column: 1 / -1;
+      min-height: 340px;
+      padding: 60px 30px;
+    }
+    .trips-grid.is-empty .trip-new-mark { font-size: 88px; }
+
+    .trips-empty-hint {
+      margin: 28px auto 0;
+      max-width: 560px;
+      text-align: center;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--text-dim);
     }
 
     /* ───────────────── Access denied ───────────────── */
@@ -419,11 +568,15 @@
       </div>
     </header>
     <main class="dash-main">
-      <div class="dash-eyebrow">Workspace <span class="dot">·</span> trips</div>
-      <h2 class="dash-heading">Your trips</h2>
-      <div class="dash-empty">
-        <p>Your road trips will live here. Start building one — you'll have a map, a route, and a story by the end.</p>
+      <div class="dash-eyebrow">
+        Workspace <span class="dot">·</span> trips <span class="dot">·</span>
+        <span id="trip-count">0</span>
       </div>
+      <h2 class="dash-heading">Your trips</h2>
+      <div id="trips-grid" class="trips-grid"></div>
+      <p id="trips-empty-hint" class="trips-empty-hint" hidden>
+        Your road trips will live here. Start by plotting your first route — pick a starting point, add stops along the way, and the days will sort themselves out.
+      </p>
     </main>
   </section>
 
@@ -453,10 +606,129 @@
       onAuthStateChanged,
     } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
 
+    let firebaseAuth = null;
+
     const SCREENS = ['loading', 'login', 'dashboard', 'access-denied'];
     function showScreen(name) {
       for (const s of SCREENS) {
         document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
+      }
+    }
+
+    async function apiFetch(path, options = {}) {
+      if (!firebaseAuth?.currentUser) throw new Error('Not signed in');
+      const token = await firebaseAuth.currentUser.getIdToken();
+      const headers = { Authorization: `Bearer ${token}`, ...(options.headers || {}) };
+      if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+      return fetch(path, { ...options, headers });
+    }
+
+    function el(tag, props = {}, ...children) {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(props)) {
+        if (v == null || v === false) continue;
+        if (k === 'class') node.className = v;
+        else if (k === 'dataset') Object.assign(node.dataset, v);
+        else if (k === 'aria') for (const [ak, av] of Object.entries(v)) node.setAttribute('aria-' + ak, av);
+        else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+        else if (k in node) node[k] = v;
+        else node.setAttribute(k, v);
+      }
+      for (const c of children.flat()) {
+        if (c == null || c === false) continue;
+        node.appendChild(c instanceof Node ? c : document.createTextNode(String(c)));
+      }
+      return node;
+    }
+
+    function tripCardNode(trip) {
+      const flags = (trip.countries || []).join(' ');
+      const totalDays = Number(trip.totalDays || 0);
+
+      const card = el('article', { class: 'trip-card', dataset: { tripId: trip.id } },
+        el('div', { class: 'trip-emoji' }, trip.coverEmoji || '🚗'),
+        el('h3', { class: 'trip-name' }, trip.name || 'Untitled trip'),
+        el('div', { class: 'trip-meta' },
+          el('span', {}, el('span', { class: 'num' }, String(Number(trip.totalKm || 0))), 'km'),
+          el('span', {}, el('span', { class: 'num' }, String(totalDays)), totalDays === 1 ? 'day' : 'days'),
+        ),
+        el('div', { class: 'trip-flags', aria: { label: 'countries' } }, flags),
+        el('div', { class: 'trip-actions' },
+          el('button', { class: 'trip-action-btn primary', dataset: { action: 'edit' } }, 'Edit'),
+          el('button', { class: 'trip-action-btn', dataset: { action: 'view' } }, 'View'),
+          el('span', { class: 'trip-action-spacer' }),
+          el('button', { class: 'trip-action-btn danger', dataset: { action: 'delete' } }, 'Delete'),
+        ),
+        el('div', { class: 'trip-confirm' },
+          el('span', {}, 'Delete this trip?'),
+          el('span', { class: 'trip-action-spacer' }),
+          el('button', { class: 'trip-action-btn danger', dataset: { action: 'delete-yes' } }, 'Yes, delete'),
+          el('button', { class: 'trip-action-btn', dataset: { action: 'delete-no' } }, 'Cancel'),
+        ),
+      );
+
+      card.addEventListener('click', (ev) => {
+        const action = ev.target.closest('[data-action]')?.dataset.action;
+        if (!action) return;
+        const id = card.dataset.tripId;
+        if (action === 'edit') alert('Builder coming in Slice 05.');
+        else if (action === 'view') alert('Viewer coming in Slice 08.');
+        else if (action === 'delete') card.classList.add('confirming');
+        else if (action === 'delete-no') card.classList.remove('confirming');
+        else if (action === 'delete-yes') deleteTrip(id);
+      });
+
+      return card;
+    }
+
+    function newTripTileNode() {
+      return el('button', { id: 'btn-new-trip', class: 'trip-new', type: 'button', onclick: onNewTrip },
+        el('div', { class: 'trip-new-mark' }, '+'),
+        el('div', { class: 'trip-new-rule', aria: { hidden: 'true' } }),
+        el('div', { class: 'trip-new-label' }, 'Plot a new route'),
+      );
+    }
+
+    function renderTrips(trips) {
+      const grid = document.getElementById('trips-grid');
+      const isEmpty = trips.length === 0;
+      grid.classList.toggle('is-empty', isEmpty);
+      document.getElementById('trip-count').textContent = String(trips.length);
+      document.getElementById('trips-empty-hint').hidden = !isEmpty;
+      grid.replaceChildren(...trips.map(tripCardNode), newTripTileNode());
+    }
+
+    async function loadTrips() {
+      try {
+        const res = await apiFetch('/api/trips');
+        if (!res.ok) throw new Error(`GET /api/trips ${res.status}`);
+        const { trips } = await res.json();
+        renderTrips(trips);
+      } catch (err) {
+        console.error('loadTrips failed', err);
+        renderTrips([]);
+      }
+    }
+
+    async function onNewTrip() {
+      try {
+        const res = await apiFetch('/api/trips', { method: 'POST', body: JSON.stringify({}) });
+        if (!res.ok) throw new Error(`POST /api/trips ${res.status}`);
+        await loadTrips();
+      } catch (err) {
+        console.error('onNewTrip failed', err);
+        alert('Could not create trip. Try again.');
+      }
+    }
+
+    async function deleteTrip(id) {
+      try {
+        const res = await apiFetch(`/api/trips/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`DELETE /api/trips/${id} ${res.status}`);
+        await loadTrips();
+      } catch (err) {
+        console.error('deleteTrip failed', err);
+        alert('Could not delete trip.');
       }
     }
 
@@ -514,6 +786,7 @@
 
       const app = initializeApp(cfg.firebaseConfig);
       const auth = getAuth(app);
+      firebaseAuth = auth;
       const provider = new GoogleAuthProvider();
 
       document.getElementById('btn-signin').addEventListener('click', async () => {
@@ -561,6 +834,7 @@
           const me = await res.json();
           renderUser(me);
           showScreen('dashboard');
+          loadTrips();
         } catch (err) {
           console.error('Bootstrap error', err);
           await signOut(auth);
