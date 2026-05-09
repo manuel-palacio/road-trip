@@ -5,3 +5,7 @@ node_modules
 *.log
 .DS_Store
 .idea
+
+# Playwright (used for visual verification, not part of the app)
+.playwright-mcp/
+slice*-*.png
