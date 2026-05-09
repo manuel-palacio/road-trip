@@ -1354,7 +1354,8 @@
         const searchInput = document.getElementById('stop-search');
         mapAutocomplete = new maps.places.Autocomplete(searchInput, {
           fields: ['name', 'formatted_address', 'geometry.location', 'address_components'],
-          types: ['geocode'],
+          // No `types` restriction — accept cities, addresses AND establishments
+          // (hotels, restaurants, landmarks). Google ranks them by relevance.
         });
         mapAutocomplete.addListener('place_changed', onPlaceSelected);
 
