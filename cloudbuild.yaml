@@ -1,0 +1,29 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/roadtrip-map/app:$COMMIT_SHA'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/roadtrip-map/app:$COMMIT_SHA'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'roadtrip-map'
+      - '--image=europe-north1-docker.pkg.dev/$PROJECT_ID/roadtrip-map/app:$COMMIT_SHA'
+      - '--region=europe-north1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'europe-north1-docker.pkg.dev/$PROJECT_ID/roadtrip-map/app:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,19 @@
+{
+  "name": "roadtrip-map",
+  "version": "0.1.0",
+  "description": "Build your road trip. Share the adventure.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}
