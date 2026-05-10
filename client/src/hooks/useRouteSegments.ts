@@ -17,6 +17,37 @@ function pairKey(fromId: string, toId: string) {
   return `${fromId}::${toId}`;
 }
 
+// Minimal types for the new Routes library — @types/google.maps may not carry
+// them yet depending on version, so we describe just what we use.
+type LatLngAltitudeLike = { lat: number; lng: number; altitude?: number };
+type RouteResponse = {
+  distanceMeters?: number;
+  durationMillis?: number;
+  path?: LatLngAltitudeLike[];
+};
+type RoutesLibrary = {
+  Route: {
+    computeRoutes: (req: {
+      origin: { lat: number; lng: number };
+      destination: { lat: number; lng: number };
+      travelMode: string;
+      fields: string[];
+    }) => Promise<{ routes?: RouteResponse[] }>;
+  };
+};
+
+let routesLibPromise: Promise<RoutesLibrary> | null = null;
+function loadRoutesLib(maps: typeof google.maps): Promise<RoutesLibrary> {
+  if (routesLibPromise) return routesLibPromise;
+  // importLibrary is part of the modern bootstrap loader. Our SDK is loaded
+  // with `loading=async`, so this works without additional `libraries=routes`
+  // in the script URL.
+  const importer = (maps as unknown as { importLibrary: (n: string) => Promise<unknown> })
+    .importLibrary;
+  routesLibPromise = importer('routes').then((lib) => lib as RoutesLibrary);
+  return routesLibPromise;
+}
+
 export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null) {
   const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -39,24 +70,33 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
     if (missing.length === 0) return;
 
     setLoading(true);
-    const directionsService = new maps.DirectionsService();
     (async () => {
+      let Route: RoutesLibrary['Route'];
+      try {
+        ({ Route } = await loadRoutesLib(maps));
+      } catch (err) {
+        console.error('Failed to load routes library', err);
+        setLoading(false);
+        return;
+      }
       for (const { from, to, key } of missing) {
         if (cancelled || reqRef.current !== myReq) break;
         try {
-          const result = await directionsService.route({
+          const { routes } = await Route.computeRoutes({
             origin: { lat: from.lat, lng: from.lng },
             destination: { lat: to.lat, lng: to.lng },
-            travelMode: google.maps.TravelMode.DRIVING,
+            travelMode: 'DRIVING',
+            fields: ['distanceMeters', 'durationMillis', 'path'],
           });
-          const leg = result.routes[0].legs[0];
+          const route = routes?.[0];
+          if (!route) throw new Error('No route returned');
           cache.set(key, {
-            km: Math.round((leg.distance?.value || 0) / 1000),
-            durationSeconds: leg.duration?.value || 0,
-            path: result.routes[0].overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() })),
+            km: Math.round((route.distanceMeters || 0) / 1000),
+            durationSeconds: Math.round((route.durationMillis || 0) / 1000),
+            path: (route.path || []).map((p) => ({ lat: p.lat, lng: p.lng })),
           });
         } catch (err) {
-          console.error('Directions failed', err);
+          console.error('Routes computeRoutes failed', err);
           cache.set(key, { km: 0, durationSeconds: 0, path: [], failed: true });
           setLastFailure(`${from.label || 'stop'} → ${to.label || 'stop'}`);
         }
