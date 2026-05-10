@@ -464,7 +464,7 @@
     /* ───────────────── Builder ───────────────── */
     #screen-builder.active { display: grid; }
     .builder {
-      grid-template-columns: 380px 1fr;
+      grid-template-columns: 420px 1fr;
       height: 100vh;
       overflow: hidden;
     }
@@ -649,6 +649,7 @@
     .stops-list {
       flex: 1;
       overflow-y: auto;
+      scrollbar-gutter: stable;
       padding: 4px 24px 12px;
       display: flex;
       flex-direction: column;
@@ -722,7 +723,8 @@
       margin-top: 8px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      flex-wrap: wrap;
+      gap: 6px 8px;
     }
     .stop-type-select {
       background: transparent;
