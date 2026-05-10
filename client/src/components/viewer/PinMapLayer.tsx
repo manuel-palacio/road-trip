@@ -28,7 +28,7 @@ function markerLabelFor(pin: Pin): google.maps.MarkerLabel {
 }
 
 export type PinMapLayerHandle = {
-  focusPin: (pinId: string) => void;
+  focusPin: (pin: Pin) => void;
 };
 
 function escapeHtml(s: string) {
@@ -194,18 +194,17 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
   useImperativeHandle(
     ref,
     () => ({
-      focusPin: (pinId: string) => {
+      focusPin: (pin: Pin) => {
         if (!map) return;
-        const marker = pinMarkersRef.current.get(pinId);
-        const pin = pins.find((p) => p.id === pinId);
-        if (!marker || !pin) return;
         map.panTo({ lat: pin.lat, lng: pin.lng });
-        if ((map.getZoom() ?? 0) < 10) map.setZoom(11);
-        openInfoWindow(pin, marker);
+        if ((map.getZoom() ?? 0) < 12) map.setZoom(13);
+        // Attached pins have no marker — pan only, no info window.
+        const marker = pinMarkersRef.current.get(pin.id);
+        if (marker) openInfoWindow(pin, marker);
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [map, pins],
+    [map],
   );
 
   return (

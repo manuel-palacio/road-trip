@@ -6,7 +6,6 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePins } from '../hooks/usePins';
-import { computePinAttachments } from '../lib/pin-attachment';
 import { createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
@@ -115,15 +114,9 @@ export function Builder() {
 
   const pinModal = usePinModal(state.tripId || '');
   const pinsQuery = usePins(state.tripId || undefined);
-  const allPins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
-  const pinAttachments = useMemo(
-    () => computePinAttachments(allPins, state.stops),
-    [allPins, state.stops],
-  );
-  const builderFreePins = useMemo(
-    () => allPins.filter((p) => pinAttachments.get(p.id) === null),
-    [allPins, pinAttachments],
-  );
+  // Builder is the planning surface — show ALL pins (no in-town suppression).
+  // Suppression only applies to the Viewer where the map serves driving.
+  const builderPins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
 
   // Enrich stops with km/duration/path from Directions API
   const routes = useRouteSegments(state.stops, maps);
@@ -521,7 +514,7 @@ export function Builder() {
           <PinMapLayer
             map={map}
             maps={maps}
-            pins={builderFreePins}
+            pins={builderPins}
             onRequestCreate={pinModal.openCreate}
             onRequestEdit={pinModal.openEdit}
             onRequestDelete={pinModal.deletePin}

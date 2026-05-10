@@ -1,17 +1,14 @@
-import type { Pin, Stop } from '../../lib/types';
+import type { Pin } from '../../lib/types';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 
 type Props = {
   pins: Pin[];
-  stops: readonly Stop[];
-  attachments: Map<string, string | null>;
   onEdit: (pin: Pin) => void;
   onDelete: (pin: Pin) => void;
   onFocus: (pin: Pin) => void;
 };
 
-export function PinList({ pins, stops, attachments, onEdit, onDelete, onFocus }: Props) {
-  const stopById = new Map(stops.map((s) => [s.id, s]));
+export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
   if (pins.length === 0) {
     return (
       <div className="px-4 py-10 text-center">
@@ -30,8 +27,6 @@ export function PinList({ pins, stops, attachments, onEdit, onDelete, onFocus }:
       {pins.map((pin) => {
         const meta = PIN_CATEGORY_META[pin.category];
         const isMust = pin.priority === 'must';
-        const parentStopId = attachments.get(pin.id);
-        const parentStop = parentStopId ? stopById.get(parentStopId) : null;
         const ringColor = isMust ? '#e76f51' : meta.tint;
         return (
           <li
@@ -63,9 +58,6 @@ export function PinList({ pins, stops, attachments, onEdit, onDelete, onFocus }:
                 <div className="mt-0.5 font-mono text-[9.5px] tracking-[0.2em] uppercase text-paper-muted flex items-center gap-2 flex-wrap">
                   <span>{meta.label}</span>
                   {isMust && <span className="text-accent">· Must</span>}
-                  {parentStop && (
-                    <span className="text-paper-dim">· in {parentStop.label || parentStop.name}</span>
-                  )}
                 </div>
                 {pin.notes && (
                   <p className="mt-1.5 font-serif italic text-[13px] text-paper-dim leading-snug [overflow-wrap:anywhere]">
