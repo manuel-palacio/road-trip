@@ -10,7 +10,7 @@ import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-map
 import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute';
 import type { Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
-import { StopRow } from '../components/builder/StopRow';
+import { StopList } from '../components/builder/StopList';
 import { Toast } from '../components/Toast';
 
 type BuilderState = {
@@ -71,12 +71,14 @@ export function Builder() {
   const [hydrated, setHydrated] = useState(!isEditing);
   const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  const snapshotRef = useRef<string | null>(null);
+  const draggedIdRef = useRef<string | null>(null);
 
   // Hydrate from loaded trip
   useEffect(() => {
     if (!isEditing || !tripQuery.data) return;
     const t = tripQuery.data;
-    setState({
+    const next: BuilderState = {
       tripId: t.id,
       name: t.name || '',
       coverEmoji: t.coverEmoji || '🚗',
@@ -84,9 +86,19 @@ export function Builder() {
       maxKmPerDay: typeof t.maxKmPerDay === 'number' && t.maxKmPerDay > 0 ? t.maxKmPerDay : 600,
       description: t.description || '',
       stops: Array.isArray(t.stops) ? t.stops.map((s) => ({ ...s })) : [],
-    });
+    };
+    setState(next);
+    snapshotRef.current = serializeSnapshot(next);
     setHydrated(true);
   }, [isEditing, tripQuery.data]);
+
+  // Take initial snapshot for new trips
+  useEffect(() => {
+    if (!isEditing && snapshotRef.current === null) {
+      snapshotRef.current = serializeSnapshot(state);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
 
   const mapDivRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -212,6 +224,75 @@ export function Builder() {
   function removeStop(id: string) {
     setState((s) => ({ ...s, stops: reassignTypes(s.stops.filter((x) => x.id !== id)) }));
   }
+  function setForceDayStart(id: string, value: boolean) {
+    setState((s) => ({
+      ...s,
+      stops: s.stops.map((x) => (x.id === id ? { ...x, forceDayStart: value } : x)),
+    }));
+  }
+  function addHighlight(id: string, text: string) {
+    setState((s) => ({
+      ...s,
+      stops: s.stops.map((x) =>
+        x.id === id
+          ? { ...x, highlights: [...(x.highlights || []), text].filter((v, i, a) => a.indexOf(v) === i) }
+          : x,
+      ),
+    }));
+  }
+  function removeHighlight(id: string, text: string) {
+    setState((s) => ({
+      ...s,
+      stops: s.stops.map((x) =>
+        x.id === id ? { ...x, highlights: (x.highlights || []).filter((h) => h !== text) } : x,
+      ),
+    }));
+  }
+
+  function reorder(targetId: string, ev: React.DragEvent) {
+    const sourceId = draggedIdRef.current;
+    if (!sourceId || sourceId === targetId) return;
+    setState((s) => {
+      const stops = [...s.stops];
+      const fromIdx = stops.findIndex((x) => x.id === sourceId);
+      if (fromIdx < 0) return s;
+      const [moved] = stops.splice(fromIdx, 1);
+      const targetIdx = stops.findIndex((x) => x.id === targetId);
+      if (targetIdx < 0) {
+        stops.splice(fromIdx, 0, moved);
+        return s;
+      }
+      // Determine above/below by current Y in the row
+      const row = (ev.currentTarget as HTMLDivElement);
+      const rect = row.getBoundingClientRect();
+      const above = ev.clientY < rect.top + rect.height / 2;
+      const insertAt = above ? targetIdx : targetIdx + 1;
+      stops.splice(insertAt, 0, moved);
+      return { ...s, stops: reassignTypes(stops) };
+    });
+  }
+
+  function serializeSnapshot(s: BuilderState): string {
+    return JSON.stringify({
+      name: s.name || '',
+      coverEmoji: s.coverEmoji || '',
+      startDate: s.startDate || '',
+      description: s.description || '',
+      maxKmPerDay: s.maxKmPerDay || 600,
+      stops: (s.stops || []).map((x) => ({
+        id: x.id, name: x.name, label: x.label,
+        lat: x.lat, lng: x.lng,
+        countryCode: x.countryCode || '',
+        type: x.type,
+        forceDayStart: x.forceDayStart === true,
+        highlights: x.highlights || [],
+      })),
+    });
+  }
+  function isDirty() {
+    if (!snapshotRef.current) return false;
+    return serializeSnapshot(state) !== snapshotRef.current;
+  }
 
   async function onSave() {
     if (saving) return;
@@ -250,6 +331,8 @@ export function Builder() {
       }
       queryClient.invalidateQueries({ queryKey: ['trips'] });
       queryClient.setQueryData(['trip', saved.id], saved);
+      // Reset snapshot so the dirty check is clean — Cancel won't prompt
+      snapshotRef.current = serializeSnapshot({ ...state, tripId: state.tripId || saved.id });
       setSavedToast(true);
       setTimeout(() => setSavedToast(false), 1800);
     } catch (err) {
@@ -261,6 +344,10 @@ export function Builder() {
   }
 
   function onCancel() {
+    if (isDirty()) {
+      const ok = window.confirm('Discard unsaved changes?');
+      if (!ok) return;
+    }
     navigate('/');
   }
 
@@ -350,21 +437,21 @@ export function Builder() {
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[11px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />
           </div>
-          <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-6 pb-3 flex flex-col gap-2">
-            {dayedStops.map((stop, i) => (
-              <StopRow
-                key={stop.id}
-                stop={stop}
-                index={i}
-                onChangeType={setStopType}
-                onRemove={removeStop}
-              />
-            ))}
-            {dayedStops.length === 0 && (
-              <p className="px-6 py-5 text-center font-serif italic text-[14px] text-paper-muted leading-[1.5]">
-                Search above to add your first stop.
-              </p>
-            )}
+          <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-6 pb-3">
+            <StopList
+              stops={dayedStops}
+              startDate={state.startDate}
+              onChangeType={setStopType}
+              onRemove={removeStop}
+              onSetForceDayStart={setForceDayStart}
+              onAddHighlight={addHighlight}
+              onRemoveHighlight={removeHighlight}
+              onDragStart={(id) => { draggedIdRef.current = id; }}
+              onDragEnd={() => { draggedIdRef.current = null; }}
+              onDragOver={() => { /* handled in StopRow */ }}
+              onDragLeave={() => { /* handled in StopRow */ }}
+              onDrop={(id, ev) => reorder(id, ev)}
+            />
           </div>
         </div>
 

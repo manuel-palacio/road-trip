@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { flagEmoji } from '../../lib/flags';
 import { dayColor } from '../../lib/compute';
 import { getStopRoutingFailed } from '../../hooks/useRouteSegments';
@@ -6,8 +7,18 @@ import type { Stop } from '../../lib/types';
 type Props = {
   stop: Stop;
   index: number;
+  isFirst: boolean;
   onChangeType: (id: string, type: Stop['type']) => void;
   onRemove: (id: string) => void;
+  onSetForceDayStart: (id: string, value: boolean) => void;
+  onAddHighlight: (id: string, text: string) => void;
+  onRemoveHighlight: (id: string, text: string) => void;
+  // DnD
+  onDragStart: (id: string, ev: React.DragEvent) => void;
+  onDragEnd: () => void;
+  onDragOver: (id: string, ev: React.DragEvent) => void;
+  onDragLeave: (ev: React.DragEvent) => void;
+  onDrop: (id: string, ev: React.DragEvent) => void;
 };
 
 const TYPE_OPTIONS: { value: Stop['type']; label: string }[] = [
@@ -17,7 +28,12 @@ const TYPE_OPTIONS: { value: Stop['type']; label: string }[] = [
   { value: 'destination', label: 'Destination' },
 ];
 
-export function StopRow({ stop, index, onChangeType, onRemove }: Props) {
+export function StopRow(p: Props) {
+  const { stop, index, isFirst } = p;
+  const [chipDraft, setChipDraft] = useState('');
+  const [dropZone, setDropZone] = useState<'above' | 'below' | null>(null);
+  const [dragging, setDragging] = useState(false);
+
   const flag = flagEmoji(stop.countryCode);
   const accentBorder = {
     start: 'border-l-accent',
@@ -27,34 +43,92 @@ export function StopRow({ stop, index, onChangeType, onRemove }: Props) {
   }[stop.type];
   const color = dayColor(stop.dayNumber);
   const routingFailed = getStopRoutingFailed(stop);
+  const isForced = stop.forceDayStart === true;
+  const highlights = stop.highlights || [];
+
+  function commitHighlight() {
+    const v = chipDraft.trim();
+    if (!v) return;
+    p.onAddHighlight(stop.id, v);
+    setChipDraft('');
+  }
 
   return (
     <div
-      className={`relative flex items-start gap-3 pl-3.5 pr-7 py-3 bg-canvas border border-line border-l-2 ${accentBorder} rounded-md transition-colors hover:border-line-strong`}
       data-stop-id={stop.id}
+      draggable={false}
+      onDragOver={(ev) => {
+        if (!ev.dataTransfer.types.includes('text/plain')) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        const rect = (ev.currentTarget as HTMLDivElement).getBoundingClientRect();
+        const above = ev.clientY < rect.top + rect.height / 2;
+        setDropZone(above ? 'above' : 'below');
+        p.onDragOver(stop.id, ev);
+      }}
+      onDragLeave={(ev) => {
+        const related = ev.relatedTarget as Node | null;
+        if (related && (ev.currentTarget as HTMLDivElement).contains(related)) return;
+        setDropZone(null);
+        p.onDragLeave(ev);
+      }}
+      onDrop={(ev) => {
+        ev.preventDefault();
+        setDropZone(null);
+        p.onDrop(stop.id, ev);
+      }}
+      className={`relative flex items-start gap-3 pl-3.5 pr-7 py-3 bg-canvas border border-line border-l-2 ${accentBorder} rounded-md transition-all hover:border-line-strong ${
+        dragging ? 'opacity-30 scale-[0.98]' : ''
+      }`}
     >
+      {dropZone === 'above' && (
+        <div className="absolute -top-1.5 left-2 right-2 h-[3px] bg-accent rounded-sm pointer-events-none z-10 shadow-[0_0_14px_rgba(231,111,81,0.7)]" />
+      )}
+      {dropZone === 'below' && (
+        <div className="absolute -bottom-1.5 left-2 right-2 h-[3px] bg-accent rounded-sm pointer-events-none z-10 shadow-[0_0_14px_rgba(231,111,81,0.7)]" />
+      )}
+
       <span
-        className="font-mono text-paper-muted text-[13px] cursor-grab pt-0.5 select-none"
+        className="font-mono text-paper-muted text-[13px] cursor-grab pt-0.5 select-none hover:text-accent active:cursor-grabbing"
         aria-hidden
-        title="Drag to reorder (slice 18e)"
+        title="Drag to reorder"
+        draggable
+        onDragStart={(ev) => {
+          ev.dataTransfer.effectAllowed = 'move';
+          ev.dataTransfer.setData('text/plain', stop.id);
+          if (ev.dataTransfer.setDragImage) {
+            const row = (ev.currentTarget as HTMLElement).parentElement;
+            if (row) ev.dataTransfer.setDragImage(row, 24, 18);
+          }
+          setTimeout(() => setDragging(true), 0);
+          p.onDragStart(stop.id, ev);
+        }}
+        onDragEnd={() => {
+          setDragging(false);
+          setDropZone(null);
+          p.onDragEnd();
+        }}
       >
         ⠿
       </span>
+
       <div
         className="w-[22px] h-[22px] font-mono text-[11px] font-semibold rounded-full flex items-center justify-center shrink-0"
         style={{ backgroundColor: color, color: '#0d0e11' }}
       >
         {index + 1}
       </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[14px] text-paper [overflow-wrap:anywhere]">{stop.label || stop.name}</span>
           {flag && <span className="text-[14px] leading-none">{flag}</span>}
         </div>
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
+
+        <div className="mt-2 flex items-center flex-wrap gap-y-1.5 gap-x-2">
           <select
             value={stop.type}
-            onChange={(e) => onChangeType(stop.id, e.target.value as Stop['type'])}
+            onChange={(e) => p.onChangeType(stop.id, e.target.value as Stop['type'])}
             className="bg-transparent border border-line rounded text-paper-dim font-mono text-[9.5px] tracking-[0.18em] uppercase px-1.5 py-[3px] pr-[18px] appearance-none cursor-pointer hover:border-paper-dim hover:text-paper focus:outline-none focus:border-accent"
             style={{
               backgroundImage:
@@ -85,12 +159,75 @@ export function StopRow({ stop, index, onChangeType, onRemove }: Props) {
           >
             Day {stop.dayNumber || 1}
           </span>
+
+          <span className="inline-flex items-center gap-1 ml-1">
+            <button
+              type="button"
+              aria-label="Merge with previous day"
+              title={
+                isFirst
+                  ? 'First stop — locked to Day 1'
+                  : (isForced ? 'Merge into the previous day (remove the day break)' : 'Already on the earliest natural day')
+              }
+              disabled={isFirst || !isForced}
+              onClick={() => p.onSetForceDayStart(stop.id, false)}
+              className="w-[18px] h-[18px] bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              aria-label="Start a new day at this stop"
+              title={
+                isFirst
+                  ? 'First stop — locked to Day 1'
+                  : (isForced ? 'Already starts a new day' : 'Start a new day at this stop')
+              }
+              disabled={isFirst || isForced}
+              onClick={() => p.onSetForceDayStart(stop.id, true)}
+              className="w-[18px] h-[18px] bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
+            >
+              +
+            </button>
+          </span>
+        </div>
+
+        {/* Highlights */}
+        <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+          {highlights.map((text) => (
+            <span key={text} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-[3px] bg-[rgba(243,236,222,0.06)] border border-line rounded-full text-[11px] text-paper max-w-[200px]">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={text}>{text}</span>
+              <button
+                type="button"
+                aria-label="Remove note"
+                onClick={() => p.onRemoveHighlight(stop.id, text)}
+                className="bg-transparent border-0 text-paper-muted text-[13px] w-4 h-4 rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-white transition-colors"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            type="text"
+            placeholder={highlights.length ? 'add another…' : 'add a note…'}
+            maxLength={60}
+            value={chipDraft}
+            onChange={(e) => setChipDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commitHighlight();
+              }
+            }}
+            className="flex-1 min-w-[90px] bg-transparent border-0 border-b border-dotted border-line-strong text-paper font-serif italic text-[12px] py-0.5 outline-none placeholder:text-paper-muted placeholder:italic transition-colors focus:border-accent focus:border-solid"
+          />
         </div>
       </div>
+
       <button
         type="button"
         aria-label="Remove stop"
-        onClick={() => onRemove(stop.id)}
+        onClick={() => p.onRemove(stop.id)}
         className="absolute top-1.5 right-1.5 w-[22px] h-[22px] bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
       >
         ×
