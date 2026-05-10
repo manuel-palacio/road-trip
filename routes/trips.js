@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const { admin, getDb } = require('../lib/firebase');
 const { authRequired } = require('../middleware/auth');
@@ -281,6 +282,49 @@ router.delete('/api/trips/:id/pins/:pinId', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('DELETE /api/trips/:id/pins/:pinId failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.post('/api/trips/:id/share', async (req, res) => {
+  try {
+    const db = getDb();
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Trip not found', code: 'NOT_FOUND' });
+    if (snap.data().ownerUid !== req.uid) {
+      return res.status(403).json({ error: 'Owner only', code: 'FORBIDDEN' });
+    }
+    const shareToken = crypto.randomUUID();
+    await ref.update({
+      shareToken,
+      isShared: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ shareToken, isShared: true });
+  } catch (e) {
+    console.error('POST /api/trips/:id/share failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.delete('/api/trips/:id/share', async (req, res) => {
+  try {
+    const db = getDb();
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Trip not found', code: 'NOT_FOUND' });
+    if (snap.data().ownerUid !== req.uid) {
+      return res.status(403).json({ error: 'Owner only', code: 'FORBIDDEN' });
+    }
+    await ref.update({
+      shareToken: null,
+      isShared: false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/trips/:id/share failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
   }
 });

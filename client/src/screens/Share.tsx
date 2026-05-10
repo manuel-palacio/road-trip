@@ -1,0 +1,338 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { useConfig } from '../hooks/useConfig';
+import { useGoogleMaps } from '../hooks/useGoogleMaps';
+import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
+import { getSharedTrip } from '../lib/api';
+import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
+import { flagEmoji } from '../lib/flags';
+import { MAP_STYLE, makeMarkerIcon, makePinIcon } from '../lib/google-maps';
+import { PIN_CATEGORY_META } from '../lib/pin-meta';
+import type { Pin, Stop } from '../lib/types';
+import { Brand } from '../components/Brand';
+import { DayCard } from '../components/viewer/DayCard';
+import { PinList } from '../components/viewer/PinList';
+import { SidebarTabs } from '../components/viewer/SidebarTabs';
+import { Toast } from '../components/Toast';
+
+function fitBounds(map: google.maps.Map, stops: Stop[]) {
+  if (stops.length === 0) return;
+  if (stops.length === 1) {
+    map.setCenter({ lat: stops[0].lat, lng: stops[0].lng });
+    map.setZoom(10);
+    return;
+  }
+  const b = new google.maps.LatLngBounds();
+  stops.forEach((s) => b.extend({ lat: s.lat, lng: s.lng }));
+  map.fitBounds(b, 80);
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+}
+
+export function Share() {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const cfg = useConfig();
+  const { maps } = useGoogleMaps(cfg.data?.mapsApiKey || null);
+
+  const sharedQuery = useQuery({
+    queryKey: ['share', token],
+    queryFn: () => getSharedTrip(token!),
+    enabled: !!token,
+    retry: false,
+  });
+
+  const trip = sharedQuery.data?.trip;
+  const pins: Pin[] = useMemo(() => sharedQuery.data?.pins || [], [sharedQuery.data]);
+  const owner = sharedQuery.data?.owner;
+  const stops = useMemo<Stop[]>(() => trip?.stops || [], [trip]);
+
+  const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
+  const [hiddenDays, setHiddenDays] = useState<Set<number>>(new Set());
+  function toggleDay(day: number) {
+    setHiddenDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  }
+
+  const routes = useRouteSegments(stops, maps);
+  const dayedStops = useMemo(
+    () => applyDays(routes.enriched, trip?.maxKmPerDay || 600),
+    [routes.enriched, trip?.maxKmPerDay],
+  );
+  const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
+  const flagSet = useMemo(
+    () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
+    [dayedStops],
+  );
+
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const stopMarkersRef = useRef<google.maps.Marker[]>([]);
+  const polylinesRef = useRef<google.maps.Polyline[]>([]);
+  const pinMarkersRef = useRef<google.maps.Marker[]>([]);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+
+  useEffect(() => {
+    if (!maps || !mapDivRef.current || map) return;
+    const m = new maps.Map(mapDivRef.current, {
+      center: { lat: 60, lng: 18 },
+      zoom: 4,
+      styles: MAP_STYLE,
+      disableDefaultUI: true,
+      zoomControl: true,
+      gestureHandling: 'greedy',
+      backgroundColor: '#13151a',
+      clickableIcons: false,
+    });
+    infoWindowRef.current = new maps.InfoWindow();
+    setMap(m);
+  }, [maps, map]);
+
+  // Stop markers + polylines
+  useEffect(() => {
+    if (!maps || !map) return;
+    stopMarkersRef.current.forEach((m) => m.setMap(null));
+    stopMarkersRef.current = [];
+    polylinesRef.current.forEach((p) => p.setMap(null));
+    polylinesRef.current = [];
+
+    const visibleStops = dayedStops.filter((s) => !hiddenDays.has(s.dayNumber || 1));
+    visibleStops.forEach((stop) => {
+      const originalIndex = dayedStops.findIndex((x) => x.id === stop.id);
+      const marker = new maps.Marker({
+        position: { lat: stop.lat, lng: stop.lng },
+        map,
+        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber)),
+        title: stop.label || stop.name,
+      });
+      marker.addListener('click', () => {
+        if (!infoWindowRef.current) return;
+        const flag = flagEmoji(stop.countryCode);
+        const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
+        const dur = stop.durationFromPrevious || '';
+        const meta = [km, dur].filter(Boolean).join(' · ');
+        const highlights = (stop.highlights || []).map((h) => escapeHtml(h)).join(' · ');
+        const html = `
+          <div style="font-family:Geist,sans-serif;color:#1a1a1a;max-width:240px;">
+            <div style="font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6358;">Day ${stop.dayNumber || 1}</div>
+            <div style="font-family:Fraunces,serif;font-style:italic;font-size:18px;line-height:1.15;margin-top:2px;">${escapeHtml(stop.label || stop.name)}${flag ? ` ${flag}` : ''}</div>
+            ${meta ? `<div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#6b6358;margin-top:4px;text-transform:uppercase;">${meta}</div>` : ''}
+            ${highlights ? `<div style="font-size:12px;color:#3d3633;margin-top:6px;line-height:1.5;font-style:italic;">${highlights}</div>` : ''}
+          </div>
+        `;
+        infoWindowRef.current.setContent(html);
+        infoWindowRef.current.open({ map, anchor: marker });
+      });
+      stopMarkersRef.current.push(marker);
+    });
+
+    for (let i = 1; i < dayedStops.length; i++) {
+      const stop = dayedStops[i];
+      const prev = dayedStops[i - 1];
+      if (hiddenDays.has(stop.dayNumber || 1) || hiddenDays.has(prev.dayNumber || 1)) continue;
+      const path = getStopPath(stop);
+      if (!path || path.length === 0) continue;
+      const polyline = new maps.Polyline({
+        path,
+        map,
+        strokeColor: dayColor(stop.dayNumber),
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+      });
+      polylinesRef.current.push(polyline);
+    }
+
+    fitBounds(map, visibleStops);
+  }, [maps, map, dayedStops, hiddenDays]);
+
+  // Pin markers — read-only (click shows info window without edit/delete)
+  useEffect(() => {
+    if (!maps || !map) return;
+    pinMarkersRef.current.forEach((m) => m.setMap(null));
+    pinMarkersRef.current = pins.map((pin) => {
+      const meta = PIN_CATEGORY_META[pin.category];
+      const marker = new maps.Marker({
+        position: { lat: pin.lat, lng: pin.lng },
+        map,
+        icon: makePinIcon(meta.emoji, meta.tint, pin.priority || 'want'),
+        label: {
+          text: pin.name,
+          fontSize: '11px',
+          fontFamily: 'Geist, sans-serif',
+          fontWeight: pin.priority === 'must' ? '500' : '400',
+          color: pin.priority === 'must' ? '#f3ecde' : '#cfc6b3',
+          className: pin.priority === 'must' ? 'pin-name-label pin-name-label--must' : 'pin-name-label',
+        },
+        title: pin.name,
+        zIndex: pin.priority === 'must' ? 60 : 50,
+      });
+      marker.addListener('click', () => {
+        if (!infoWindowRef.current) return;
+        const html = `
+          <div style="font-family:Geist,sans-serif;color:#1a1a1a;max-width:240px;">
+            <div style="display:flex;align-items:center;gap:6px;font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6358;">
+              <span style="font-size:13px;line-height:1;">${meta.emoji}</span>${meta.label}
+            </div>
+            <div style="font-family:Fraunces,serif;font-style:italic;font-size:18px;line-height:1.15;margin-top:3px;">${escapeHtml(pin.name)}</div>
+            ${pin.notes ? `<div style="font-size:12px;color:#3d3633;margin-top:6px;line-height:1.5;font-style:italic;">${escapeHtml(pin.notes)}</div>` : ''}
+          </div>
+        `;
+        infoWindowRef.current.setContent(html);
+        infoWindowRef.current.open({ map, anchor: marker });
+      });
+      return marker;
+    });
+  }, [maps, map, pins]);
+
+  useEffect(() => {
+    return () => {
+      stopMarkersRef.current.forEach((m) => m.setMap(null));
+      stopMarkersRef.current = [];
+      polylinesRef.current.forEach((p) => p.setMap(null));
+      polylinesRef.current = [];
+      pinMarkersRef.current.forEach((m) => m.setMap(null));
+      pinMarkersRef.current = [];
+      infoWindowRef.current?.close();
+    };
+  }, []);
+
+  if (sharedQuery.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">Loading shared trip…</div>
+      </div>
+    );
+  }
+
+  if (sharedQuery.error || !trip) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-8 text-center">
+        <Brand size="md" />
+        <div className="font-mono text-[10px] tracking-[0.28em] uppercase text-accent">Link not found</div>
+        <p className="max-w-[420px] font-serif italic text-[16px] leading-[1.55] text-paper-dim">
+          This share link has been revoked or never existed. Ask the trip owner for a fresh link.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="bg-transparent border border-line text-paper-dim px-4 py-[9px] rounded font-mono text-[10px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
+        >
+          Build your own
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen">
+      {/* Top banner */}
+      <div className="flex items-center justify-between gap-4 px-6 py-2.5 border-b border-line bg-canvas/85 backdrop-blur-md">
+        <div className="flex items-center gap-3 min-w-0">
+          {owner?.photoURL ? (
+            <img src={owner.photoURL} alt="" className="w-7 h-7 rounded-full object-cover border border-line" />
+          ) : (
+            <span className="w-7 h-7 rounded-full bg-surface-2 border border-line inline-flex items-center justify-center font-mono text-[10px] text-paper-dim">
+              {(owner?.displayName || 'A').slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <span className="font-serif italic text-[15px] text-paper-dim truncate">
+            <span className="text-paper">{owner?.displayName || 'A traveller'}</span>
+            <span className="mx-1.5 text-paper-muted">·</span>
+            <span>road trip</span>
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="inline-flex items-center gap-2 bg-accent text-canvas border-0 rounded px-3.5 py-[7px] font-mono text-[10px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)]"
+        >
+          Sign in to build your own <span aria-hidden>→</span>
+        </button>
+      </div>
+
+      <section className="grid grid-cols-[360px_1fr] flex-1 overflow-hidden">
+        <aside className="bg-canvas border-r border-line flex flex-col overflow-hidden">
+          <header className="flex items-center gap-3 px-5 py-4 border-b border-line">
+            <span className="text-[24px] leading-none">{trip.coverEmoji || '🚗'}</span>
+            <div className="flex-1 min-w-0">
+              <h1 className="font-serif italic font-normal text-[20px] leading-[1.15] tracking-tight text-paper truncate">
+                {trip.name || 'Untitled trip'}
+              </h1>
+              {trip.description && (
+                <p className="mt-0.5 font-serif italic text-[12.5px] text-paper-dim truncate">{trip.description}</p>
+              )}
+            </div>
+          </header>
+
+          <div className="flex items-center gap-4 px-5 py-3 border-b border-line font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim">
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-paper text-[14px] font-medium">{totals.totalKm.toLocaleString('en-US')}</span>
+              <span>km</span>
+            </span>
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-paper text-[14px] font-medium">{totals.totalDays}</span>
+              <span>{totals.totalDays === 1 ? 'day' : 'days'}</span>
+            </span>
+            {totals.totalDurationSeconds > 0 && (
+              <span className="inline-flex items-baseline gap-1">
+                <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
+              </span>
+            )}
+            <span className="ml-auto font-sans text-[14px] tracking-[0.06em]">{flagSet.join(' ')}</span>
+          </div>
+
+          <SidebarTabs
+            active={activeTab}
+            daysCount={groups.length}
+            pinsCount={pins.length}
+            onChange={setActiveTab}
+          />
+
+          <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-4 py-3 flex flex-col gap-2.5">
+            {activeTab === 'days' ? (
+              groups.length === 0 ? (
+                <p className="px-2 py-6 text-center font-serif italic text-[14px] text-paper-muted">
+                  No stops on this trip yet.
+                </p>
+              ) : (
+                groups.map((g) => (
+                  <DayCard
+                    key={g.day}
+                    group={g}
+                    startDate={trip.startDate}
+                    visible={!hiddenDays.has(g.day)}
+                    onToggleVisibility={() => toggleDay(g.day)}
+                  />
+                ))
+              )
+            ) : (
+              <PinList pins={pins} />
+            )}
+          </div>
+        </aside>
+
+        <div className="relative w-full h-full bg-[#13151a]">
+          {routes.loading && (
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+              <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
+            </div>
+          )}
+          <div ref={mapDivRef} className="w-full h-full" />
+        </div>
+      </section>
+
+      <Toast
+        message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
+        onDismiss={routes.clearFailure}
+      />
+    </div>
+  );
+}

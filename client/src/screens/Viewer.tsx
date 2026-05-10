@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePromotePin } from '../hooks/usePromoteAction';
-import { getTrip } from '../lib/api';
+import { enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon } from '../lib/google-maps';
@@ -55,6 +55,34 @@ export function Viewer() {
   const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
   const pinModal = usePinModal(tripId || '', { onCreated: () => setActiveTab('pins') });
   const promotePin = usePromotePin(tripId || '', stops);
+
+  const queryClient = useQueryClient();
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const isShared = !!trip?.isShared;
+  const enableShareMut = useMutation({
+    mutationFn: () => enableShare(tripId!),
+    onSuccess: ({ shareToken }) => {
+      const url = `${window.location.origin}/share/${shareToken}`;
+      navigator.clipboard?.writeText(url).catch(() => { /* ignore — toast still shown */ });
+      setShareToast('Link copied');
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    },
+    onError: () => setShareToast('Could not enable sharing'),
+  });
+  const revokeShareMut = useMutation({
+    mutationFn: () => revokeShare(tripId!),
+    onSuccess: () => {
+      setShareToast('Share link revoked');
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    },
+    onError: () => setShareToast('Could not revoke link'),
+  });
+  function copyExistingShare() {
+    if (!trip?.shareToken) return;
+    const url = `${window.location.origin}/share/${trip.shareToken}`;
+    navigator.clipboard?.writeText(url).catch(() => { /* ignore */ });
+    setShareToast('Link copied');
+  }
 
   const routes = useRouteSegments(stops, maps);
   const dayedStops = useMemo(
@@ -214,15 +242,44 @@ export function Viewer() {
               {trip.name || 'Untitled trip'}
             </h1>
           </div>
-          <button
-            type="button"
-            aria-label="Share trip (coming in slice 10)"
-            title="Sharing comes in Slice 10"
-            disabled
-            className="bg-transparent border border-line text-paper-muted px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase cursor-not-allowed opacity-60"
-          >
-            Share
-          </button>
+          {isShared ? (
+            <div className="inline-flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={copyExistingShare}
+                aria-label="Copy share link"
+                title="Copy share link"
+                className="bg-accent-soft border border-accent text-accent px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:bg-accent hover:text-canvas transition-colors"
+              >
+                Copy link
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Revoke this share link? Anyone with the URL will see a 404.')) {
+                    revokeShareMut.mutate();
+                  }
+                }}
+                disabled={revokeShareMut.isPending}
+                aria-label="Revoke share link"
+                title="Revoke share link"
+                className="bg-transparent border border-line text-paper-muted px-2 py-[7px] rounded font-mono text-[12px] hover:text-accent hover:border-accent disabled:opacity-50 transition-colors"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => enableShareMut.mutate()}
+              disabled={enableShareMut.isPending}
+              aria-label="Create share link"
+              title="Create a public read-only link"
+              className="bg-transparent border border-line text-paper-dim px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim disabled:opacity-50 transition-colors"
+            >
+              {enableShareMut.isPending ? 'Sharing…' : 'Share'}
+            </button>
+          )}
         </header>
 
         <div className="flex items-center gap-4 px-5 py-3 border-b border-line font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim">
@@ -309,6 +366,7 @@ export function Viewer() {
         message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
         onDismiss={routes.clearFailure}
       />
+      <Toast message={shareToast} variant="success" onDismiss={() => setShareToast(null)} durationMs={2200} />
     </section>
   );
 }

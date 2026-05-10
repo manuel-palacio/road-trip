@@ -3,14 +3,17 @@ import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 
 type Props = {
   pins: Pin[];
-  onEdit: (pin: Pin) => void;
-  onDelete: (pin: Pin) => void;
-  onFocus: (pin: Pin) => void;
+  // All actions are optional so the share view can render the list without
+  // any edit affordances. When a handler isn't provided, its button is hidden.
+  onEdit?: (pin: Pin) => void;
+  onDelete?: (pin: Pin) => void;
+  onFocus?: (pin: Pin) => void;
   onPromote?: (pin: Pin) => void;
   promotingPinId?: string | null;
 };
 
 export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingPinId }: Props) {
+  const interactive = !!(onFocus || onEdit || onDelete);
   if (pins.length === 0) {
     return (
       <div className="px-4 py-10 text-center">
@@ -18,7 +21,11 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
           No pins yet
         </div>
         <p className="font-serif italic text-[14px] text-paper-dim leading-relaxed">
-          Hit the <span className="not-italic font-mono text-[11px] tracking-wider text-accent">+</span> button on the map and click anywhere to drop your first pin.
+          {interactive ? (
+            <>Hit the <span className="not-italic font-mono text-[11px] tracking-wider text-accent">+</span> button on the map and click anywhere to drop your first pin.</>
+          ) : (
+            <>This trip doesn't have any pinned places.</>
+          )}
         </p>
       </div>
     );
@@ -40,23 +47,37 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
             }`}
           >
             <div className="flex items-start gap-3">
-              <button
-                type="button"
-                onClick={() => onFocus(pin)}
-                aria-label={`Show ${pin.name} on the map`}
-                className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2 transition-transform hover:scale-110"
-                style={{ borderColor: ringColor }}
-              >
-                <span aria-hidden>{meta.emoji}</span>
-              </button>
-              <div className="flex-1 min-w-0">
+              {onFocus ? (
                 <button
                   type="button"
                   onClick={() => onFocus(pin)}
-                  className="block w-full text-left text-[14px] text-paper truncate hover:text-accent transition-colors"
+                  aria-label={`Show ${pin.name} on the map`}
+                  className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2 transition-transform hover:scale-110"
+                  style={{ borderColor: ringColor }}
                 >
-                  {pin.name}
+                  <span aria-hidden>{meta.emoji}</span>
                 </button>
+              ) : (
+                <span
+                  aria-hidden
+                  className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2"
+                  style={{ borderColor: ringColor }}
+                >
+                  {meta.emoji}
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                {onFocus ? (
+                  <button
+                    type="button"
+                    onClick={() => onFocus(pin)}
+                    className="block w-full text-left text-[14px] text-paper truncate hover:text-accent transition-colors"
+                  >
+                    {pin.name}
+                  </button>
+                ) : (
+                  <span className="block w-full text-[14px] text-paper truncate">{pin.name}</span>
+                )}
                 <div className="mt-0.5 font-mono text-[9.5px] tracking-[0.2em] uppercase text-paper-muted flex items-center gap-2 flex-wrap">
                   <span>{meta.label}</span>
                   {isMust && <span className="text-accent">· Must</span>}
@@ -79,26 +100,32 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
                   </button>
                 )}
               </div>
-              <div className="flex flex-col gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onEdit(pin)}
-                  aria-label={`Edit ${pin.name}`}
-                  title="Edit"
-                  className="w-7 h-7 rounded text-paper-muted hover:text-paper hover:bg-surface-2 text-[12px] leading-none flex items-center justify-center transition-colors"
-                >
-                  ✎
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(pin)}
-                  aria-label={`Delete ${pin.name}`}
-                  title="Delete"
-                  className="w-7 h-7 rounded text-paper-muted hover:text-accent hover:bg-surface-2 text-[14px] leading-none flex items-center justify-center transition-colors"
-                >
-                  ×
-                </button>
-              </div>
+              {(onEdit || onDelete) && (
+                <div className="flex flex-col gap-1 shrink-0">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(pin)}
+                      aria-label={`Edit ${pin.name}`}
+                      title="Edit"
+                      className="w-7 h-7 rounded text-paper-muted hover:text-paper hover:bg-surface-2 text-[12px] leading-none flex items-center justify-center transition-colors"
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onDelete(pin)}
+                      aria-label={`Delete ${pin.name}`}
+                      title="Delete"
+                      className="w-7 h-7 rounded text-paper-muted hover:text-accent hover:bg-surface-2 text-[14px] leading-none flex items-center justify-center transition-colors"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </li>
         );

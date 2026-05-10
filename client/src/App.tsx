@@ -10,6 +10,7 @@ import { Dashboard } from './screens/Dashboard';
 import { AccessDenied } from './screens/AccessDenied';
 import { Builder } from './screens/Builder';
 import { Viewer } from './screens/Viewer';
+import { Share } from './screens/Share';
 import type { MeResponse } from './lib/types';
 
 export default function App() {
@@ -21,7 +22,14 @@ export default function App() {
   }
 
   initFirebase(cfg.data.firebaseConfig as any);
-  return <AppAuthed />;
+  return (
+    <Routes>
+      {/* Public — no auth gate. Anyone with a valid share token can view. */}
+      <Route path="/share/:token" element={<Share />} />
+      {/* Everything else funnels through the authed shell. */}
+      <Route path="*" element={<AppAuthed />} />
+    </Routes>
+  );
 }
 
 function AppAuthed() {

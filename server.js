@@ -8,6 +8,7 @@ const { getDb } = require('./lib/firebase');
 const configRouter = require('./routes/config');
 const meRouter = require('./routes/me');
 const tripsRouter = require('./routes/trips');
+const shareRouter = require('./routes/share');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -37,6 +38,7 @@ app.get('/actuator/health/readiness', async (req, res) => {
 app.use(configRouter);
 app.use(meRouter);
 app.use(tripsRouter);
+app.use(shareRouter);
 
 // Serve the React build
 const distPath = path.join(__dirname, 'dist');
@@ -47,6 +49,8 @@ app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/config') || req.path.startsWith('/health') || req.path.startsWith('/actuator')) {
     return next();
   }
+  // /share/:token is a SPA route (the share page is rendered client-side,
+  // which then calls /api/share/:token). Falls through to index.html below.
   const indexFile = path.join(distPath, 'index.html');
   if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
   return res.status(404).end();

@@ -100,3 +100,30 @@ export async function deletePin(tripId: string, pinId: string): Promise<void> {
     })),
   );
 }
+
+export async function enableShare(tripId: string): Promise<{ shareToken: string; isShared: boolean }> {
+  return handle<{ shareToken: string; isShared: boolean }>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/share`, await withToken({
+      method: 'POST',
+    })),
+  );
+}
+
+export async function revokeShare(tripId: string): Promise<void> {
+  await handle<unknown>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/share`, await withToken({
+      method: 'DELETE',
+    })),
+  );
+}
+
+export type SharedTripResponse = {
+  trip: Omit<Trip, 'ownerUid' | 'collaborators' | 'shareToken' | 'isShared'>;
+  pins: Pin[];
+  owner: { displayName: string; photoURL: string };
+};
+
+// Public — no auth header. Returns 404 if the token is unknown or revoked.
+export async function getSharedTrip(token: string): Promise<SharedTripResponse> {
+  return handle<SharedTripResponse>(await fetch(`/api/share/${encodeURIComponent(token)}`));
+}
