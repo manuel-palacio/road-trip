@@ -15,7 +15,6 @@ import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { PinList } from '../components/viewer/PinList';
 import { PinMapLayer, type PinMapLayerHandle } from '../components/viewer/PinMapLayer';
-import { PinSearchBar } from '../components/viewer/PinSearchBar';
 import { SidebarTabs } from '../components/viewer/SidebarTabs';
 import { Toast } from '../components/Toast';
 
@@ -272,17 +271,14 @@ export function Viewer() {
               ))
             )
           ) : (
-            <>
-              <PinSearchBar maps={maps} onSelect={pinModal.openCreate} />
-              <PinList
-                pins={pins}
-                onEdit={pinModal.openEdit}
-                onDelete={pinModal.deletePin}
-                onFocus={(p) => pinLayerRef.current?.focusPin(p)}
-                onPromote={(p) => promotePin.mutate(p)}
-                promotingPinId={promotePin.isPending ? promotePin.variables?.id ?? null : null}
-              />
-            </>
+            <PinList
+              pins={pins}
+              onEdit={pinModal.openEdit}
+              onDelete={pinModal.deletePin}
+              onFocus={(p) => pinLayerRef.current?.focusPin(p)}
+              onPromote={(p) => promotePin.mutate(p)}
+              promotingPinId={promotePin.isPending ? promotePin.variables?.id ?? null : null}
+            />
           )}
         </div>
       </aside>
