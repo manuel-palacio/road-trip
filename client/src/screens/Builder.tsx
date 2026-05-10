@@ -114,7 +114,27 @@ export function Builder() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const pinModal = usePinModal(state.tripId || '');
+  const pinModal = usePinModal(state.tripId || '', {
+    onSaveAsStop: (draft) => {
+      // The user picked "Add as stop" in the pin modal — create a route stop
+      // from the same form data instead of saving as a pin. Carries the
+      // category/priority/notes so demote round-trips losslessly.
+      const newStop: Stop = {
+        id: crypto.randomUUID(),
+        name: draft.name,
+        label: draft.name,
+        lat: draft.lat,
+        lng: draft.lng,
+        type: 'overnight',
+        highlights: draft.notes ? [draft.notes] : [],
+        kmFromPrevious: 0,
+        category: draft.category,
+        priority: draft.priority,
+        notes: draft.notes,
+      };
+      setState((s) => ({ ...s, stops: reassignTypes([...s.stops, newStop]) }));
+    },
+  });
   const pinModalRef = useRef(pinModal);
   pinModalRef.current = pinModal;
   const pinsQuery = usePins(state.tripId || undefined);

@@ -17,6 +17,10 @@ export type CreateDraftInput = {
 
 type Options = {
   onCreated?: () => void;
+  // Optional alternative save path. When provided, the modal renders a
+  // secondary "Add as stop" button. The callback receives the same draft
+  // data; the hook closes the modal afterwards.
+  onSaveAsStop?: (draft: import('../components/viewer/PinModal').PinDraft) => void;
 };
 
 export function usePinModal(tripId: string, options: Options = {}) {
@@ -47,6 +51,11 @@ export function usePinModal(tripId: string, options: Options = {}) {
     }
   }
 
+  function handleSaveAsStop(draft: PinDraft) {
+    options.onSaveAsStop?.(draft);
+    closeModal();
+  }
+
   const modalElement: ReactNode =
     modal.kind !== 'closed' ? (
       <PinModal
@@ -58,6 +67,7 @@ export function usePinModal(tripId: string, options: Options = {}) {
         saving={createPin.isPending || updatePin.isPending}
         onCancel={closeModal}
         onSave={handleSave}
+        onSaveAsStop={options.onSaveAsStop ? handleSaveAsStop : undefined}
       />
     ) : null;
 

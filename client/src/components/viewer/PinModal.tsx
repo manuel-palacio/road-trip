@@ -21,9 +21,14 @@ type Props = {
   saving?: boolean;
   onCancel: () => void;
   onSave: (draft: PinDraft) => void;
+  // When provided, render a secondary "Add as stop" action that creates a
+  // route stop from the same form data instead of saving as a pin. Only
+  // shown in create mode (editing an existing pin doesn't make sense as a
+  // stop conversion — use the Promote action for that).
+  onSaveAsStop?: (draft: PinDraft) => void;
 };
 
-export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defaultPriority, saving, onCancel, onSave }: Props) {
+export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defaultPriority, saving, onCancel, onSave, onSaveAsStop }: Props) {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || defaultName || '');
   const [category, setCategory] = useState<PinCategory>(initial?.category || defaultCategory || 'landmark');
@@ -47,6 +52,11 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
     e.preventDefault();
     if (!name.trim()) return;
     onSave({ name: name.trim(), category, priority, notes: notes.trim(), lat, lng });
+  }
+
+  function saveAsStop() {
+    if (!name.trim() || !onSaveAsStop) return;
+    onSaveAsStop({ name: name.trim(), category, priority, notes: notes.trim(), lat, lng });
   }
 
   return (
@@ -182,13 +192,26 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={saving || !name.trim()}
-            className="bg-accent text-canvas border-0 rounded px-5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
-          >
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Drop pin'}
-          </button>
+          <div className="flex items-center gap-2">
+            {!isEdit && onSaveAsStop && (
+              <button
+                type="button"
+                onClick={saveAsStop}
+                disabled={saving || !name.trim()}
+                title="Add this place to the route as a navigation stop instead of pinning it"
+                className="bg-transparent border border-line-strong text-paper-dim rounded px-3.5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase cursor-pointer transition-colors hover:border-paper hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add as stop
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={saving || !name.trim()}
+              className="bg-accent text-canvas border-0 rounded px-5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+            >
+              {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Drop pin'}
+            </button>
+          </div>
         </footer>
       </form>
     </div>
