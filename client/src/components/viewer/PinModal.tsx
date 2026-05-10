@@ -18,10 +18,16 @@ type Props = {
   defaultName?: string;
   defaultCategory?: PinCategory;
   defaultPriority?: PinPriority;
+  defaultNotes?: string;
   // Which action is the primary (accent-styled) button. Defaults to 'pin'.
   // For hotels (search dispatch sets this to 'stop'), "Add as stop" becomes
   // the primary action since hotels are almost always navigation destinations.
   primaryAction?: 'pin' | 'stop';
+  // Override the modal's header text and submit button label. Used when the
+  // modal serves as the "Demote to pin" form (header = "Demote to pin",
+  // submit = "Demote to pin"). Defaults derive from create/edit mode.
+  headerLabel?: string;
+  submitLabel?: string;
   saving?: boolean;
   onCancel: () => void;
   onSave: (draft: PinDraft) => void;
@@ -35,12 +41,12 @@ type Props = {
 const ACCENT_BTN_CLS = 'bg-accent text-canvas border-0 rounded px-5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none';
 const SECONDARY_BTN_CLS = 'bg-transparent border border-line-strong text-paper-dim rounded px-3.5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase cursor-pointer transition-colors hover:border-paper hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed';
 
-export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defaultPriority, primaryAction, saving, onCancel, onSave, onSaveAsStop }: Props) {
+export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defaultPriority, defaultNotes, primaryAction, headerLabel, submitLabel, saving, onCancel, onSave, onSaveAsStop }: Props) {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || defaultName || '');
   const [category, setCategory] = useState<PinCategory>(initial?.category || defaultCategory || 'landmark');
   const [priority, setPriority] = useState<PinPriority>(initial?.priority || defaultPriority || 'want');
-  const [notes, setNotes] = useState(initial?.notes || '');
+  const [notes, setNotes] = useState(initial?.notes || defaultNotes || '');
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,7 +84,7 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
       >
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
           <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
-            {isEdit ? 'Edit pin' : 'New pin'}
+            {headerLabel ?? (isEdit ? 'Edit pin' : 'New pin')}
           </span>
           <button
             type="button"
@@ -203,7 +209,8 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
             {(() => {
               const showStopOption = !isEdit && !!onSaveAsStop;
               const stopIsPrimary = showStopOption && primaryAction === 'stop';
-              const submitLabel = saving ? 'Saving…' : isEdit ? 'Save changes' : 'Drop pin';
+              const defaultSubmit = isEdit ? 'Save changes' : 'Drop pin';
+              const computedSubmitLabel = saving ? 'Saving…' : (submitLabel ?? defaultSubmit);
 
               if (stopIsPrimary) {
                 return (
@@ -214,7 +221,7 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
                       title="Just drop a pin (don't add to the route)"
                       className={SECONDARY_BTN_CLS}
                     >
-                      {submitLabel}
+                      {computedSubmitLabel}
                     </button>
                     <button
                       type="button"

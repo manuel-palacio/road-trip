@@ -258,8 +258,8 @@ export function Share() {
         </button>
       </div>
 
-      <section className="grid grid-cols-[360px_1fr] flex-1 overflow-hidden">
-        <aside className="bg-canvas border-r border-line flex flex-col overflow-hidden">
+      <section className="flex flex-1 min-h-0 overflow-hidden">
+        <aside className="w-[360px] shrink-0 bg-canvas border-r border-line flex flex-col overflow-hidden">
           <header className="flex items-center gap-3 px-5 py-4 border-b border-line">
             <span className="text-[24px] leading-none">{trip.coverEmoji || '🚗'}</span>
             <div className="flex-1 min-w-0">
@@ -319,13 +319,15 @@ export function Share() {
           </div>
         </aside>
 
-        <div className="relative w-full h-full bg-[#13151a]">
+        <div className="relative flex-1 min-w-0 bg-[#13151a]">
           {routes.loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
               <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
             </div>
           )}
-          <div ref={mapDivRef} className="w-full h-full" />
+          {/* absolute inset-0 sidesteps any flex/grid height-propagation
+              quirks — the map fills its positioned parent regardless. */}
+          <div ref={mapDivRef} className="absolute inset-0" />
         </div>
       </section>
 
