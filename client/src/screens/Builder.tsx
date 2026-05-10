@@ -10,7 +10,6 @@ import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
-import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-category';
 import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute';
 import type { Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -135,6 +134,22 @@ export function Builder() {
       };
       setState((s) => ({ ...s, stops: reassignTypes([...s.stops, newStop]) }));
     },
+    onDemoted: (draft, stop) => {
+      // The user clicked Pin on a stop card and confirmed in the modal.
+      // Run the demote mutation with the edited draft (so any tweaks to
+      // category/priority/notes the user made in the modal are kept).
+      demoteStop.mutate({
+        stop,
+        draft: {
+          name: draft.name,
+          category: draft.category,
+          priority: draft.priority,
+          notes: draft.notes,
+          lat: draft.lat,
+          lng: draft.lng,
+        },
+      });
+    },
   });
   const pinModalRef = useRef(pinModal);
   pinModalRef.current = pinModal;
@@ -177,47 +192,21 @@ export function Builder() {
     setMap(m);
     if (searchInputRef.current) {
       autocompleteRef.current = new maps.places.Autocomplete(searchInputRef.current, {
-        fields: ['name', 'formatted_address', 'geometry.location', 'address_components', 'types'],
-        // No `types` restriction on the request — we want geocoded areas AND
-        // establishments. We dispatch on the response's types[] below.
+        fields: ['name', 'formatted_address', 'geometry.location', 'address_components'],
       });
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current?.getPlace();
         if (!place?.geometry?.location) return;
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-
-        // Concrete POI (Hilton Reims, Eiffel Tower, BP) → open the pin modal
-        // prefilled. The user confirms category/priority/notes and saves.
-        if (isConcretePlace(place.types)) {
-          if (stateRef.current.tripId) {
-            const cat = guessCategoryFromTypes(place.types);
-            // Hotels are almost always navigation destinations (you drive to
-            // the hotel, you sleep there). Prefill priority=must and make
-            // "Add as stop" the primary action. Other POIs default to want+pin.
-            const isHotel = cat === 'hotel';
-            pinModalRef.current.openCreate({
-              lat,
-              lng,
-              defaultName: place.name || place.formatted_address || '',
-              defaultCategory: cat,
-              defaultPriority: isHotel ? 'must' : 'want',
-              primaryAction: isHotel ? 'stop' : 'pin',
-            });
-            if (searchInputRef.current) searchInputRef.current.value = '';
-            return;
-          }
-          // No saved trip yet — fall through and add as a stop so the user
-          // isn't blocked. We'll surface a toast later about saving first.
-        }
-
-        // City / area / region → add as a route stop (current behavior).
+        // Search input is a navigation gesture — always add as a route stop.
+        // POI metadata (category, priority, notes) lives on pins, which the
+        // user adds via the map FAB or by demoting a stop with the Pin
+        // button (which opens a modal for details).
         const newStop: Stop = {
           id: crypto.randomUUID(),
           name: place.formatted_address || place.name || '',
           label: place.name || place.formatted_address || '',
-          lat,
-          lng,
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
           countryCode: extractCountryCode(place.address_components),
           type: 'overnight',
           highlights: [],
@@ -521,8 +510,14 @@ export function Builder() {
               onSetForceDayStart={setForceDayStart}
               onAddHighlight={addHighlight}
               onRemoveHighlight={removeHighlight}
-              onDemote={state.tripId ? (s) => demoteStop.mutate(s) : undefined}
-              demotingStopId={demoteStop.isPending ? demoteStop.variables?.id ?? null : null}
+              onDemote={state.tripId ? (s) => pinModal.openDemote(s) : undefined}
+              demotingStopId={
+                demoteStop.isPending && demoteStop.variables
+                  ? ('stop' in demoteStop.variables
+                      ? demoteStop.variables.stop.id
+                      : demoteStop.variables.id)
+                  : null
+              }
               onDragStart={(id) => { draggedIdRef.current = id; }}
               onDragEnd={() => { draggedIdRef.current = null; }}
               onDragOver={() => { /* handled in StopRow */ }}

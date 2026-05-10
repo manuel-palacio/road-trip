@@ -33,13 +33,23 @@ export function usePromotePin(tripId: string, currentStops: readonly Stop[]) {
 /**
  * Demote: create a pin from the stop's data, save the trip with the stop
  * removed (and types reassigned). Two writes, same trade-off as promote.
+ *
+ * The mutation accepts either just a stop (pin draft is auto-derived from
+ * the stop's data via stopToPinDraft) or a stop + a custom draft (used when
+ * the user edits category/priority/notes in the demote modal before
+ * confirming).
  */
+type DemoteInput =
+  | Stop
+  | { stop: Stop; draft: ReturnType<typeof stopToPinDraft> };
+
 export function useDemoteStop(tripId: string, currentStops: readonly Stop[]) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (stop: Stop) => {
-      const pinDraft = stopToPinDraft(stop);
-      await createPin(tripId, pinDraft);
+    mutationFn: async (input: DemoteInput) => {
+      const stop = 'stop' in input ? input.stop : input;
+      const draft = 'draft' in input ? input.draft : stopToPinDraft(stop);
+      await createPin(tripId, draft);
       const remaining = currentStops.filter((s) => s.id !== stop.id);
       const finalStops = reassignStopTypes(remaining);
       await updateTrip(tripId, { stops: finalStops });

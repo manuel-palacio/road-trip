@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useCreatePin, useDeletePin, useUpdatePin } from './usePins';
 import { PinModal, type PinDraft } from '../components/viewer/PinModal';
-import type { Pin, PinCategory, PinPriority } from '../lib/types';
+import type { Pin, PinCategory, PinPriority, Stop } from '../lib/types';
 
 type ModalState =
   | { kind: 'closed' }
@@ -14,7 +14,11 @@ type ModalState =
       defaultPriority?: PinPriority;
       primaryAction?: 'pin' | 'stop';
     }
-  | { kind: 'edit'; pin: Pin };
+  | { kind: 'edit'; pin: Pin }
+  // Demote-from-stop: prefill the form from the stop's data; on save the
+  // hook calls options.onDemoted(draft, stop). Header + submit label say
+  // "Demote to pin" so the destructive intent is obvious.
+  | { kind: 'demote'; stop: Stop };
 
 export type CreateDraftInput = {
   lat: number;
@@ -33,7 +37,12 @@ type Options = {
   // Optional alternative save path. When provided, the modal renders a
   // secondary "Add as stop" button. The callback receives the same draft
   // data; the hook closes the modal afterwards.
-  onSaveAsStop?: (draft: import('../components/viewer/PinModal').PinDraft) => void;
+  onSaveAsStop?: (draft: PinDraft) => void;
+  // Called when the user confirms a demote-from-stop. Receives the edited
+  // draft (so category/priority/notes the user filled in are preserved)
+  // and the original stop. The caller is responsible for the actual
+  // mutation (pin create + stop removal). Hook closes the modal after.
+  onDemoted?: (draft: PinDraft, stop: Stop) => void;
 };
 
 export function usePinModal(tripId: string, options: Options = {}) {
@@ -44,6 +53,7 @@ export function usePinModal(tripId: string, options: Options = {}) {
 
   const openCreate = (input: CreateDraftInput) => setModal({ kind: 'create', ...input });
   const openEdit = (pin: Pin) => setModal({ kind: 'edit', pin });
+  const openDemote = (stop: Stop) => setModal({ kind: 'demote', stop });
   const closeModal = () => setModal({ kind: 'closed' });
 
   function deletePin(pin: Pin) {
@@ -69,22 +79,56 @@ export function usePinModal(tripId: string, options: Options = {}) {
     closeModal();
   }
 
-  const modalElement: ReactNode =
-    modal.kind !== 'closed' ? (
+  function handleDemote(draft: PinDraft) {
+    if (modal.kind !== 'demote') return;
+    options.onDemoted?.(draft, modal.stop);
+    closeModal();
+  }
+
+  let modalElement: ReactNode = null;
+  if (modal.kind === 'create') {
+    modalElement = (
       <PinModal
-        initial={modal.kind === 'edit' ? modal.pin : null}
-        lat={modal.kind === 'edit' ? modal.pin.lat : modal.lat}
-        lng={modal.kind === 'edit' ? modal.pin.lng : modal.lng}
-        defaultName={modal.kind === 'create' ? modal.defaultName : undefined}
-        defaultCategory={modal.kind === 'create' ? modal.defaultCategory : undefined}
-        defaultPriority={modal.kind === 'create' ? modal.defaultPriority : undefined}
-        primaryAction={modal.kind === 'create' ? modal.primaryAction : undefined}
-        saving={createPin.isPending || updatePin.isPending}
+        lat={modal.lat}
+        lng={modal.lng}
+        defaultName={modal.defaultName}
+        defaultCategory={modal.defaultCategory}
+        defaultPriority={modal.defaultPriority}
+        primaryAction={modal.primaryAction}
+        saving={createPin.isPending}
         onCancel={closeModal}
         onSave={handleSave}
         onSaveAsStop={options.onSaveAsStop ? handleSaveAsStop : undefined}
       />
-    ) : null;
+    );
+  } else if (modal.kind === 'edit') {
+    modalElement = (
+      <PinModal
+        initial={modal.pin}
+        lat={modal.pin.lat}
+        lng={modal.pin.lng}
+        saving={updatePin.isPending}
+        onCancel={closeModal}
+        onSave={handleSave}
+      />
+    );
+  } else if (modal.kind === 'demote') {
+    const stop = modal.stop;
+    modalElement = (
+      <PinModal
+        lat={stop.lat}
+        lng={stop.lng}
+        defaultName={stop.label || stop.name}
+        defaultCategory={stop.category || 'landmark'}
+        defaultPriority={stop.priority || 'want'}
+        defaultNotes={stop.notes || (stop.highlights?.length ? stop.highlights.join(' · ') : '')}
+        headerLabel="Demote to pin"
+        submitLabel="Demote to pin"
+        onCancel={closeModal}
+        onSave={handleDemote}
+      />
+    );
+  }
 
-  return { openCreate, openEdit, closeModal, deletePin, modalElement };
+  return { openCreate, openEdit, openDemote, closeModal, deletePin, modalElement };
 }
