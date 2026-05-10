@@ -1,3 +1,4 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useAuth } from './hooks/useAuth';
 import { useMe } from './hooks/useMe';
@@ -7,20 +8,18 @@ import { Loading } from './screens/Loading';
 import { Login } from './screens/Login';
 import { Dashboard } from './screens/Dashboard';
 import { AccessDenied } from './screens/AccessDenied';
+import { Builder } from './screens/Builder';
+import type { MeResponse } from './lib/types';
 
 export default function App() {
   const cfg = useConfig();
 
   if (cfg.isLoading) return <Loading label="Loading config" />;
   if (cfg.error || !cfg.data?.firebaseConfig?.apiKey) {
-    // No config → render bare Login; clicking sign-in will surface the error
     return <Login />;
   }
 
-  // Init synchronously BEFORE rendering AppAuthed so its child hooks can use
-  // getFirebaseAuth() on the same render. initFirebase is idempotent.
   initFirebase(cfg.data.firebaseConfig as any);
-
   return <AppAuthed />;
 }
 
@@ -35,7 +34,6 @@ function AppAuthed() {
   if (me.isLoading) return <Loading label="Loading profile" />;
 
   if (me.error instanceof ApiError && me.error.status === 403) {
-    // Sign out so they can try a different account
     signOutFirebase();
     return <AccessDenied />;
   }
@@ -44,5 +42,16 @@ function AppAuthed() {
     return <Login />;
   }
 
-  return <Dashboard me={me.data} />;
+  return <AuthedRoutes me={me.data} />;
+}
+
+function AuthedRoutes({ me }: { me: MeResponse }) {
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard me={me} />} />
+      <Route path="/builder" element={<Builder />} />
+      <Route path="/builder/:tripId" element={<Builder />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }

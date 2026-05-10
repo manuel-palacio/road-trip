@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { signOutFirebase } from '../lib/firebase';
 import type { MeResponse, Trip } from '../lib/types';
 import { Brand } from '../components/Brand';
@@ -12,6 +13,7 @@ function initials(name: string) {
 }
 
 export function Dashboard({ me }: { me: MeResponse }) {
+  const navigate = useNavigate();
   const trips = useTrips(true);
   const del = useDeleteTrip();
 
@@ -62,14 +64,14 @@ export function Dashboard({ me }: { me: MeResponse }) {
             <TripCard
               key={trip.id}
               trip={trip}
-              onEdit={() => alert('Builder coming in slice 18c.')}
-              onView={() => alert('Viewer coming in slice 18d/Slice 08.')}
+              onEdit={(id) => navigate(`/builder/${id}`)}
+              onView={() => alert('Viewer coming in Slice 08.')}
               onDelete={(id) => del.mutateAsync(id)}
             />
           ))}
           <NewTripTile
             hero={isEmpty}
-            onClick={() => alert('Builder coming in slice 18c.')}
+            onClick={() => navigate('/builder')}
           />
         </div>
 
