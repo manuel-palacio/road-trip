@@ -9,6 +9,7 @@ import { Login } from './screens/Login';
 import { Dashboard } from './screens/Dashboard';
 import { AccessDenied } from './screens/AccessDenied';
 import { Builder } from './screens/Builder';
+import { Viewer } from './screens/Viewer';
 import type { MeResponse } from './lib/types';
 
 export default function App() {
@@ -51,6 +52,7 @@ function AuthedRoutes({ me }: { me: MeResponse }) {
       <Route path="/" element={<Dashboard me={me} />} />
       <Route path="/builder" element={<Builder />} />
       <Route path="/builder/:tripId" element={<Builder />} />
+      <Route path="/viewer/:tripId" element={<Viewer />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

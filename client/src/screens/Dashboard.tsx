@@ -65,7 +65,7 @@ export function Dashboard({ me }: { me: MeResponse }) {
               key={trip.id}
               trip={trip}
               onEdit={(id) => navigate(`/builder/${id}`)}
-              onView={() => alert('Viewer coming in Slice 08.')}
+              onView={(id) => navigate(`/viewer/${id}`)}
               onDelete={(id) => del.mutateAsync(id)}
             />
           ))}
