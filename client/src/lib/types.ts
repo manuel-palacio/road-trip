@@ -41,6 +41,20 @@ export type Stop = {
   durationSecondsFromPrevious?: number;
 };
 
+export type PinCategory = 'food' | 'hotel' | 'scenic' | 'fuel' | 'landmark' | 'other';
+
+export type Pin = {
+  id: string;
+  name: string;
+  category: PinCategory;
+  notes?: string;
+  lat: number;
+  lng: number;
+  addedByUid?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
 export type Trip = {
   id: string;
   ownerUid: string;

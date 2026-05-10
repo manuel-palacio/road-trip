@@ -1,5 +1,5 @@
 import { getFirebaseAuth } from './firebase';
-import type { AppConfig, MeResponse, Trip } from './types';
+import type { AppConfig, MeResponse, Pin, Trip } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -69,4 +69,34 @@ export async function deleteTrip(id: string): Promise<void> {
   await handle<unknown>(await fetch(`/api/trips/${encodeURIComponent(id)}`, await withToken({
     method: 'DELETE',
   })));
+}
+
+export async function listPins(tripId: string): Promise<{ pins: Pin[] }> {
+  return handle<{ pins: Pin[] }>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/pins`, await withToken()),
+  );
+}
+
+export async function createPin(tripId: string, body: Omit<Pin, 'id' | 'addedByUid' | 'createdAt' | 'updatedAt'>): Promise<Pin> {
+  return handle<Pin>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/pins`, await withToken({
+      method: 'POST', body: JSON.stringify(body),
+    })),
+  );
+}
+
+export async function updatePin(tripId: string, pinId: string, body: Partial<Pin>): Promise<Pin> {
+  return handle<Pin>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/pins/${encodeURIComponent(pinId)}`, await withToken({
+      method: 'PUT', body: JSON.stringify(body),
+    })),
+  );
+}
+
+export async function deletePin(tripId: string, pinId: string): Promise<void> {
+  await handle<unknown>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/pins/${encodeURIComponent(pinId)}`, await withToken({
+      method: 'DELETE',
+    })),
+  );
 }

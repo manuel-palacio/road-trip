@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { signInWithGoogle } from '../lib/firebase';
 import { Brand } from '../components/Brand';
-import { RouteMark } from '../components/RouteMark';
 
 const GoogleG = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
@@ -12,6 +11,39 @@ const GoogleG = () => (
   </svg>
 );
 
+const FEATURES = [
+  {
+    glyph: '📍',
+    label: 'Pins for places that matter',
+    body: 'Drop food, hotel, scenic, fuel, and landmark pins anywhere on the map. Annotate, edit, navigate.',
+  },
+  {
+    glyph: '🗓',
+    label: 'Days that sort themselves',
+    body: 'Set a daily kilometre budget — your stops split into days on their own. No spreadsheets.',
+  },
+  {
+    glyph: '🚗',
+    label: 'Android Auto, considered',
+    body: 'We track the ten-stop-per-day limit so the dashboard never drops half your route on the way.',
+  },
+  {
+    glyph: '✦',
+    label: 'Highlights, not itineraries',
+    body: 'A few words per stop. The vibe and the must-sees, not a minute-by-minute timetable.',
+  },
+  {
+    glyph: '↹',
+    label: 'Drag to reorder',
+    body: 'Move stops around with one hand. Distance, duration, and day numbers recompute live.',
+  },
+  {
+    glyph: '↗',
+    label: 'One tap to Google Maps',
+    body: 'Open any single day directly in Google Maps. Hand-off to the car just works.',
+  },
+];
+
 export function Login() {
   const [error, setError] = useState<string | null>(null);
 
@@ -19,24 +51,34 @@ export function Login() {
     setError(null);
     try {
       await signInWithGoogle();
-    } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') return;
-      setError(err?.message || 'Sign-in failed');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+      setError((err as { message?: string })?.message || 'Sign-in failed');
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-8">
-      <div className="max-w-[460px] w-full text-center">
+    <div className="min-h-screen flex flex-col items-center px-8 py-16">
+      {/* Hero */}
+      <div className="max-w-[480px] w-full text-center pt-12">
         <h1 className="animate-rise [animation-delay:0.05s]">
           <Brand size="xl" />
         </h1>
-        <p className="mt-[18px] text-[15px] text-paper-dim animate-rise [animation-delay:0.18s]">
-          Build your road trip. Share the adventure.
+        <p className="mt-5 font-serif italic text-[19px] leading-[1.4] text-paper-dim animate-rise [animation-delay:0.18s]">
+          Plot the route. Pin the moments.<br />
+          Share the adventure.
         </p>
-        <div className="mt-9 mb-8 mx-auto animate-rise [animation-delay:0.32s]">
-          <RouteMark />
+
+        <div className="my-9 flex items-center justify-center gap-3 animate-rise [animation-delay:0.32s]" aria-hidden>
+          <span className="block h-px w-20 bg-gradient-to-r from-transparent to-paper-muted/40" />
+          <span className="relative w-2 h-2">
+            <span className="absolute inset-0 rounded-full bg-accent" />
+            <span className="absolute -inset-1.5 rounded-full border border-accent/40" />
+          </span>
+          <span className="block h-px w-20 bg-gradient-to-l from-transparent to-paper-muted/40" />
         </div>
+
         <button
           type="button"
           onClick={onSignIn}
@@ -51,6 +93,44 @@ export function Login() {
         <p className="mt-7 font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted animate-rise [animation-delay:0.6s]">
           Private beta <span className="text-accent mx-1">·</span> invite-only
         </p>
+      </div>
+
+      {/* Features */}
+      <section className="mt-24 w-full max-w-[1040px] animate-rise [animation-delay:0.78s]">
+        <div className="text-center mb-12">
+          <span className="font-mono text-[10px] tracking-[0.28em] uppercase text-paper-muted">
+            What's in the box
+          </span>
+          <h2 className="mt-3 font-serif italic font-normal text-[clamp(28px,4vw,40px)] tracking-tight leading-[1.1] text-paper">
+            A road-trip planner that thinks in days.
+          </h2>
+        </div>
+
+        <ul className="grid gap-x-10 gap-y-12 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <li key={f.label} className="flex flex-col items-start text-left">
+              <span
+                className="w-10 h-10 rounded-full bg-canvas border border-line-strong flex items-center justify-center text-[18px] mb-4 shadow-[inset_0_1px_0_rgba(243,236,222,0.04)]"
+                aria-hidden
+              >
+                {f.glyph}
+              </span>
+              <h3 className="font-serif italic text-[18px] leading-[1.25] text-paper">
+                {f.label}
+              </h3>
+              <p className="mt-2 text-[13.5px] leading-[1.55] text-paper-dim">
+                {f.body}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Footer atmosphere */}
+      <div className="mt-20 pb-2 flex items-center gap-3 font-mono text-[9.5px] tracking-[0.3em] uppercase text-paper-muted/70">
+        <span className="block h-px w-12 bg-paper-muted/30" />
+        <span>Built for long roads</span>
+        <span className="block h-px w-12 bg-paper-muted/30" />
       </div>
     </div>
   );

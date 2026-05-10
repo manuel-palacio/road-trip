@@ -56,6 +56,17 @@ export function makeMarkerIcon(num: number, ringColor = '#f3ecde'): google.maps.
   };
 }
 
+export function makePinIcon(emoji: string, tint: string): google.maps.Icon {
+  // Smaller, darker disc than the cream route markers — pins read as
+  // secondary annotations layered on top of the day spine.
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34' viewBox='0 0 34 34'><circle cx='17' cy='17' r='13.5' fill='#0d0e11' stroke='${tint}' stroke-width='2'/><text x='17' y='17' text-anchor='middle' dominant-baseline='central' font-size='15'>${emoji}</text></svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    anchor: new google.maps.Point(17, 17),
+    scaledSize: new google.maps.Size(34, 34),
+  };
+}
+
 export function requestGeolocation(): Promise<{ lat: number; lng: number } | null> {
   return new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);

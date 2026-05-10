@@ -24,3 +24,9 @@ Download a service account key from Firebase Console → Project Settings → Se
 ### Access allowlist
 
 `ALLOWED_EMAILS` is a comma-separated list. When set, only those emails can pass `/api/me` and any other authenticated endpoint. Leave blank to open the site to any Google account (post-launch mode). In private beta, set it to your own email.
+
+```
+gcloud run services update road-trip --region=europe-north1 \                                     
+    --update-env-vars ALLOWED_EMAILS=emanuel.palacio@gmail.com,FRIEND_EMAIL@example.com 
+```
+
