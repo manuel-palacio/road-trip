@@ -832,10 +832,28 @@
     }
 
     /* Drag-and-drop visuals */
-    .stop-row.is-dragging { opacity: 0.35; }
-    .stop-row.drop-above { box-shadow: 0 -2px 0 0 var(--accent) inset; }
-    .stop-row.drop-below { box-shadow: 0 2px 0 0 var(--accent) inset; }
+    .stop-row.is-dragging {
+      opacity: 0.3;
+      transform: scale(0.98);
+      transition: opacity 100ms, transform 100ms;
+    }
+    .stop-row.drop-above::before,
+    .stop-row.drop-below::after {
+      content: '';
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      box-shadow: 0 0 14px rgba(231, 111, 81, 0.7);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .stop-row.drop-above::before { top: -6px; }
+    .stop-row.drop-below::after { bottom: -6px; }
     .stop-handle:active { cursor: grabbing; }
+    .stop-handle:hover { color: var(--accent); }
 
     /* Day offset +/- on stop card */
     .day-offset {
