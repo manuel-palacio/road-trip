@@ -1,11 +1,19 @@
 import { useState, type ReactNode } from 'react';
 import { useCreatePin, useDeletePin, useUpdatePin } from './usePins';
 import { PinModal, type PinDraft } from '../components/viewer/PinModal';
-import type { Pin, PinCategory } from '../lib/types';
+import type { Pin, PinCategory, PinPriority } from '../lib/types';
 
 type ModalState =
   | { kind: 'closed' }
-  | { kind: 'create'; lat: number; lng: number; defaultName?: string; defaultCategory?: PinCategory }
+  | {
+      kind: 'create';
+      lat: number;
+      lng: number;
+      defaultName?: string;
+      defaultCategory?: PinCategory;
+      defaultPriority?: PinPriority;
+      primaryAction?: 'pin' | 'stop';
+    }
   | { kind: 'edit'; pin: Pin };
 
 export type CreateDraftInput = {
@@ -13,6 +21,11 @@ export type CreateDraftInput = {
   lng: number;
   defaultName?: string;
   defaultCategory?: PinCategory;
+  defaultPriority?: PinPriority;
+  // 'stop' makes "Add as stop" the primary (accent) action and demotes
+  // "Drop pin" to secondary. Used for hotels where the search result is
+  // almost always a navigation destination, not just a highlight.
+  primaryAction?: 'pin' | 'stop';
 };
 
 type Options = {
@@ -64,6 +77,8 @@ export function usePinModal(tripId: string, options: Options = {}) {
         lng={modal.kind === 'edit' ? modal.pin.lng : modal.lng}
         defaultName={modal.kind === 'create' ? modal.defaultName : undefined}
         defaultCategory={modal.kind === 'create' ? modal.defaultCategory : undefined}
+        defaultPriority={modal.kind === 'create' ? modal.defaultPriority : undefined}
+        primaryAction={modal.kind === 'create' ? modal.primaryAction : undefined}
         saving={createPin.isPending || updatePin.isPending}
         onCancel={closeModal}
         onSave={handleSave}

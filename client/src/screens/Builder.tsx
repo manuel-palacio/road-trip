@@ -190,11 +190,18 @@ export function Builder() {
         // prefilled. The user confirms category/priority/notes and saves.
         if (isConcretePlace(place.types)) {
           if (stateRef.current.tripId) {
+            const cat = guessCategoryFromTypes(place.types);
+            // Hotels are almost always navigation destinations (you drive to
+            // the hotel, you sleep there). Prefill priority=must and make
+            // "Add as stop" the primary action. Other POIs default to want+pin.
+            const isHotel = cat === 'hotel';
             pinModalRef.current.openCreate({
               lat,
               lng,
               defaultName: place.name || place.formatted_address || '',
-              defaultCategory: guessCategoryFromTypes(place.types),
+              defaultCategory: cat,
+              defaultPriority: isHotel ? 'must' : 'want',
+              primaryAction: isHotel ? 'stop' : 'pin',
             });
             if (searchInputRef.current) searchInputRef.current.value = '';
             return;
