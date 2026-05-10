@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
-const TRAVEL_EMOJIS = ['🚗','🚙','🛻','🏎️','🚐','🛵','🚲','⛺','🏕️','🏔️','🏖️','🏝️','🗺️','🧭','🌅','🌲','🛣️','⛰️','🌊','🐪'];
+const TRAVEL_EMOJIS = [
+  '🚗','🚙','🛻','🏎️','🚐','🛵',
+  '🚲','🏍️','🚌','🚎','🚂','🚢',
+  '⛺','🏕️','🛖','🏔️','⛰️','🌋',
+  '🏖️','🏝️','🌅','🌄','🌆','🌃',
+  '🗺️','🧭','🛣️','🛤️','🌲','🌳',
+  '🌊','🌴','🏰','🗿','🐪','🐎',
+];
 
 type Props = {
   value: string;
@@ -33,18 +40,28 @@ export function EmojiPicker({ value, onChange }: Props) {
         {value || '🚗'}
       </button>
       {open && (
-        <div className="absolute top-12 left-0 z-50 grid grid-cols-5 gap-1 p-2.5 bg-canvas border border-line-strong rounded-lg shadow-[0_16px_40px_-10px_rgba(0,0,0,0.6)]">
-          {TRAVEL_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              title={emoji}
-              onClick={() => { onChange(emoji); setOpen(false); }}
-              className="bg-transparent border-0 text-[22px] w-9 h-9 rounded cursor-pointer transition-colors hover:bg-surface-2"
-            >
-              {emoji}
-            </button>
-          ))}
+        <div className="absolute top-12 left-0 z-50 w-[300px] bg-canvas border border-line-strong rounded-lg shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)] animate-rise">
+          <div className="px-3.5 pt-3 pb-2 border-b border-line flex items-center justify-between">
+            <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
+              Cover icon
+            </span>
+            <span className="font-serif italic text-[13px] text-paper-dim">{value || '🚗'}</span>
+          </div>
+          <div className="grid grid-cols-6 gap-1.5 p-3 max-h-[280px] overflow-y-auto">
+            {TRAVEL_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                title={emoji}
+                onClick={() => { onChange(emoji); setOpen(false); }}
+                className={`bg-transparent border text-[22px] w-10 h-10 rounded cursor-pointer transition-all hover:bg-surface-2 hover:scale-110 ${
+                  emoji === value ? 'border-accent bg-accent-soft' : 'border-transparent'
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
