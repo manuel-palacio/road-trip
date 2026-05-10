@@ -105,6 +105,29 @@ function canDelete(data, uid) {
 router.post('/api/trips', async (req, res) => {
   try {
     const db = getDb();
+
+    // Plan limit enforcement: free users are capped at FREE_TRIP_LIMIT.
+    // Pro users (or anyone explicitly marked plan='pro') skip the check.
+    const userSnap = await db.collection('users').doc(req.uid).get();
+    const user = userSnap.exists ? userSnap.data() : null;
+    if (!user || user.plan !== 'pro') {
+      const limit = (user && typeof user.tripLimit === 'number')
+        ? user.tripLimit
+        : parseInt(process.env.FREE_TRIP_LIMIT || '2', 10);
+      const countSnap = await db
+        .collection('trips')
+        .where('ownerUid', '==', req.uid)
+        .count()
+        .get();
+      if (countSnap.data().count >= limit) {
+        return res.status(402).json({
+          error: `Free plan is capped at ${limit} trips. Upgrade to create more.`,
+          code: 'TRIP_LIMIT_REACHED',
+          limit,
+        });
+      }
+    }
+
     const body = req.body || {};
     const trip = {
       ownerUid: req.uid,

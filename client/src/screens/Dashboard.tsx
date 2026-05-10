@@ -12,6 +12,11 @@ function initials(name: string) {
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '··';
 }
 
+function showUpgradeAlert() {
+  // Slice 12 will wire this to Paddle. For now, a friendly placeholder.
+  alert('Upgrade to Pro is coming soon — Paddle integration ships in Slice 12.');
+}
+
 export function Dashboard({ me }: { me: MeResponse }) {
   const navigate = useNavigate();
   const trips = useTrips(true);
@@ -19,6 +24,8 @@ export function Dashboard({ me }: { me: MeResponse }) {
 
   const list: Trip[] = trips.data?.trips ?? [];
   const isEmpty = !trips.isLoading && list.length === 0;
+  const isFree = me.plan === 'free';
+  const atLimit = isFree && me.tripCount >= me.tripLimit;
 
   return (
     <div className="min-h-screen relative">
@@ -59,6 +66,44 @@ export function Dashboard({ me }: { me: MeResponse }) {
           Your trips
         </h2>
 
+        {isFree && (
+          atLimit ? (
+            <div className="mt-7 flex flex-wrap items-center gap-4 px-5 py-3.5 rounded-md border border-accent bg-accent-soft">
+              <div className="flex-1 min-w-[260px]">
+                <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-accent mb-1">
+                  Free plan · limit reached
+                </div>
+                <p className="font-serif italic text-[14.5px] text-paper">
+                  You've used all {me.tripLimit} of your free trips. Upgrade to Pro to keep building.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={showUpgradeAlert}
+                className="bg-accent text-canvas border-0 rounded px-4 py-2 font-mono text-[10.5px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_8px_24px_-6px_rgba(231,111,81,0.5)]"
+              >
+                Subscribe → Pro
+              </button>
+            </div>
+          ) : (
+            <div className="mt-7 flex items-center justify-between gap-4 px-4 py-2.5 rounded-md border border-line bg-surface/40">
+              <div className="font-mono text-[10.5px] tracking-[0.18em] uppercase text-paper-dim">
+                <span className="text-paper-muted">Free plan</span>
+                <span className="mx-2 text-paper-muted">·</span>
+                <span className="text-paper font-medium">{me.tripCount}</span>
+                <span className="text-paper-muted"> of {me.tripLimit} trips used</span>
+              </div>
+              <button
+                type="button"
+                onClick={showUpgradeAlert}
+                className="bg-transparent border border-line-strong text-paper-dim px-3 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-accent hover:border-accent transition-colors"
+              >
+                Upgrade for unlimited trips, PDF export &amp; collaboration <span aria-hidden>→</span>
+              </button>
+            </div>
+          )
+        )}
+
         <div className="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(290px,1fr))]">
           {list.map((trip) => (
             <TripCard
@@ -71,7 +116,9 @@ export function Dashboard({ me }: { me: MeResponse }) {
           ))}
           <NewTripTile
             hero={isEmpty}
+            disabled={atLimit}
             onClick={() => navigate('/builder')}
+            onUpgrade={showUpgradeAlert}
           />
         </div>
 

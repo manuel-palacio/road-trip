@@ -7,7 +7,7 @@ import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
-import { createTrip, getTrip, updateTrip } from '../lib/api';
+import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
 import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-category';
@@ -407,7 +407,12 @@ export function Builder() {
       setTimeout(() => setSavedToast(false), 1800);
     } catch (err) {
       console.error('Save failed', err);
-      alert('Could not save trip.');
+      if (err instanceof ApiError && err.code === 'TRIP_LIMIT_REACHED') {
+        alert(`${err.message}\n\nUpgrade to Pro to keep building new trips. (Paddle integration ships in Slice 12.)`);
+        navigate('/');
+      } else {
+        alert('Could not save trip.');
+      }
     } finally {
       setSaving(false);
     }
