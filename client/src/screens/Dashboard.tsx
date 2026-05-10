@@ -1,6 +1,9 @@
 import { signOutFirebase } from '../lib/firebase';
-import type { MeResponse } from '../lib/types';
+import type { MeResponse, Trip } from '../lib/types';
 import { Brand } from '../components/Brand';
+import { TripCard } from '../components/TripCard';
+import { NewTripTile } from '../components/NewTripTile';
+import { useDeleteTrip, useTrips } from '../hooks/useTrips';
 
 function initials(name: string) {
   if (!name) return '··';
@@ -9,6 +12,12 @@ function initials(name: string) {
 }
 
 export function Dashboard({ me }: { me: MeResponse }) {
+  const trips = useTrips(true);
+  const del = useDeleteTrip();
+
+  const list: Trip[] = trips.data?.trips ?? [];
+  const isEmpty = !trips.isLoading && list.length === 0;
+
   return (
     <div className="min-h-screen relative">
       <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-9 py-5 border-b border-line bg-canvas/85 backdrop-blur-md">
@@ -42,16 +51,33 @@ export function Dashboard({ me }: { me: MeResponse }) {
       </header>
       <main className="max-w-[1100px] mx-auto pt-[140px] px-9 pb-20">
         <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted mb-3.5">
-          Workspace <span className="text-accent mx-1.5">·</span> trips <span className="text-accent mx-1.5">·</span> {me.tripCount}
+          Workspace <span className="text-accent mx-1.5">·</span> trips <span className="text-accent mx-1.5">·</span> {list.length}
         </div>
         <h2 className="font-serif italic font-normal text-[clamp(48px,7vw,76px)] tracking-tight leading-none">
           Your trips
         </h2>
-        <div className="mt-10 p-12 border border-dashed border-line-strong rounded-lg text-center">
-          <p className="font-serif italic text-[18px] text-paper-dim max-w-[420px] mx-auto leading-[1.5]">
-            Trip cards, builder, viewer and the rest of the editor are migrating to React over the next few commits.
-          </p>
+
+        <div className="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(290px,1fr))]">
+          {list.map((trip) => (
+            <TripCard
+              key={trip.id}
+              trip={trip}
+              onEdit={() => alert('Builder coming in slice 18c.')}
+              onView={() => alert('Viewer coming in slice 18d/Slice 08.')}
+              onDelete={(id) => del.mutateAsync(id)}
+            />
+          ))}
+          <NewTripTile
+            hero={isEmpty}
+            onClick={() => alert('Builder coming in slice 18c.')}
+          />
         </div>
+
+        {isEmpty && (
+          <p className="mt-7 mx-auto max-w-[560px] text-center font-serif italic text-[16px] leading-[1.55] text-paper-dim">
+            Your road trips will live here. Start by plotting your first route — pick a starting point, add stops along the way, and the days will sort themselves out.
+          </p>
+        )}
       </main>
     </div>
   );
