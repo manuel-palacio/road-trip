@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useConfig } from './hooks/useConfig';
 import { useAuth } from './hooks/useAuth';
 import { useMe } from './hooks/useMe';
@@ -12,17 +11,15 @@ import { AccessDenied } from './screens/AccessDenied';
 export default function App() {
   const cfg = useConfig();
 
-  // Initialize Firebase as soon as we have config
-  useEffect(() => {
-    if (cfg.data?.firebaseConfig?.apiKey) {
-      initFirebase(cfg.data.firebaseConfig as any);
-    }
-  }, [cfg.data]);
-
   if (cfg.isLoading) return <Loading label="Loading config" />;
   if (cfg.error || !cfg.data?.firebaseConfig?.apiKey) {
-    return <Login />; // bare login with no config — sign-in will fail visibly
+    // No config → render bare Login; clicking sign-in will surface the error
+    return <Login />;
   }
+
+  // Init synchronously BEFORE rendering AppAuthed so its child hooks can use
+  // getFirebaseAuth() on the same render. initFirebase is idempotent.
+  initFirebase(cfg.data.firebaseConfig as any);
 
   return <AppAuthed />;
 }
