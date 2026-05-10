@@ -12,6 +12,8 @@ type Props = {
   onSetForceDayStart: (id: string, value: boolean) => void;
   onAddHighlight: (id: string, text: string) => void;
   onRemoveHighlight: (id: string, text: string) => void;
+  onDemote?: (stop: Stop) => void;
+  demotingStopId?: string | null;
   onDragStart: (id: string, ev: React.DragEvent) => void;
   onDragEnd: () => void;
   onDragOver: (id: string, ev: React.DragEvent) => void;
@@ -51,6 +53,8 @@ export function StopList(p: Props) {
               onSetForceDayStart={p.onSetForceDayStart}
               onAddHighlight={p.onAddHighlight}
               onRemoveHighlight={p.onRemoveHighlight}
+              onDemote={p.onDemote}
+              demotingStopId={p.demotingStopId}
               onDragStart={p.onDragStart}
               onDragEnd={p.onDragEnd}
               onDragOver={p.onDragOver}

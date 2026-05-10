@@ -45,10 +45,12 @@
   }
 }
 
-/* Pin name label under map marker — Google Maps Marker.label className target */
+/* Pin name label under map marker — Google Maps Marker.label className target.
+ * Anchor is at the teardrop tip (bottom of marker), so the label sits below
+ * the tip with a small gap. */
 .gm-style .pin-name-label {
-  transform: translateY(28px);
-  background: rgba(13, 14, 17, 0.8);
+  transform: translateY(14px);
+  background: rgba(13, 14, 17, 0.82);
   border: 1px solid rgba(243, 236, 222, 0.1);
   border-radius: 4px;
   padding: 2px 6px;
@@ -59,7 +61,7 @@
 }
 .gm-style .pin-name-label--must {
   border-color: rgba(231, 111, 81, 0.55);
-  background: rgba(231, 111, 81, 0.12);
+  background: rgba(231, 111, 81, 0.14);
 }
 
 /* Restyle Google Places Autocomplete dropdown */

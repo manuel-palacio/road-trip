@@ -6,9 +6,11 @@ type Props = {
   onEdit: (pin: Pin) => void;
   onDelete: (pin: Pin) => void;
   onFocus: (pin: Pin) => void;
+  onPromote?: (pin: Pin) => void;
+  promotingPinId?: string | null;
 };
 
-export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
+export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingPinId }: Props) {
   if (pins.length === 0) {
     return (
       <div className="px-4 py-10 text-center">
@@ -63,6 +65,18 @@ export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
                   <p className="mt-1.5 font-serif italic text-[13px] text-paper-dim leading-snug [overflow-wrap:anywhere]">
                     {pin.notes}
                   </p>
+                )}
+                {onPromote && (
+                  <button
+                    type="button"
+                    onClick={() => onPromote(pin)}
+                    disabled={promotingPinId === pin.id}
+                    className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase border border-line-strong text-paper-dim hover:text-accent hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Add this pin to the route as a stop"
+                  >
+                    <span aria-hidden>↗</span>
+                    {promotingPinId === pin.id ? 'Adding…' : 'Add to route'}
+                  </button>
                 )}
               </div>
               <div className="flex flex-col gap-1 shrink-0">

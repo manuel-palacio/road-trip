@@ -13,6 +13,8 @@ type Props = {
   onSetForceDayStart: (id: string, value: boolean) => void;
   onAddHighlight: (id: string, text: string) => void;
   onRemoveHighlight: (id: string, text: string) => void;
+  onDemote?: (stop: Stop) => void;
+  demotingStopId?: string | null;
   // DnD
   onDragStart: (id: string, ev: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -159,6 +161,19 @@ export function StopRow(p: Props) {
           >
             Day {stop.dayNumber || 1}
           </span>
+
+          {p.onDemote && (
+            <button
+              type="button"
+              onClick={() => p.onDemote!(stop)}
+              disabled={p.demotingStopId === stop.id}
+              title="Remove from route, keep as a pin"
+              className="inline-flex items-center gap-1 px-1.5 py-[3px] rounded border border-line text-paper-muted font-mono text-[9.5px] tracking-[0.16em] uppercase hover:text-accent hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span aria-hidden>↓</span>
+              {p.demotingStopId === stop.id ? '…' : 'Pin'}
+            </button>
+          )}
 
           <span className="inline-flex items-center gap-1 ml-1">
             <button

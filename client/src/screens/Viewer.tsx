@@ -6,6 +6,7 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
+import { usePromotePin } from '../hooks/usePromoteAction';
 import { getTrip } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
@@ -54,6 +55,7 @@ export function Viewer() {
 
   const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
   const pinModal = usePinModal(tripId || '', { onCreated: () => setActiveTab('pins') });
+  const promotePin = usePromotePin(tripId || '', stops);
 
   const routes = useRouteSegments(stops, maps);
   const dayedStops = useMemo(
@@ -277,6 +279,8 @@ export function Viewer() {
                 onEdit={pinModal.openEdit}
                 onDelete={pinModal.deletePin}
                 onFocus={(p) => pinLayerRef.current?.focusPin(p)}
+                onPromote={(p) => promotePin.mutate(p)}
+                promotingPinId={promotePin.isPending ? promotePin.variables?.id ?? null : null}
               />
             </>
           )}

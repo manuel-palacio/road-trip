@@ -39,6 +39,11 @@ export type Stop = {
   kmFromPrevious?: number;
   durationFromPrevious?: string;
   durationSecondsFromPrevious?: number;
+  // Optional metadata carried over when this stop was promoted from a pin.
+  // Lossless promote/demote keeps these around for Phase 3 unification.
+  category?: PinCategory;
+  priority?: PinPriority;
+  notes?: string;
 };
 
 export type PinCategory = 'food' | 'hotel' | 'scenic' | 'fuel' | 'landmark' | 'other';

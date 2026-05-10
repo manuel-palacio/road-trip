@@ -32,3 +32,40 @@ export function guessCategoryFromTypes(types: readonly string[] | undefined): Pi
   }
   return 'other';
 }
+
+// Concrete-place markers from Google Places — when present, the result is
+// a specific POI (a hotel, restaurant, attraction) rather than a city/area.
+const CONCRETE_PLACE_TYPES = new Set([
+  'lodging',
+  'restaurant',
+  'cafe',
+  'bakery',
+  'meal_takeaway',
+  'meal_delivery',
+  'food',
+  'bar',
+  'gas_station',
+  'tourist_attraction',
+  'museum',
+  'church',
+  'hindu_temple',
+  'mosque',
+  'synagogue',
+  'point_of_interest',
+  'natural_feature',
+  'park',
+  'campground',
+  'rv_park',
+  'establishment',
+]);
+
+/**
+ * True when a Google Places result represents a concrete POI (Hilton Reims,
+ * Eiffel Tower, BP gas station) as opposed to an administrative area
+ * (Reims, Île-de-France, France). Used to dispatch the Builder's search:
+ * concrete places open the pin modal; areas add as a route stop.
+ */
+export function isConcretePlace(types: readonly string[] | undefined): boolean {
+  if (!types || types.length === 0) return false;
+  return types.some((t) => CONCRETE_PLACE_TYPES.has(t));
+}

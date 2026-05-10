@@ -79,23 +79,29 @@ type PinIconStyle = { ringColor: string; ringWidth: number; haloOpacity: number 
 const PRIORITY_ICON_STYLE: Record<'must' | 'want' | 'maybe', (tint: string) => PinIconStyle> = {
   // Must-visit pins get the terra-cotta accent ring + a soft halo so they
   // stand out across the editorial palette regardless of category color.
-  must:  () =>     ({ ringColor: '#e76f51', ringWidth: 3, haloOpacity: 0.35 }),
-  want:  (tint) => ({ ringColor: tint,      ringWidth: 2, haloOpacity: 0 }),
+  must:  () =>     ({ ringColor: '#e76f51', ringWidth: 2.5, haloOpacity: 0.32 }),
+  want:  (tint) => ({ ringColor: tint,      ringWidth: 2,   haloOpacity: 0 }),
   maybe: (tint) => ({ ringColor: tint,      ringWidth: 1.5, haloOpacity: 0 }),
 };
 
+// Classic teardrop "map pin" silhouette (44x56, point at bottom center).
+// Distinct shape from the circular numbered stop markers — pins read as
+// dropped highlights, stops read as route beads.
+const PIN_PATH = 'M22 2 C10.4 2 1 11.4 1 23 C1 38 22 54 22 54 C22 54 43 38 43 23 C43 11.4 33.6 2 22 2 Z';
+
 export function makePinIcon(emoji: string, tint: string, priority: 'must' | 'want' | 'maybe' = 'want'): google.maps.Icon {
   const { ringColor, ringWidth, haloOpacity } = PRIORITY_ICON_STYLE[priority](tint);
-  // Larger viewBox to accommodate the optional halo for must-visit pins.
   const halo = haloOpacity > 0
-    ? `<circle cx='20' cy='20' r='18' fill='${ringColor}' fill-opacity='${haloOpacity}'/>`
+    ? `<ellipse cx='22' cy='23' rx='22' ry='22' fill='${ringColor}' fill-opacity='${haloOpacity}'/>`
     : '';
   const opacity = priority === 'maybe' ? 0.78 : 1;
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><g opacity='${opacity}'>${halo}<circle cx='20' cy='20' r='13.5' fill='#0d0e11' stroke='${ringColor}' stroke-width='${ringWidth}'/><text x='20' y='20' text-anchor='middle' dominant-baseline='central' font-size='15'>${emoji}</text></g></svg>`;
+  // Emoji centered in the bulb (around y=23). Text-shadow via filter for legibility.
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='56' viewBox='0 0 44 56'><g opacity='${opacity}'>${halo}<path d='${PIN_PATH}' fill='#0d0e11' stroke='${ringColor}' stroke-width='${ringWidth}' stroke-linejoin='round'/><text x='22' y='23' text-anchor='middle' dominant-baseline='central' font-size='17'>${emoji}</text></g></svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    anchor: new google.maps.Point(20, 20),
-    scaledSize: new google.maps.Size(40, 40),
+    // Anchor at the tip of the teardrop (bottom center) so the pin "drops" on the location.
+    anchor: new google.maps.Point(22, 54),
+    scaledSize: new google.maps.Size(44, 56),
   };
 }
 

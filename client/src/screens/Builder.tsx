@@ -6,9 +6,11 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePins } from '../hooks/usePins';
+import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
+import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-category';
 import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute';
 import type { Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -113,10 +115,17 @@ export function Builder() {
   stateRef.current = state;
 
   const pinModal = usePinModal(state.tripId || '');
+  const pinModalRef = useRef(pinModal);
+  pinModalRef.current = pinModal;
   const pinsQuery = usePins(state.tripId || undefined);
   // Builder is the planning surface — show ALL pins (no in-town suppression).
   // Suppression only applies to the Viewer where the map serves driving.
   const builderPins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
+  // Promote/demote use the *current edit-state* stops, not the saved ones,
+  // because the Builder works on a draft. Promote/demote write to the server
+  // immediately, then the trip query reload pulls fresh state.
+  const promotePin = usePromotePin(state.tripId || '', state.stops);
+  const demoteStop = useDemoteStop(state.tripId || '', state.stops);
 
   // Enrich stops with km/duration/path from Directions API
   const routes = useRouteSegments(state.stops, maps);
@@ -147,18 +156,40 @@ export function Builder() {
     setMap(m);
     if (searchInputRef.current) {
       autocompleteRef.current = new maps.places.Autocomplete(searchInputRef.current, {
-        fields: ['name', 'formatted_address', 'geometry.location', 'address_components'],
-        // No `types` restriction — geocoded places + establishments (hotels, POIs)
+        fields: ['name', 'formatted_address', 'geometry.location', 'address_components', 'types'],
+        // No `types` restriction on the request — we want geocoded areas AND
+        // establishments. We dispatch on the response's types[] below.
       });
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current?.getPlace();
         if (!place?.geometry?.location) return;
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+
+        // Concrete POI (Hilton Reims, Eiffel Tower, BP) → open the pin modal
+        // prefilled. The user confirms category/priority/notes and saves.
+        if (isConcretePlace(place.types)) {
+          if (stateRef.current.tripId) {
+            pinModalRef.current.openCreate({
+              lat,
+              lng,
+              defaultName: place.name || place.formatted_address || '',
+              defaultCategory: guessCategoryFromTypes(place.types),
+            });
+            if (searchInputRef.current) searchInputRef.current.value = '';
+            return;
+          }
+          // No saved trip yet — fall through and add as a stop so the user
+          // isn't blocked. We'll surface a toast later about saving first.
+        }
+
+        // City / area / region → add as a route stop (current behavior).
         const newStop: Stop = {
           id: crypto.randomUUID(),
           name: place.formatted_address || place.name || '',
           label: place.name || place.formatted_address || '',
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
+          lat,
+          lng,
           countryCode: extractCountryCode(place.address_components),
           type: 'overnight',
           highlights: [],
@@ -457,6 +488,8 @@ export function Builder() {
               onSetForceDayStart={setForceDayStart}
               onAddHighlight={addHighlight}
               onRemoveHighlight={removeHighlight}
+              onDemote={state.tripId ? (s) => demoteStop.mutate(s) : undefined}
+              demotingStopId={demoteStop.isPending ? demoteStop.variables?.id ?? null : null}
               onDragStart={(id) => { draggedIdRef.current = id; }}
               onDragEnd={() => { draggedIdRef.current = null; }}
               onDragOver={() => { /* handled in StopRow */ }}

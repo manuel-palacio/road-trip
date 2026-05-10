@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessCategoryFromTypes } from '../place-to-category';
+import { guessCategoryFromTypes, isConcretePlace } from '../place-to-category';
 
 describe('guessCategoryFromTypes', () => {
   it('returns "other" for missing or empty types', () => {
@@ -39,5 +39,37 @@ describe('guessCategoryFromTypes', () => {
 
   it('falls back to "other" for unknown types', () => {
     expect(guessCategoryFromTypes(['atm', 'finance'])).toBe('other');
+  });
+});
+
+describe('isConcretePlace', () => {
+  it('returns false for missing or empty types', () => {
+    expect(isConcretePlace(undefined)).toBe(false);
+    expect(isConcretePlace([])).toBe(false);
+  });
+
+  it('returns true for a hotel result', () => {
+    expect(isConcretePlace(['lodging', 'point_of_interest', 'establishment'])).toBe(true);
+  });
+
+  it('returns true for a restaurant result', () => {
+    expect(isConcretePlace(['restaurant', 'food', 'point_of_interest'])).toBe(true);
+  });
+
+  it('returns false for a city/locality (Reims)', () => {
+    expect(isConcretePlace(['locality', 'political'])).toBe(false);
+  });
+
+  it('returns false for an administrative area (region/country)', () => {
+    expect(isConcretePlace(['administrative_area_level_1', 'political'])).toBe(false);
+    expect(isConcretePlace(['country', 'political'])).toBe(false);
+  });
+
+  it('returns false for a postal code lookup', () => {
+    expect(isConcretePlace(['postal_code'])).toBe(false);
+  });
+
+  it('returns true when establishment is the only marker (generic POI)', () => {
+    expect(isConcretePlace(['establishment'])).toBe(true);
   });
 });
