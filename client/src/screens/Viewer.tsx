@@ -10,6 +10,7 @@ import { getTrip } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon } from '../lib/google-maps';
+import { computePinAttachments } from '../lib/pin-attachment';
 import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { PinList } from '../components/viewer/PinList';
@@ -50,7 +51,12 @@ export function Viewer() {
   const stops = useMemo<Stop[]>(() => trip?.stops || [], [trip]);
 
   const pinsQuery = usePins(tripId);
-  const pins = pinsQuery.data || [];
+  const pins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
+  const attachments = useMemo(() => computePinAttachments(pins, stops), [pins, stops]);
+  const freePins = useMemo(
+    () => pins.filter((p) => attachments.get(p.id) === null),
+    [pins, attachments],
+  );
 
   const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
   const pinModal = usePinModal(tripId || '', { onCreated: () => setActiveTab('pins') });
@@ -274,6 +280,8 @@ export function Viewer() {
               <PinSearchBar maps={maps} onSelect={pinModal.openCreate} />
               <PinList
                 pins={pins}
+                stops={stops}
+                attachments={attachments}
                 onEdit={pinModal.openEdit}
                 onDelete={pinModal.deletePin}
                 onFocus={(p) => pinLayerRef.current?.focusPin(p.id)}
@@ -295,7 +303,7 @@ export function Viewer() {
             ref={pinLayerRef}
             map={map}
             maps={maps}
-            tripId={tripId}
+            pins={freePins}
             onRequestCreate={pinModal.openCreate}
             onRequestEdit={pinModal.openEdit}
             onRequestDelete={pinModal.deletePin}

@@ -74,14 +74,28 @@ export function makeMarkerIcon(num: number, ringColor = '#f3ecde'): google.maps.
   };
 }
 
-export function makePinIcon(emoji: string, tint: string): google.maps.Icon {
-  // Smaller, darker disc than the cream route markers — pins read as
-  // secondary annotations layered on top of the day spine.
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34' viewBox='0 0 34 34'><circle cx='17' cy='17' r='13.5' fill='#0d0e11' stroke='${tint}' stroke-width='2'/><text x='17' y='17' text-anchor='middle' dominant-baseline='central' font-size='15'>${emoji}</text></svg>`;
+type PinIconStyle = { ringColor: string; ringWidth: number; haloOpacity: number };
+
+const PRIORITY_ICON_STYLE: Record<'must' | 'want' | 'maybe', (tint: string) => PinIconStyle> = {
+  // Must-visit pins get the terra-cotta accent ring + a soft halo so they
+  // stand out across the editorial palette regardless of category color.
+  must:  () =>     ({ ringColor: '#e76f51', ringWidth: 3, haloOpacity: 0.35 }),
+  want:  (tint) => ({ ringColor: tint,      ringWidth: 2, haloOpacity: 0 }),
+  maybe: (tint) => ({ ringColor: tint,      ringWidth: 1.5, haloOpacity: 0 }),
+};
+
+export function makePinIcon(emoji: string, tint: string, priority: 'must' | 'want' | 'maybe' = 'want'): google.maps.Icon {
+  const { ringColor, ringWidth, haloOpacity } = PRIORITY_ICON_STYLE[priority](tint);
+  // Larger viewBox to accommodate the optional halo for must-visit pins.
+  const halo = haloOpacity > 0
+    ? `<circle cx='20' cy='20' r='18' fill='${ringColor}' fill-opacity='${haloOpacity}'/>`
+    : '';
+  const opacity = priority === 'maybe' ? 0.78 : 1;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><g opacity='${opacity}'>${halo}<circle cx='20' cy='20' r='13.5' fill='#0d0e11' stroke='${ringColor}' stroke-width='${ringWidth}'/><text x='20' y='20' text-anchor='middle' dominant-baseline='central' font-size='15'>${emoji}</text></g></svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    anchor: new google.maps.Point(17, 17),
-    scaledSize: new google.maps.Size(34, 34),
+    anchor: new google.maps.Point(20, 20),
+    scaledSize: new google.maps.Size(40, 40),
   };
 }
 

@@ -45,6 +45,23 @@
   }
 }
 
+/* Pin name label under map marker — Google Maps Marker.label className target */
+.gm-style .pin-name-label {
+  transform: translateY(28px);
+  background: rgba(13, 14, 17, 0.8);
+  border: 1px solid rgba(243, 236, 222, 0.1);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.gm-style .pin-name-label--must {
+  border-color: rgba(231, 111, 81, 0.55);
+  background: rgba(231, 111, 81, 0.12);
+}
+
 /* Restyle Google Places Autocomplete dropdown */
 .pac-container {
   background: theme('colors.canvas') !important;

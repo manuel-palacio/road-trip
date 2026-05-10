@@ -1,14 +1,17 @@
-import type { Pin } from '../../lib/types';
+import type { Pin, Stop } from '../../lib/types';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 
 type Props = {
   pins: Pin[];
+  stops: readonly Stop[];
+  attachments: Map<string, string | null>;
   onEdit: (pin: Pin) => void;
   onDelete: (pin: Pin) => void;
   onFocus: (pin: Pin) => void;
 };
 
-export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
+export function PinList({ pins, stops, attachments, onEdit, onDelete, onFocus }: Props) {
+  const stopById = new Map(stops.map((s) => [s.id, s]));
   if (pins.length === 0) {
     return (
       <div className="px-4 py-10 text-center">
@@ -26,10 +29,18 @@ export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
     <ul className="flex flex-col gap-2">
       {pins.map((pin) => {
         const meta = PIN_CATEGORY_META[pin.category];
+        const isMust = pin.priority === 'must';
+        const parentStopId = attachments.get(pin.id);
+        const parentStop = parentStopId ? stopById.get(parentStopId) : null;
+        const ringColor = isMust ? '#e76f51' : meta.tint;
         return (
           <li
             key={pin.id}
-            className="group border border-line rounded-lg bg-surface px-3 py-2.5 transition-colors hover:border-line-strong"
+            className={`group border rounded-lg px-3 py-2.5 transition-colors ${
+              isMust
+                ? 'border-[rgba(231,111,81,0.45)] bg-[rgba(231,111,81,0.06)] hover:border-accent'
+                : 'border-line bg-surface hover:border-line-strong'
+            }`}
           >
             <div className="flex items-start gap-3">
               <button
@@ -37,7 +48,7 @@ export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
                 onClick={() => onFocus(pin)}
                 aria-label={`Show ${pin.name} on the map`}
                 className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2 transition-transform hover:scale-110"
-                style={{ borderColor: meta.tint }}
+                style={{ borderColor: ringColor }}
               >
                 <span aria-hidden>{meta.emoji}</span>
               </button>
@@ -49,8 +60,12 @@ export function PinList({ pins, onEdit, onDelete, onFocus }: Props) {
                 >
                   {pin.name}
                 </button>
-                <div className="mt-0.5 font-mono text-[9.5px] tracking-[0.2em] uppercase text-paper-muted">
-                  {meta.label}
+                <div className="mt-0.5 font-mono text-[9.5px] tracking-[0.2em] uppercase text-paper-muted flex items-center gap-2 flex-wrap">
+                  <span>{meta.label}</span>
+                  {isMust && <span className="text-accent">· Must</span>}
+                  {parentStop && (
+                    <span className="text-paper-dim">· in {parentStop.label || parentStop.name}</span>
+                  )}
                 </div>
                 {pin.notes && (
                   <p className="mt-1.5 font-serif italic text-[13px] text-paper-dim leading-snug [overflow-wrap:anywhere]">

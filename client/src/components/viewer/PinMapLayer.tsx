@@ -2,7 +2,6 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { MAP_STYLE, makePinIcon, mapStyleForDropMode } from '../../lib/google-maps';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 import { guessCategoryFromTypes } from '../../lib/place-to-category';
-import { usePins } from '../../hooks/usePins';
 import type { Pin, PinCategory } from '../../lib/types';
 import { DropModeBanner } from './DropModeBanner';
 import { PinFab } from './PinFab';
@@ -10,11 +9,23 @@ import { PinFab } from './PinFab';
 type Props = {
   map: google.maps.Map | null;
   maps: typeof google.maps | null;
-  tripId: string;
+  pins: readonly Pin[];
   onRequestCreate: (input: { lat: number; lng: number; defaultName?: string; defaultCategory?: PinCategory }) => void;
   onRequestEdit: (pin: Pin) => void;
   onRequestDelete: (pin: Pin) => void;
 };
+
+function markerLabelFor(pin: Pin): google.maps.MarkerLabel {
+  const isMust = pin.priority === 'must';
+  return {
+    text: pin.name,
+    fontSize: '11px',
+    fontFamily: "Geist, sans-serif",
+    fontWeight: isMust ? '500' : '400',
+    color: isMust ? '#f3ecde' : '#cfc6b3',
+    className: isMust ? 'pin-name-label pin-name-label--must' : 'pin-name-label',
+  };
+}
 
 export type PinMapLayerHandle = {
   focusPin: (pinId: string) => void;
@@ -42,12 +53,9 @@ function pinInfoHtml(pin: Pin): string {
 }
 
 export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapLayer(
-  { map, maps, tripId, onRequestCreate, onRequestEdit, onRequestDelete },
+  { map, maps, pins, onRequestCreate, onRequestEdit, onRequestDelete },
   ref,
 ) {
-  const pinsQuery = usePins(tripId);
-  const pins = pinsQuery.data || [];
-
   const [dropMode, setDropMode] = useState(false);
   const pinMarkersRef = useRef<Map<string, google.maps.Marker>>(new globalThis.Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
@@ -90,19 +98,22 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
     });
     pins.forEach((pin) => {
       const meta = PIN_CATEGORY_META[pin.category];
+      const priority = pin.priority || 'want';
       const existing = pinMarkersRef.current.get(pin.id);
       if (existing) {
         existing.setPosition({ lat: pin.lat, lng: pin.lng });
-        existing.setIcon(makePinIcon(meta.emoji, meta.tint));
+        existing.setIcon(makePinIcon(meta.emoji, meta.tint, priority));
         existing.setTitle(pin.name);
+        existing.setLabel(markerLabelFor(pin));
         return;
       }
       const marker = new maps.Marker({
         position: { lat: pin.lat, lng: pin.lng },
         map,
-        icon: makePinIcon(meta.emoji, meta.tint),
+        icon: makePinIcon(meta.emoji, meta.tint, priority),
+        label: markerLabelFor(pin),
         title: pin.name,
-        zIndex: 50,
+        zIndex: priority === 'must' ? 60 : 50,
       });
       marker.addListener('click', () => openInfoWindow(pin, marker));
       pinMarkersRef.current.set(pin.id, marker);

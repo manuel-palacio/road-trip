@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Pin, PinCategory } from '../../lib/types';
-import { PIN_CATEGORIES, PIN_CATEGORY_META } from '../../lib/pin-meta';
+import type { Pin, PinCategory, PinPriority } from '../../lib/types';
+import { PIN_CATEGORIES, PIN_CATEGORY_META, PIN_PRIORITIES, PIN_PRIORITY_META } from '../../lib/pin-meta';
 
 export type PinDraft = {
   name: string;
   category: PinCategory;
+  priority: PinPriority;
   notes: string;
   lat: number;
   lng: number;
@@ -16,15 +17,17 @@ type Props = {
   lng: number;
   defaultName?: string;
   defaultCategory?: PinCategory;
+  defaultPriority?: PinPriority;
   saving?: boolean;
   onCancel: () => void;
   onSave: (draft: PinDraft) => void;
 };
 
-export function PinModal({ initial, lat, lng, defaultName, defaultCategory, saving, onCancel, onSave }: Props) {
+export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defaultPriority, saving, onCancel, onSave }: Props) {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || defaultName || '');
   const [category, setCategory] = useState<PinCategory>(initial?.category || defaultCategory || 'landmark');
+  const [priority, setPriority] = useState<PinPriority>(initial?.priority || defaultPriority || 'want');
   const [notes, setNotes] = useState(initial?.notes || '');
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +46,7 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, savi
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), category, notes: notes.trim(), lat, lng });
+    onSave({ name: name.trim(), category, priority, notes: notes.trim(), lat, lng });
   }
 
   return (
@@ -110,6 +113,45 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, savi
                     </span>
                     <span className={`font-mono text-[9.5px] tracking-[0.18em] uppercase ${selected ? 'text-accent' : 'text-paper-dim'}`}>
                       {meta.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-2">
+              Priority
+            </span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {PIN_PRIORITIES.map((p) => {
+                const meta = PIN_PRIORITY_META[p];
+                const selected = priority === p;
+                const isMust = p === 'must';
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    title={meta.hint}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-md border transition-all duration-150 ${
+                      selected
+                        ? isMust
+                          ? 'border-accent bg-accent-soft'
+                          : 'border-paper-dim bg-[rgba(243,236,222,0.04)]'
+                        : 'border-line bg-canvas hover:border-paper-muted'
+                    }`}
+                  >
+                    <span className={`font-mono text-[10px] tracking-[0.18em] uppercase ${
+                      selected
+                        ? isMust ? 'text-accent' : 'text-paper'
+                        : 'text-paper-dim'
+                    }`}>
+                      {meta.label}
+                    </span>
+                    <span className="font-serif italic text-[11px] text-paper-muted leading-none">
+                      {meta.hint}
                     </span>
                   </button>
                 );

@@ -5,6 +5,8 @@ import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePinModal } from '../hooks/usePinModal';
+import { usePins } from '../hooks/usePins';
+import { computePinAttachments } from '../lib/pin-attachment';
 import { createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
@@ -112,6 +114,16 @@ export function Builder() {
   stateRef.current = state;
 
   const pinModal = usePinModal(state.tripId || '');
+  const pinsQuery = usePins(state.tripId || undefined);
+  const allPins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
+  const pinAttachments = useMemo(
+    () => computePinAttachments(allPins, state.stops),
+    [allPins, state.stops],
+  );
+  const builderFreePins = useMemo(
+    () => allPins.filter((p) => pinAttachments.get(p.id) === null),
+    [allPins, pinAttachments],
+  );
 
   // Enrich stops with km/duration/path from Directions API
   const routes = useRouteSegments(state.stops, maps);
@@ -509,7 +521,7 @@ export function Builder() {
           <PinMapLayer
             map={map}
             maps={maps}
-            tripId={state.tripId}
+            pins={builderFreePins}
             onRequestCreate={pinModal.openCreate}
             onRequestEdit={pinModal.openEdit}
             onRequestDelete={pinModal.deletePin}

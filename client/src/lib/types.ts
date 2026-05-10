@@ -42,11 +42,13 @@ export type Stop = {
 };
 
 export type PinCategory = 'food' | 'hotel' | 'scenic' | 'fuel' | 'landmark' | 'other';
+export type PinPriority = 'must' | 'want' | 'maybe';
 
 export type Pin = {
   id: string;
   name: string;
   category: PinCategory;
+  priority?: PinPriority;
   notes?: string;
   lat: number;
   lng: number;

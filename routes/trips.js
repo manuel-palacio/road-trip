@@ -19,7 +19,8 @@ const UPDATABLE_FIELDS = [
 ];
 
 const PIN_CATEGORIES = ['food', 'hotel', 'scenic', 'fuel', 'landmark', 'other'];
-const PIN_UPDATABLE_FIELDS = ['name', 'category', 'notes', 'lat', 'lng'];
+const PIN_PRIORITIES = ['must', 'want', 'maybe'];
+const PIN_UPDATABLE_FIELDS = ['name', 'category', 'notes', 'lat', 'lng', 'priority'];
 
 function validatePinPayload(body, { partial }) {
   const out = {};
@@ -43,6 +44,14 @@ function validatePinPayload(body, { partial }) {
     out.notes = typeof body.notes === 'string' ? body.notes.slice(0, 500) : '';
   } else if (!partial) {
     out.notes = '';
+  }
+  if ('priority' in body) {
+    if (!PIN_PRIORITIES.includes(body.priority)) {
+      return { error: `priority must be one of: ${PIN_PRIORITIES.join(', ')}` };
+    }
+    out.priority = body.priority;
+  } else if (!partial) {
+    out.priority = 'want';
   }
   if ('lat' in body) {
     if (typeof body.lat !== 'number' || !Number.isFinite(body.lat)) {
