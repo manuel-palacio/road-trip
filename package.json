@@ -16,6 +16,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@radix-ui/react-switch": "^1.2.6",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase-admin": "^13.0.2"

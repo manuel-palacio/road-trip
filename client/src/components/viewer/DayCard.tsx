@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as Switch from '@radix-ui/react-switch';
 import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
@@ -52,21 +53,16 @@ export function DayCard({ group, startDate, visible, onToggleVisibility }: Props
           <span className="text-paper font-medium">{group.km}</span> km
           {group.durationSeconds > 0 && <> · {formatDuration(group.durationSeconds)}</>}
         </span>
-        <button
-          type="button"
+        <Switch.Root
+          checked={visible}
+          onCheckedChange={onToggleVisibility}
+          onClick={(e) => e.stopPropagation()}
           aria-label={visible ? 'Hide this day on the map' : 'Show this day on the map'}
           title={visible ? 'Hide this day on the map' : 'Show this day on the map'}
-          onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
-          className={`ml-1 w-9 h-5 rounded-full relative transition-colors ${
-            visible ? 'bg-accent' : 'bg-surface-2 border border-line-strong'
-          }`}
+          className="ml-1 relative w-10 h-5 rounded-full border border-line-strong bg-surface-2 transition-colors duration-200 ease-out-soft data-[state=checked]:bg-accent data-[state=checked]:border-accent outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          <span
-            className={`absolute top-[2px] w-3.5 h-3.5 rounded-full bg-canvas transition-transform ${
-              visible ? 'translate-x-[18px]' : 'translate-x-[2px]'
-            }`}
-          />
-        </button>
+          <Switch.Thumb className="block w-4 h-4 rounded-full bg-canvas shadow-sm translate-x-[1px] data-[state=checked]:translate-x-[21px] transition-transform duration-200 ease-out-soft will-change-transform" />
+        </Switch.Root>
       </header>
 
       <div className="px-4 pb-3 -mt-1">

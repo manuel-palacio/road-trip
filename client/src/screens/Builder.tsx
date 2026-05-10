@@ -105,7 +105,8 @@ export function Builder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
-  const mapDivRef = useRef<HTMLDivElement>(null);
+  // Ref-callback → state so the init effect re-runs when the div mounts.
+  const [mapDiv, setMapDiv] = useState<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -162,8 +163,8 @@ export function Builder() {
 
   // Init map + autocomplete once SDK ready
   useEffect(() => {
-    if (!maps || !mapDivRef.current || map) return;
-    const m = new maps.Map(mapDivRef.current, {
+    if (!maps || !mapDiv || map) return;
+    const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
       styles: MAP_STYLE,
@@ -227,7 +228,7 @@ export function Builder() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maps]);
+  }, [maps, mapDiv]);
 
   // Geolocation centering for new trips (once map is ready)
   useEffect(() => {
@@ -569,7 +570,7 @@ export function Builder() {
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}
-        <div ref={mapDivRef} className="w-full h-full" />
+        <div ref={setMapDiv} className="w-full h-full" />
         {state.tripId && (
           <PinMapLayer
             map={map}

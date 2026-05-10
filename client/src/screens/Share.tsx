@@ -73,7 +73,11 @@ export function Share() {
     [dayedStops],
   );
 
-  const mapDivRef = useRef<HTMLDivElement>(null);
+  // Ref callback → state, so the init effect re-runs *when the div mounts*
+  // (not just when maps/map deps change). Without this, the SDK could load
+  // before the success-render commits the div, the effect would early-return,
+  // and the map would never initialize.
+  const [mapDiv, setMapDiv] = useState<HTMLDivElement | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const stopMarkersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
@@ -81,8 +85,8 @@ export function Share() {
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
   useEffect(() => {
-    if (!maps || !mapDivRef.current || map) return;
-    const m = new maps.Map(mapDivRef.current, {
+    if (!maps || !mapDiv || map) return;
+    const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
       styles: MAP_STYLE,
@@ -94,7 +98,7 @@ export function Share() {
     });
     infoWindowRef.current = new maps.InfoWindow();
     setMap(m);
-  }, [maps, map]);
+  }, [maps, mapDiv, map]);
 
   // Stop markers + polylines
   useEffect(() => {
@@ -327,7 +331,7 @@ export function Share() {
           )}
           {/* absolute inset-0 sidesteps any flex/grid height-propagation
               quirks — the map fills its positioned parent regardless. */}
-          <div ref={mapDivRef} className="absolute inset-0" />
+          <div ref={setMapDiv} className="absolute inset-0" />
         </div>
       </section>
 

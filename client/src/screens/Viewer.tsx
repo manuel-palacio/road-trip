@@ -107,7 +107,11 @@ export function Viewer() {
     });
   }
 
-  const mapDivRef = useRef<HTMLDivElement>(null);
+  // Ref-callback → state so the init effect re-runs when the div mounts,
+  // not just when maps/map change. Otherwise the SDK could load before the
+  // success render attaches the div, the init effect would early-return,
+  // and the map would never construct.
+  const [mapDiv, setMapDiv] = useState<HTMLDivElement | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const stopMarkersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
@@ -116,8 +120,8 @@ export function Viewer() {
 
   // Init map
   useEffect(() => {
-    if (!maps || !mapDivRef.current || map) return;
-    const m = new maps.Map(mapDivRef.current, {
+    if (!maps || !mapDiv || map) return;
+    const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
       styles: MAP_STYLE,
@@ -129,7 +133,7 @@ export function Viewer() {
     });
     stopInfoWindowRef.current = new maps.InfoWindow();
     setMap(m);
-  }, [maps, map]);
+  }, [maps, mapDiv, map]);
 
   // Sync stop markers + polylines to dayedStops + hiddenDays
   useEffect(() => {
@@ -346,7 +350,7 @@ export function Viewer() {
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}
-        <div ref={mapDivRef} className="w-full h-full" />
+        <div ref={setMapDiv} className="w-full h-full" />
         {tripId && (
           <PinMapLayer
             ref={pinLayerRef}
