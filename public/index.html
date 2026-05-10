@@ -761,6 +761,163 @@
     }
     .stop-remove:hover { color: var(--accent); background: var(--accent-soft); }
 
+    /* Day section header (between day groups in stop list) */
+    .day-header {
+      padding: 14px 4px 10px;
+      border-top: 1px dashed var(--line-strong);
+      margin-top: 4px;
+    }
+    .day-header:first-child { border-top: 0; margin-top: 0; padding-top: 4px; }
+    .day-header-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .day-header-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .day-header-date {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 13px;
+      color: var(--text-dim);
+      letter-spacing: -0.005em;
+    }
+    .day-header-spacer { flex: 1; }
+    .day-header-stat {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .day-header-stat .num { color: var(--text); font-weight: 500; }
+    .day-header-row-2 {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .aa-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .aa-badge.is-ready  { background: rgba(122, 154, 114, 0.16); color: #9bbf91; border: 1px solid rgba(122, 154, 114, 0.4); }
+    .aa-badge.is-limit  { background: rgba(212, 164, 74, 0.16);  color: #e0b86d; border: 1px solid rgba(212, 164, 74, 0.4); }
+    .aa-badge.is-over   { background: rgba(214, 90, 63, 0.18);   color: #ec8e74; border: 1px solid rgba(214, 90, 63, 0.5); }
+    .aa-badge .icon { font-size: 11px; }
+    .km-warning {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #ec8e74;
+      padding: 3px 8px;
+      border: 1px dashed rgba(214, 90, 63, 0.5);
+      border-radius: 3px;
+    }
+
+    /* Drag-and-drop visuals */
+    .stop-row.is-dragging { opacity: 0.35; }
+    .stop-row.drop-above { box-shadow: 0 -2px 0 0 var(--accent) inset; }
+    .stop-row.drop-below { box-shadow: 0 2px 0 0 var(--accent) inset; }
+    .stop-handle:active { cursor: grabbing; }
+
+    /* Day offset +/- on stop card */
+    .day-offset {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 4px;
+    }
+    .day-offset-btn {
+      width: 18px;
+      height: 18px;
+      background: transparent;
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 150ms, border-color 150ms;
+    }
+    .day-offset-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .day-offset-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Highlight chips on stop card */
+    .stop-highlights {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+    }
+    .highlight-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 4px 3px 9px;
+      background: rgba(243, 236, 222, 0.06);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--text);
+      max-width: 200px;
+    }
+    .highlight-chip-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .highlight-remove {
+      background: transparent;
+      border: 0;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 120ms, background 120ms;
+    }
+    .highlight-remove:hover { color: #fff; background: var(--accent); }
+    .highlight-input {
+      flex: 1;
+      min-width: 90px;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px dotted var(--line-strong);
+      color: var(--text);
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 12px;
+      padding: 2px 0;
+      outline: none;
+      transition: border-color 150ms;
+    }
+    .highlight-input:focus { border-bottom-color: var(--accent); border-bottom-style: solid; }
+    .highlight-input::placeholder { color: var(--text-muted); font-style: italic; }
+
     /* Stop card: distance chip + day badge */
     .stop-meta {
       margin-top: 8px;
@@ -1173,6 +1330,8 @@
     let mapAutocomplete = null;
     let directionsService = null;
     let builderState = null;
+    let builderSnapshot = null;
+    let draggedStopId = null;
     const directionsCache = new Map();
     let toastTimer = null;
 
@@ -1428,9 +1587,11 @@
       const maxKm = (builderState && builderState.maxKmPerDay) || 600;
       let day = 1;
       let dayKm = 0;
+      let cumulativeOffset = 0;
       stops.forEach((stop, i) => {
+        cumulativeOffset += (stop.dayOffset || 0);
         if (i === 0) {
-          stop.dayNumber = 1;
+          stop.dayNumber = Math.max(1, 1 + cumulativeOffset);
           dayKm = 0;
           return;
         }
@@ -1441,13 +1602,49 @@
         } else {
           dayKm += seg;
         }
-        stop.dayNumber = day;
+        stop.dayNumber = Math.max(1, day + cumulativeOffset);
         // Overnight ends the day — next stop opens a new one
         if (stop.type === 'overnight' && i < stops.length - 1) {
           day++;
           dayKm = 0;
         }
       });
+    }
+
+    function formatDayDate(dayNum) {
+      if (!builderState?.startDate) return '';
+      const d = new Date(builderState.startDate + 'T00:00:00');
+      if (isNaN(d.getTime())) return '';
+      d.setDate(d.getDate() + (dayNum - 1));
+      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      return `${weekday} · ${month} ${d.getDate()}`;
+    }
+
+    function snapshotState() {
+      if (!builderState) { builderSnapshot = null; return; }
+      builderSnapshot = serializeForSnapshot(builderState);
+    }
+    function serializeForSnapshot(s) {
+      return JSON.stringify({
+        name: s.name || '',
+        coverEmoji: s.coverEmoji || '',
+        startDate: s.startDate || '',
+        description: s.description || '',
+        maxKmPerDay: s.maxKmPerDay || 600,
+        stops: (s.stops || []).map((x) => ({
+          id: x.id, name: x.name, label: x.label,
+          lat: x.lat, lng: x.lng,
+          countryCode: x.countryCode || '',
+          type: x.type,
+          dayOffset: x.dayOffset || 0,
+          highlights: x.highlights || [],
+        })),
+      });
+    }
+    function isDirty() {
+      if (!builderSnapshot) return false;
+      return serializeForSnapshot(builderState) !== builderSnapshot;
     }
 
     async function fetchSegment(from, to) {
@@ -1503,12 +1700,14 @@
           try {
             const seg = await fetchSegment(from, to);
             to.kmFromPrevious = seg.km;
+            to.durationSecondsFromPrevious = seg.durationSeconds;
             to.durationFromPrevious = formatDuration(seg.durationSeconds);
             to.path = seg.path;
             to.routingFailed = false;
           } catch (err) {
             console.error('Directions failed', err);
             to.kmFromPrevious = 0;
+            to.durationSecondsFromPrevious = 0;
             to.durationFromPrevious = '';
             to.path = null;
             to.routingFailed = true;
@@ -1627,6 +1826,121 @@
       recomputeRoutes().then(fitMapToStops);
     }
 
+    function bumpDay(stopId, delta) {
+      const stop = builderState.stops.find((s) => s.id === stopId);
+      if (!stop) return;
+      stop.dayOffset = (stop.dayOffset || 0) + delta;
+      computeDays(builderState.stops);
+      refreshMarkers();
+      refreshPolylines();
+      renderStops();
+      renderSummary();
+    }
+
+    function addHighlight(stopId, text) {
+      const stop = builderState.stops.find((s) => s.id === stopId);
+      if (!stop) return;
+      if (!Array.isArray(stop.highlights)) stop.highlights = [];
+      if (stop.highlights.includes(text)) return;
+      stop.highlights.push(text);
+      renderStops();
+      const inp = document.querySelector(`.stop-row[data-stop-id="${stopId}"] .highlight-input`);
+      inp?.focus();
+    }
+
+    function removeHighlight(stopId, text) {
+      const stop = builderState.stops.find((s) => s.id === stopId);
+      if (!stop) return;
+      stop.highlights = (stop.highlights || []).filter((h) => h !== text);
+      renderStops();
+    }
+
+    function onDragStart(ev, stopId) {
+      draggedStopId = stopId;
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', stopId);
+      const row = ev.target.closest('.stop-row');
+      if (row) {
+        if (ev.dataTransfer.setDragImage) ev.dataTransfer.setDragImage(row, 24, 18);
+        setTimeout(() => row.classList.add('is-dragging'), 0);
+      }
+    }
+    function onDragEnd() {
+      document.querySelectorAll('.stop-row').forEach((r) => {
+        r.classList.remove('is-dragging', 'drop-above', 'drop-below');
+      });
+      draggedStopId = null;
+    }
+    function onDragOver(ev, targetStopId) {
+      if (!draggedStopId || draggedStopId === targetStopId) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      const row = ev.currentTarget;
+      const rect = row.getBoundingClientRect();
+      const above = ev.clientY < rect.top + rect.height / 2;
+      document.querySelectorAll('.stop-row').forEach((r) => r.classList.remove('drop-above', 'drop-below'));
+      row.classList.add(above ? 'drop-above' : 'drop-below');
+    }
+    function onDragLeave(ev) {
+      const related = ev.relatedTarget;
+      const row = ev.currentTarget;
+      if (related && row.contains(related)) return;
+      row.classList.remove('drop-above', 'drop-below');
+    }
+    function onDrop(ev, targetStopId) {
+      ev.preventDefault();
+      if (!draggedStopId || draggedStopId === targetStopId) {
+        onDragEnd();
+        return;
+      }
+      const row = ev.currentTarget;
+      const above = row.classList.contains('drop-above');
+      const stops = builderState.stops;
+      const fromIdx = stops.findIndex((s) => s.id === draggedStopId);
+      if (fromIdx < 0) { onDragEnd(); return; }
+      const [moved] = stops.splice(fromIdx, 1);
+      let toIdx = stops.findIndex((s) => s.id === targetStopId);
+      if (toIdx < 0) { stops.splice(fromIdx, 0, moved); onDragEnd(); return; }
+      if (!above) toIdx += 1;
+      stops.splice(toIdx, 0, moved);
+      onDragEnd();
+      reassignStopTypes();
+      recomputeRoutes().then(fitMapToStops);
+    }
+
+    function dayHeaderNode(dayNum, stopCount, dayKm, daySeconds) {
+      const date = formatDayDate(dayNum);
+      let aaCls, aaLabel;
+      if (stopCount > 10) {
+        aaCls = 'is-over';
+        aaLabel = `Android Auto: Too many stops (${stopCount}/10) · split this day`;
+      } else if (stopCount >= 9) {
+        aaCls = 'is-limit';
+        aaLabel = `Android Auto: At limit (${stopCount}/10 stops)`;
+      } else {
+        aaCls = 'is-ready';
+        aaLabel = `Android Auto: Ready (${stopCount}/10 stops)`;
+      }
+      return el('div', { class: 'day-header' },
+        el('div', { class: 'day-header-row' },
+          el('span', { class: 'day-header-label' }, `Day ${dayNum}`),
+          date ? el('span', { class: 'day-header-date' }, date) : null,
+          el('span', { class: 'day-header-spacer' }),
+          el('span', { class: 'day-header-stat' },
+            el('span', { class: 'num' }, String(dayKm)), ' km',
+            daySeconds ? ' · ' + formatDuration(daySeconds) : null,
+          ),
+        ),
+        el('div', { class: 'day-header-row-2' },
+          el('span', { class: `aa-badge ${aaCls}` },
+            el('span', { class: 'icon' }, '🚗'),
+            aaLabel,
+          ),
+          dayKm > 800 ? el('span', { class: 'km-warning' }, 'Over 800 km · long day') : null,
+        ),
+      );
+    }
+
     function stopRowNode(stop, i) {
       const flag = flagEmoji(stop.countryCode);
       const opt = (val, label) => el('option', { value: val, selected: stop.type === val }, label);
@@ -1645,8 +1959,46 @@
                 : null))
         : null;
 
-      return el('div', { class: `stop-row is-${stop.type}`, dataset: { stopId: stop.id } },
-        el('span', { class: 'stop-handle', aria: { hidden: 'true' }, title: 'Reorder (slice 07)' }, '⠿'),
+      const highlights = stop.highlights || [];
+      const highlightChips = highlights.map((text) =>
+        el('span', { class: 'highlight-chip' },
+          el('span', { class: 'highlight-chip-text', title: text }, text),
+          el('button', {
+            class: 'highlight-remove', type: 'button', 'aria-label': 'Remove note',
+            onclick: () => removeHighlight(stop.id, text),
+          }, '×'),
+        ),
+      );
+      const highlightInput = el('input', {
+        class: 'highlight-input', type: 'text',
+        placeholder: highlights.length ? 'add another…' : 'add a note…',
+        maxlength: 60,
+        onkeydown: (ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            const v = ev.target.value.trim();
+            if (v) {
+              addHighlight(stop.id, v);
+              ev.target.value = '';
+            }
+          }
+        },
+      });
+
+      return el('div', {
+          class: `stop-row is-${stop.type}`,
+          dataset: { stopId: stop.id },
+          ondragenter: (ev) => ev.preventDefault(),
+          ondragover: (ev) => onDragOver(ev, stop.id),
+          ondragleave: onDragLeave,
+          ondrop: (ev) => onDrop(ev, stop.id),
+        },
+        el('span', {
+          class: 'stop-handle', aria: { hidden: 'true' }, title: 'Drag to reorder',
+          draggable: true,
+          ondragstart: (ev) => onDragStart(ev, stop.id),
+          ondragend: onDragEnd,
+        }, '⠿'),
         el('div', { class: 'stop-num', style: numStyle }, String(i + 1)),
         el('div', { class: 'stop-info' },
           el('div', { class: 'stop-label-row' },
@@ -1672,7 +2024,18 @@
             ),
             routeInfo,
             el('span', { class: 'stop-day-badge', style: dayBadgeStyle }, `Day ${stop.dayNumber || 1}`),
+            el('span', { class: 'day-offset' },
+              el('button', {
+                class: 'day-offset-btn', type: 'button', 'aria-label': 'Earlier day',
+                onclick: () => bumpDay(stop.id, -1),
+              }, '−'),
+              el('button', {
+                class: 'day-offset-btn', type: 'button', 'aria-label': 'Later day',
+                onclick: () => bumpDay(stop.id, +1),
+              }, '+'),
+            ),
           ),
+          el('div', { class: 'stop-highlights' }, ...highlightChips, highlightInput),
         ),
         el('button', {
           class: 'stop-remove', type: 'button', 'aria-label': 'Remove stop',
@@ -1684,10 +2047,29 @@
     function renderStops() {
       const list = document.getElementById('stops-list');
       const empty = document.getElementById('stops-empty');
-      const isEmpty = builderState.stops.length === 0;
-      document.getElementById('stop-count').textContent = String(builderState.stops.length);
+      const stops = builderState.stops;
+      const isEmpty = stops.length === 0;
+      document.getElementById('stop-count').textContent = String(stops.length);
       empty.hidden = !isEmpty;
-      list.replaceChildren(...builderState.stops.map((s, i) => stopRowNode(s, i)));
+
+      // Group stops by dayNumber, preserving original index for marker numbering
+      const groups = new Map();
+      stops.forEach((s, i) => {
+        const d = s.dayNumber || 1;
+        if (!groups.has(d)) groups.set(d, []);
+        groups.get(d).push({ stop: s, index: i });
+      });
+      const orderedDays = [...groups.keys()].sort((a, b) => a - b);
+
+      const nodes = [];
+      for (const d of orderedDays) {
+        const items = groups.get(d);
+        const dayKm = items.reduce((sum, x) => sum + (x.stop.kmFromPrevious || 0), 0);
+        const daySec = items.reduce((sum, x) => sum + (x.stop.durationSecondsFromPrevious || 0), 0);
+        nodes.push(dayHeaderNode(d, items.length, dayKm, daySec));
+        items.forEach(({ stop, index }) => nodes.push(stopRowNode(stop, index)));
+      }
+      list.replaceChildren(...nodes);
     }
 
     function syncBuilderUI() {
@@ -1703,6 +2085,7 @@
     async function openBuilderForNew() {
       builderState = newBuilderState();
       syncBuilderUI();
+      snapshotState();
       showScreen('builder');
       try {
         await ensureMap();
@@ -1741,6 +2124,7 @@
           polylines: [],
         };
         syncBuilderUI();
+        snapshotState();
         showScreen('builder');
         await ensureMap();
         google.maps.event.trigger(mapInstance, 'resize');
@@ -1754,10 +2138,13 @@
     }
 
     function cancelBuilder() {
-      // Slice 07 will add: confirm if unsaved changes
+      if (builderState && isDirty()) {
+        if (!confirm('Discard unsaved changes?')) return;
+      }
       if (builderState?.markers) builderState.markers.forEach((m) => m.setMap(null));
       if (builderState?.polylines) builderState.polylines.forEach((p) => p.setMap(null));
       builderState = null;
+      builderSnapshot = null;
       showScreen('dashboard');
     }
 
@@ -1787,8 +2174,10 @@
           countryCode: s.countryCode || '',
           type: s.type,
           dayNumber: s.dayNumber || 1,
+          dayOffset: s.dayOffset || 0,
           highlights: s.highlights || [],
           kmFromPrevious: s.kmFromPrevious || 0,
+          durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
           durationFromPrevious: s.durationFromPrevious || '',
           // intentionally omits `path` (large polyline data — re-fetched on edit)
         })),
