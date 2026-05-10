@@ -2176,6 +2176,7 @@
       builderState = null;
       builderSnapshot = null;
       showScreen('dashboard');
+      loadTrips();
     }
 
     async function saveBuilder() {
@@ -2225,10 +2226,19 @@
               method: 'POST', body: JSON.stringify(payload),
             });
         if (!res.ok) throw new Error('save failed');
-        if (builderState.markers) builderState.markers.forEach((m) => m.setMap(null));
-        builderState = null;
-        showScreen('dashboard');
-        await loadTrips();
+        const saved = await res.json();
+        if (!builderState.tripId && saved && saved.id) {
+          builderState.tripId = saved.id;
+        }
+        snapshotState();
+        showToast('Saved');
+        btn.textContent = 'Saved';
+        setTimeout(() => {
+          if (document.getElementById('builder-save')) {
+            document.getElementById('builder-save').textContent = originalLabel;
+            document.getElementById('builder-save').disabled = false;
+          }
+        }, 1200);
       } catch (err) {
         console.error('saveBuilder failed', err);
         alert('Could not save trip.');
