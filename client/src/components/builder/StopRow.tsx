@@ -1,4 +1,6 @@
 import { flagEmoji } from '../../lib/flags';
+import { dayColor } from '../../lib/compute';
+import { getStopRoutingFailed } from '../../hooks/useRouteSegments';
 import type { Stop } from '../../lib/types';
 
 type Props = {
@@ -23,6 +25,8 @@ export function StopRow({ stop, index, onChangeType, onRemove }: Props) {
     waypoint: 'border-l-paper-muted',
     overnight: 'border-l-line',
   }[stop.type];
+  const color = dayColor(stop.dayNumber);
+  const routingFailed = getStopRoutingFailed(stop);
 
   return (
     <div
@@ -37,7 +41,8 @@ export function StopRow({ stop, index, onChangeType, onRemove }: Props) {
         ⠿
       </span>
       <div
-        className="w-[22px] h-[22px] bg-paper text-canvas font-mono text-[11px] font-semibold rounded-full flex items-center justify-center shrink-0"
+        className="w-[22px] h-[22px] font-mono text-[11px] font-semibold rounded-full flex items-center justify-center shrink-0"
+        style={{ backgroundColor: color, color: '#0d0e11' }}
       >
         {index + 1}
       </div>
@@ -62,13 +67,31 @@ export function StopRow({ stop, index, onChangeType, onRemove }: Props) {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+
+          {index > 0 && routingFailed && (
+            <span className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-accent">no route</span>
+          )}
+          {index > 0 && !routingFailed && stop.kmFromPrevious ? (
+            <span className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-paper-dim">
+              <span className="text-paper-muted mr-1">↗</span>
+              <span className="text-paper font-medium mr-0.5">{stop.kmFromPrevious}</span>km
+              {stop.durationFromPrevious ? <span> · {stop.durationFromPrevious}</span> : null}
+            </span>
+          ) : null}
+
+          <span
+            className="px-2 py-[3px] rounded-full font-mono text-[9.5px] tracking-[0.16em] uppercase font-medium whitespace-nowrap"
+            style={{ backgroundColor: color, color: '#0d0e11' }}
+          >
+            Day {stop.dayNumber || 1}
+          </span>
         </div>
       </div>
       <button
         type="button"
         aria-label="Remove stop"
         onClick={() => onRemove(stop.id)}
-        className="absolute top-1.5 right-1.5 w-5.5 h-5.5 w-[22px] h-[22px] bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
+        className="absolute top-1.5 right-1.5 w-[22px] h-[22px] bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
       >
         ×
       </button>

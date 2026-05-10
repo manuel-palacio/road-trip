@@ -45,8 +45,10 @@ export const MAP_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#13151a' }] },
 ];
 
-export function makeMarkerIcon(num: number, color = '#f3ecde'): google.maps.Icon {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><circle cx='22' cy='22' r='15' fill='${color}'/><circle cx='22' cy='22' r='11' fill='#f3ecde'/><text x='22' y='26.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='600' fill='#0d0e11'>${num}</text></svg>`;
+export function makeMarkerIcon(num: number, ringColor = '#f3ecde'): google.maps.Icon {
+  // Cream center with day-color outer ring, dark number — keeps numbers
+  // legible across all day color hues
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><circle cx='22' cy='22' r='15' fill='${ringColor}'/><circle cx='22' cy='22' r='11' fill='#f3ecde'/><text x='22' y='26.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='600' fill='#0d0e11'>${num}</text></svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
     anchor: new google.maps.Point(22, 22),

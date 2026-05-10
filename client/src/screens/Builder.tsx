@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
+import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
+import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute';
 import type { Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopRow } from '../components/builder/StopRow';
+import { Toast } from '../components/Toast';
 
 type BuilderState = {
   tripId: string | null;
@@ -89,9 +92,23 @@ export function Builder() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Enrich stops with km/duration/path from Directions API
+  const routes = useRouteSegments(state.stops, maps);
+  // Compute day numbers based on enriched km + max km/day setting
+  const dayedStops = useMemo(
+    () => applyDays(routes.enriched, state.maxKmPerDay || 600),
+    [routes.enriched, state.maxKmPerDay],
+  );
+  const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
+  const flagSet = useMemo(
+    () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
+    [dayedStops],
+  );
 
   // Init map + autocomplete once SDK ready
   useEffect(() => {
@@ -145,26 +162,47 @@ export function Builder() {
     return () => { alive = false; };
   }, [maps, isEditing]);
 
-  // Sync markers to state.stops
+  // Sync markers to dayedStops (so colors reflect day numbers)
   useEffect(() => {
     if (!maps || !mapRef.current) return;
     markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = state.stops.map((stop, i) =>
+    markersRef.current = dayedStops.map((stop, i) =>
       new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map: mapRef.current,
-        icon: makeMarkerIcon(i + 1),
+        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber)),
         title: stop.label || stop.name,
       }),
     );
-    fitBounds(mapRef.current, state.stops);
-  }, [maps, state.stops]);
+    fitBounds(mapRef.current, dayedStops);
+  }, [maps, dayedStops]);
+
+  // Sync polylines per segment in day color
+  useEffect(() => {
+    if (!maps || !mapRef.current) return;
+    polylinesRef.current.forEach((p) => p.setMap(null));
+    polylinesRef.current = [];
+    for (let i = 1; i < dayedStops.length; i++) {
+      const path = getStopPath(dayedStops[i]);
+      if (!path || path.length === 0) continue;
+      const polyline = new maps.Polyline({
+        path,
+        map: mapRef.current,
+        strokeColor: dayColor(dayedStops[i].dayNumber),
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+      });
+      polylinesRef.current.push(polyline);
+    }
+  }, [maps, dayedStops]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
+      polylinesRef.current.forEach((p) => p.setMap(null));
+      polylinesRef.current = [];
     };
   }, []);
 
@@ -179,19 +217,17 @@ export function Builder() {
     if (saving) return;
     setSaving(true);
     try {
-      const stops = state.stops;
-      const countries = [...new Set(stops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))];
-      const totalKm = stops.reduce((sum, s) => sum + (s.kmFromPrevious || 0), 0);
-      const totalDays = stops.length === 0 ? 0 : Math.max(...stops.map((s) => s.dayNumber || 1));
+      // Use the enriched + dayed stops so saved data includes km/duration/dayNumber
+      const stops = dayedStops;
       const payload: Partial<Trip> = {
         name: (state.name || '').trim() || 'Untitled trip',
         coverEmoji: state.coverEmoji || '🚗',
         startDate: state.startDate || null,
         maxKmPerDay: state.maxKmPerDay || 600,
         description: state.description || '',
-        countries,
-        totalKm,
-        totalDays,
+        countries: flagSet,
+        totalKm: totals.totalKm,
+        totalDays: totals.totalDays,
         stops: stops.map((s) => ({
           id: s.id, name: s.name, label: s.label,
           lat: s.lat, lng: s.lng,
@@ -315,7 +351,7 @@ export function Builder() {
             />
           </div>
           <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-6 pb-3 flex flex-col gap-2">
-            {state.stops.map((stop, i) => (
+            {dayedStops.map((stop, i) => (
               <StopRow
                 key={stop.id}
                 stop={stop}
@@ -324,12 +360,30 @@ export function Builder() {
                 onRemove={removeStop}
               />
             ))}
-            {state.stops.length === 0 && (
+            {dayedStops.length === 0 && (
               <p className="px-6 py-5 text-center font-serif italic text-[14px] text-paper-muted leading-[1.5]">
                 Search above to add your first stop.
               </p>
             )}
           </div>
+        </div>
+
+        {/* Summary bar */}
+        <div className="border-t border-line px-6 pt-3 pb-2.5 flex items-center gap-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim bg-surface">
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-paper text-[14px] font-medium">{totals.totalKm.toLocaleString('en-US')}</span>
+            <span>km</span>
+          </span>
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-paper text-[14px] font-medium">{totals.totalDays}</span>
+            <span>{totals.totalDays === 1 ? 'day' : 'days'}</span>
+          </span>
+          {totals.totalDurationSeconds > 0 && (
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
+            </span>
+          )}
+          <span className="ml-auto font-sans text-[14px] tracking-[0.06em]">{flagSet.join(' ')}</span>
         </div>
 
         <footer className="border-t border-line px-6 py-3.5 flex justify-between items-center gap-3 bg-surface">
@@ -352,14 +406,21 @@ export function Builder() {
       </aside>
 
       <div className="relative w-full h-full bg-[#13151a]">
+        {routes.loading && (
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+            <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
+          </div>
+        )}
         <div ref={mapDivRef} className="w-full h-full" />
       </div>
 
       {savedToast && (
-        <div className="fixed bottom-6 right-6 z-[200] bg-surface border border-accent rounded-md px-4 py-2.5 font-mono text-[11px] tracking-wide text-accent max-w-[360px] shadow-[0_12px_30px_-8px_rgba(0,0,0,0.5)]">
-          Saved
-        </div>
+        <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
       )}
+      <Toast
+        message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
+        onDismiss={routes.clearFailure}
+      />
     </section>
   );
 }
