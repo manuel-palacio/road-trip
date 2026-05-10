@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 
@@ -37,8 +38,22 @@ app.use(configRouter);
 app.use(meRouter);
 app.use(tripsRouter);
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve the React build (or fall back to legacy public/ if dist/ isn't built yet locally)
+const distPath = path.join(__dirname, 'dist');
+const legacyPublic = path.join(__dirname, 'public');
+const staticRoot = fs.existsSync(distPath) ? distPath : legacyPublic;
+app.use(express.static(staticRoot));
+
+// SPA fallback — any non-API path returns index.html
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/config') || req.path.startsWith('/health') || req.path.startsWith('/actuator')) {
+    return next();
+  }
+  const indexFile = path.join(staticRoot, 'index.html');
+  if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
+  return res.status(404).end();
+});
 
 app.listen(PORT, () => {
-  console.log(`roadtrip-map listening on :${PORT}`);
+  console.log(`roadtrip-map listening on :${PORT} (serving ${path.basename(staticRoot)}/)`);
 });

@@ -5,6 +5,8 @@ node_modules
 *.log
 .DS_Store
 .idea
+dist
+coverage
 
 # Playwright (used for visual verification, not part of the app)
 .playwright-mcp/

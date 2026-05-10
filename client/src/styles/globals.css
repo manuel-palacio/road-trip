@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-canvas text-paper font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Subtle paper grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+    opacity: 0.05;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    z-index: 1000;
+  }
+}
+
+@layer components {
+  .route-mark {
+    background: repeating-linear-gradient(
+      to right,
+      theme('colors.accent') 0,
+      theme('colors.accent') 5px,
+      transparent 5px,
+      transparent 12px
+    );
+  }
+  .route-mark-muted {
+    background: repeating-linear-gradient(
+      to right,
+      theme('colors.paper-muted') 0,
+      theme('colors.paper-muted') 4px,
+      transparent 4px,
+      transparent 9px
+    );
+  }
+}

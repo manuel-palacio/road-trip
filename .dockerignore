@@ -10,3 +10,5 @@ Dockerfile
 README.md
 .idea
 .DS_Store
+dist
+coverage
