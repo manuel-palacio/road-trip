@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
+import { usePinModal } from '../hooks/usePinModal';
 import { createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
@@ -11,6 +12,7 @@ import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute'
 import type { Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
+import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
 
 type BuilderState = {
@@ -102,12 +104,14 @@ export function Builder() {
 
   const mapDivRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const pinModal = usePinModal(state.tripId || '');
 
   // Enrich stops with km/duration/path from Directions API
   const routes = useRouteSegments(state.stops, maps);
@@ -124,8 +128,8 @@ export function Builder() {
 
   // Init map + autocomplete once SDK ready
   useEffect(() => {
-    if (!maps || !mapDivRef.current || mapRef.current) return;
-    mapRef.current = new maps.Map(mapDivRef.current, {
+    if (!maps || !mapDivRef.current || map) return;
+    const m = new maps.Map(mapDivRef.current, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
       styles: MAP_STYLE,
@@ -135,6 +139,7 @@ export function Builder() {
       backgroundColor: '#13151a',
       clickableIcons: false,
     });
+    setMap(m);
     if (searchInputRef.current) {
       autocompleteRef.current = new maps.places.Autocomplete(searchInputRef.current, {
         fields: ['name', 'formatted_address', 'geometry.location', 'address_components'],
@@ -158,40 +163,41 @@ export function Builder() {
         if (searchInputRef.current) searchInputRef.current.value = '';
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maps]);
 
   // Geolocation centering for new trips (once map is ready)
   useEffect(() => {
-    if (!maps || !mapRef.current || isEditing) return;
+    if (!maps || !map || isEditing) return;
     let alive = true;
     requestGeolocation().then((loc) => {
-      if (!alive || !mapRef.current) return;
+      if (!alive) return;
       if (loc) {
-        mapRef.current.setCenter(loc);
-        mapRef.current.setZoom(10);
+        map.setCenter(loc);
+        map.setZoom(10);
       }
     });
     return () => { alive = false; };
-  }, [maps, isEditing]);
+  }, [maps, map, isEditing]);
 
   // Sync markers to dayedStops (so colors reflect day numbers)
   useEffect(() => {
-    if (!maps || !mapRef.current) return;
+    if (!maps || !map) return;
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = dayedStops.map((stop, i) =>
       new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
-        map: mapRef.current,
+        map,
         icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber)),
         title: stop.label || stop.name,
       }),
     );
-    fitBounds(mapRef.current, dayedStops);
-  }, [maps, dayedStops]);
+    fitBounds(map, dayedStops);
+  }, [maps, map, dayedStops]);
 
   // Sync polylines per segment in day color
   useEffect(() => {
-    if (!maps || !mapRef.current) return;
+    if (!maps || !map) return;
     polylinesRef.current.forEach((p) => p.setMap(null));
     polylinesRef.current = [];
     for (let i = 1; i < dayedStops.length; i++) {
@@ -199,14 +205,14 @@ export function Builder() {
       if (!path || path.length === 0) continue;
       const polyline = new maps.Polyline({
         path,
-        map: mapRef.current,
+        map,
         strokeColor: dayColor(dayedStops[i].dayNumber),
         strokeOpacity: 0.85,
         strokeWeight: 4,
       });
       polylinesRef.current.push(polyline);
     }
-  }, [maps, dayedStops]);
+  }, [maps, map, dayedStops]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -499,7 +505,19 @@ export function Builder() {
           </div>
         )}
         <div ref={mapDivRef} className="w-full h-full" />
+        {state.tripId && (
+          <PinMapLayer
+            map={map}
+            maps={maps}
+            tripId={state.tripId}
+            onRequestCreate={pinModal.openCreate}
+            onRequestEdit={pinModal.openEdit}
+            onRequestDelete={pinModal.deletePin}
+          />
+        )}
       </div>
+
+      {pinModal.modalElement}
 
       {savedToast && (
         <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />

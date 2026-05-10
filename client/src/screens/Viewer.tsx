@@ -4,19 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
-import { useCreatePin, useDeletePin, usePins, useUpdatePin } from '../hooks/usePins';
+import { usePins } from '../hooks/usePins';
+import { usePinModal } from '../hooks/usePinModal';
 import { getTrip } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon, makePinIcon, mapStyleForDropMode } from '../lib/google-maps';
-import { PIN_CATEGORY_META } from '../lib/pin-meta';
-import { guessCategoryFromTypes } from '../lib/place-to-category';
-import type { Pin, PinCategory, Stop } from '../lib/types';
+import { MAP_STYLE, makeMarkerIcon } from '../lib/google-maps';
+import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
-import { DropModeBanner } from '../components/viewer/DropModeBanner';
-import { PinFab } from '../components/viewer/PinFab';
 import { PinList } from '../components/viewer/PinList';
-import { PinModal, type PinDraft } from '../components/viewer/PinModal';
+import { PinMapLayer, type PinMapLayerHandle } from '../components/viewer/PinMapLayer';
 import { PinSearchBar } from '../components/viewer/PinSearchBar';
 import { SidebarTabs } from '../components/viewer/SidebarTabs';
 import { Toast } from '../components/Toast';
@@ -37,28 +34,6 @@ function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-type PinModalState =
-  | { kind: 'closed' }
-  | { kind: 'create'; lat: number; lng: number; defaultName?: string; defaultCategory?: PinCategory }
-  | { kind: 'edit'; pin: Pin };
-
-function pinInfoHtml(pin: Pin): string {
-  const meta = PIN_CATEGORY_META[pin.category];
-  return `
-    <div style="font-family:Geist,sans-serif;color:#1a1a1a;max-width:240px;">
-      <div style="display:flex;align-items:center;gap:6px;font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6358;">
-        <span style="font-size:13px;line-height:1;">${meta.emoji}</span>${meta.label}
-      </div>
-      <div style="font-family:Fraunces,serif;font-style:italic;font-size:18px;line-height:1.15;margin-top:3px;">${escapeHtml(pin.name)}</div>
-      ${pin.notes ? `<div style="font-size:12px;color:#3d3633;margin-top:6px;line-height:1.5;font-style:italic;">${escapeHtml(pin.notes)}</div>` : ''}
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button id="pin-edit-${pin.id}" type="button" style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;background:transparent;border:1px solid #c9bfa9;color:#3d3633;padding:4px 9px;border-radius:4px;cursor:pointer;">Edit</button>
-        <button id="pin-delete-${pin.id}" type="button" style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;background:transparent;border:1px solid #e0a99a;color:#c54f31;padding:4px 9px;border-radius:4px;cursor:pointer;">Delete</button>
-      </div>
-    </div>
-  `;
-}
-
 export function Viewer() {
   const { tripId } = useParams();
   const navigate = useNavigate();
@@ -75,14 +50,10 @@ export function Viewer() {
   const stops = useMemo<Stop[]>(() => trip?.stops || [], [trip]);
 
   const pinsQuery = usePins(tripId);
-  const pins = useMemo<Pin[]>(() => pinsQuery.data || [], [pinsQuery.data]);
-  const createPin = useCreatePin(tripId || '');
-  const updatePin = useUpdatePin(tripId || '');
-  const deletePin = useDeletePin(tripId || '');
+  const pins = pinsQuery.data || [];
 
   const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
-  const [dropMode, setDropMode] = useState(false);
-  const [modal, setModal] = useState<PinModalState>({ kind: 'closed' });
+  const pinModal = usePinModal(tripId || '', { onCreated: () => setActiveTab('pins') });
 
   const routes = useRouteSegments(stops, maps);
   const dayedStops = useMemo(
@@ -108,18 +79,16 @@ export function Viewer() {
   }
 
   const mapDivRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const stopMarkersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
-  const pinMarkersRef = useRef<Map<string, google.maps.Marker>>(new globalThis.Map());
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
-  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const stopInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const pinLayerRef = useRef<PinMapLayerHandle>(null);
 
   // Init map
   useEffect(() => {
-    if (!maps || !mapDivRef.current || mapRef.current) return;
-    mapRef.current = new maps.Map(mapDivRef.current, {
+    if (!maps || !mapDivRef.current || map) return;
+    const m = new maps.Map(mapDivRef.current, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
       styles: MAP_STYLE,
@@ -129,15 +98,16 @@ export function Viewer() {
       backgroundColor: '#13151a',
       clickableIcons: false,
     });
-    infoWindowRef.current = new maps.InfoWindow();
-  }, [maps]);
+    stopInfoWindowRef.current = new maps.InfoWindow();
+    setMap(m);
+  }, [maps, map]);
 
-  // Sync markers + polylines to dayedStops + hiddenDays
+  // Sync stop markers + polylines to dayedStops + hiddenDays
   useEffect(() => {
-    if (!maps || !mapRef.current) return;
+    if (!maps || !map) return;
 
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
+    stopMarkersRef.current.forEach((m) => m.setMap(null));
+    stopMarkersRef.current = [];
     polylinesRef.current.forEach((p) => p.setMap(null));
     polylinesRef.current = [];
 
@@ -147,12 +117,12 @@ export function Viewer() {
       const originalIndex = dayedStops.findIndex((x) => x.id === stop.id);
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
-        map: mapRef.current,
+        map,
         icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber)),
         title: stop.label || stop.name,
       });
       marker.addListener('click', () => {
-        if (!infoWindowRef.current) return;
+        if (!stopInfoWindowRef.current) return;
         const flag = flagEmoji(stop.countryCode);
         const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
         const dur = stop.durationFromPrevious || '';
@@ -166,22 +136,21 @@ export function Viewer() {
             ${highlights ? `<div style="font-size:12px;color:#3d3633;margin-top:6px;line-height:1.5;font-style:italic;">${highlights}</div>` : ''}
           </div>
         `;
-        infoWindowRef.current.setContent(html);
-        infoWindowRef.current.open({ map: mapRef.current!, anchor: marker });
+        stopInfoWindowRef.current.setContent(html);
+        stopInfoWindowRef.current.open({ map, anchor: marker });
       });
-      markersRef.current.push(marker);
+      stopMarkersRef.current.push(marker);
     });
 
     for (let i = 1; i < dayedStops.length; i++) {
       const stop = dayedStops[i];
       const prev = dayedStops[i - 1];
-      // Only render polyline when both endpoints' days are visible
       if (hiddenDays.has(stop.dayNumber || 1) || hiddenDays.has(prev.dayNumber || 1)) continue;
       const path = getStopPath(stop);
       if (!path || path.length === 0) continue;
       const polyline = new maps.Polyline({
         path,
-        map: mapRef.current,
+        map,
         strokeColor: dayColor(stop.dayNumber),
         strokeOpacity: 0.85,
         strokeWeight: 4,
@@ -189,188 +158,17 @@ export function Viewer() {
       polylinesRef.current.push(polyline);
     }
 
-    fitBounds(mapRef.current, visibleStops);
-  }, [maps, dayedStops, hiddenDays]);
+    fitBounds(map, visibleStops);
+  }, [maps, map, dayedStops, hiddenDays]);
 
-  // Sync pin markers
-  useEffect(() => {
-    if (!maps || !mapRef.current) return;
-    const liveIds = new Set(pins.map((p) => p.id));
-
-    // Remove stale
-    pinMarkersRef.current.forEach((marker, id) => {
-      if (!liveIds.has(id)) {
-        marker.setMap(null);
-        pinMarkersRef.current.delete(id);
-      }
-    });
-
-    // Add or update
-    pins.forEach((pin) => {
-      const meta = PIN_CATEGORY_META[pin.category];
-      const existing = pinMarkersRef.current.get(pin.id);
-      if (existing) {
-        existing.setPosition({ lat: pin.lat, lng: pin.lng });
-        existing.setIcon(makePinIcon(meta.emoji, meta.tint));
-        existing.setTitle(pin.name);
-        return;
-      }
-      const marker = new maps.Marker({
-        position: { lat: pin.lat, lng: pin.lng },
-        map: mapRef.current,
-        icon: makePinIcon(meta.emoji, meta.tint),
-        title: pin.name,
-        zIndex: 50,
-      });
-      marker.addListener('click', () => {
-        if (!infoWindowRef.current || !mapRef.current) return;
-        const html = pinInfoHtml(pin);
-        infoWindowRef.current.setContent(html);
-        infoWindowRef.current.open({ map: mapRef.current, anchor: marker });
-        // Wire info window buttons after open
-        google.maps.event.addListenerOnce(infoWindowRef.current, 'domready', () => {
-          document.getElementById(`pin-edit-${pin.id}`)?.addEventListener('click', () => {
-            infoWindowRef.current?.close();
-            setModal({ kind: 'edit', pin });
-          });
-          document.getElementById(`pin-delete-${pin.id}`)?.addEventListener('click', () => {
-            infoWindowRef.current?.close();
-            handleDeletePin(pin);
-          });
-        });
-      });
-      pinMarkersRef.current.set(pin.id, marker);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maps, pins]);
-
-  // Drop-mode: cursor + POI labels + map click handler
-  useEffect(() => {
-    if (!maps || !mapRef.current) return;
-    mapRef.current.setOptions({
-      draggableCursor: dropMode ? 'crosshair' : undefined,
-      styles: dropMode ? mapStyleForDropMode() : MAP_STYLE,
-      clickableIcons: dropMode,
-    });
-    if (mapClickListenerRef.current) {
-      mapClickListenerRef.current.remove();
-      mapClickListenerRef.current = null;
-    }
-    if (dropMode) {
-      mapClickListenerRef.current = mapRef.current.addListener('click', (ev: google.maps.IconMouseEvent) => {
-        // POI click: ev has placeId. Suppress Google's default popup, fetch
-        // details, prefill modal with name + auto-detected category.
-        if (ev.placeId) {
-          ev.stop?.();
-          const fallbackLat = ev.latLng?.lat() ?? 0;
-          const fallbackLng = ev.latLng?.lng() ?? 0;
-          if (!placesServiceRef.current) {
-            placesServiceRef.current = new maps.places.PlacesService(mapRef.current!);
-          }
-          placesServiceRef.current.getDetails(
-            { placeId: ev.placeId, fields: ['name', 'types', 'geometry.location'] },
-            (place, status) => {
-              if (status !== maps.places.PlacesServiceStatus.OK || !place) {
-                setModal({ kind: 'create', lat: fallbackLat, lng: fallbackLng });
-              } else {
-                setModal({
-                  kind: 'create',
-                  lat: place.geometry?.location?.lat() ?? fallbackLat,
-                  lng: place.geometry?.location?.lng() ?? fallbackLng,
-                  defaultName: place.name || '',
-                  defaultCategory: guessCategoryFromTypes(place.types),
-                });
-              }
-              setDropMode(false);
-            },
-          );
-          return;
-        }
-        // Plain map click (open ground)
-        if (!ev.latLng) return;
-        setModal({ kind: 'create', lat: ev.latLng.lat(), lng: ev.latLng.lng() });
-        setDropMode(false);
-      });
-    }
-    return () => {
-      mapClickListenerRef.current?.remove();
-      mapClickListenerRef.current = null;
-    };
-  }, [maps, dropMode]);
-
-  function pinFromSearch(p: { lat: number; lng: number; name: string; category: PinCategory }) {
-    setModal({
-      kind: 'create',
-      lat: p.lat,
-      lng: p.lng,
-      defaultName: p.name,
-      defaultCategory: p.category,
-    });
-  }
-
-  // Esc cancels drop mode
-  useEffect(() => {
-    if (!dropMode) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setDropMode(false);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [dropMode]);
-
-  function handleSavePin(draft: PinDraft) {
-    if (modal.kind === 'edit') {
-      updatePin.mutate(
-        { pinId: modal.pin.id, body: draft },
-        { onSuccess: () => setModal({ kind: 'closed' }) },
-      );
-    } else if (modal.kind === 'create') {
-      createPin.mutate(draft, {
-        onSuccess: () => {
-          setModal({ kind: 'closed' });
-          setActiveTab('pins');
-        },
-      });
-    }
-  }
-
-  function handleDeletePin(pin: Pin) {
-    if (!window.confirm(`Delete pin "${pin.name}"?`)) return;
-    deletePin.mutate(pin.id);
-  }
-
-  function focusPin(pin: Pin) {
-    if (!mapRef.current) return;
-    mapRef.current.panTo({ lat: pin.lat, lng: pin.lng });
-    if (mapRef.current.getZoom()! < 10) mapRef.current.setZoom(11);
-    const marker = pinMarkersRef.current.get(pin.id);
-    if (marker && infoWindowRef.current) {
-      infoWindowRef.current.setContent(pinInfoHtml(pin));
-      infoWindowRef.current.open({ map: mapRef.current, anchor: marker });
-      google.maps.event.addListenerOnce(infoWindowRef.current, 'domready', () => {
-        document.getElementById(`pin-edit-${pin.id}`)?.addEventListener('click', () => {
-          infoWindowRef.current?.close();
-          setModal({ kind: 'edit', pin });
-        });
-        document.getElementById(`pin-delete-${pin.id}`)?.addEventListener('click', () => {
-          infoWindowRef.current?.close();
-          handleDeletePin(pin);
-        });
-      });
-    }
-  }
-
-  // Cleanup
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      markersRef.current.forEach((m) => m.setMap(null));
-      markersRef.current = [];
+      stopMarkersRef.current.forEach((m) => m.setMap(null));
+      stopMarkersRef.current = [];
       polylinesRef.current.forEach((p) => p.setMap(null));
       polylinesRef.current = [];
-      pinMarkersRef.current.forEach((m) => m.setMap(null));
-      pinMarkersRef.current.clear();
-      mapClickListenerRef.current?.remove();
-      infoWindowRef.current?.close();
+      stopInfoWindowRef.current?.close();
     };
   }, []);
 
@@ -473,12 +271,12 @@ export function Viewer() {
             )
           ) : (
             <>
-              <PinSearchBar maps={maps} onSelect={pinFromSearch} />
+              <PinSearchBar maps={maps} onSelect={pinModal.openCreate} />
               <PinList
                 pins={pins}
-                onEdit={(p) => setModal({ kind: 'edit', pin: p })}
-                onDelete={handleDeletePin}
-                onFocus={focusPin}
+                onEdit={pinModal.openEdit}
+                onDelete={pinModal.deletePin}
+                onFocus={(p) => pinLayerRef.current?.focusPin(p.id)}
               />
             </>
           )}
@@ -492,22 +290,20 @@ export function Viewer() {
           </div>
         )}
         <div ref={mapDivRef} className="w-full h-full" />
-        {dropMode && <DropModeBanner onCancel={() => setDropMode(false)} />}
-        <PinFab active={dropMode} onToggle={() => setDropMode((d) => !d)} />
+        {tripId && (
+          <PinMapLayer
+            ref={pinLayerRef}
+            map={map}
+            maps={maps}
+            tripId={tripId}
+            onRequestCreate={pinModal.openCreate}
+            onRequestEdit={pinModal.openEdit}
+            onRequestDelete={pinModal.deletePin}
+          />
+        )}
       </div>
 
-      {modal.kind !== 'closed' && (
-        <PinModal
-          initial={modal.kind === 'edit' ? modal.pin : null}
-          lat={modal.kind === 'edit' ? modal.pin.lat : modal.lat}
-          lng={modal.kind === 'edit' ? modal.pin.lng : modal.lng}
-          defaultName={modal.kind === 'create' ? modal.defaultName : undefined}
-          defaultCategory={modal.kind === 'create' ? modal.defaultCategory : undefined}
-          saving={createPin.isPending || updatePin.isPending}
-          onCancel={() => setModal({ kind: 'closed' })}
-          onSave={handleSavePin}
-        />
-      )}
+      {pinModal.modalElement}
 
       <Toast
         message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
