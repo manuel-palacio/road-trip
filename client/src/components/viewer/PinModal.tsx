@@ -14,15 +14,17 @@ type Props = {
   initial?: Pin | null;
   lat: number;
   lng: number;
+  defaultName?: string;
+  defaultCategory?: PinCategory;
   saving?: boolean;
   onCancel: () => void;
   onSave: (draft: PinDraft) => void;
 };
 
-export function PinModal({ initial, lat, lng, saving, onCancel, onSave }: Props) {
+export function PinModal({ initial, lat, lng, defaultName, defaultCategory, saving, onCancel, onSave }: Props) {
   const isEdit = !!initial;
-  const [name, setName] = useState(initial?.name || '');
-  const [category, setCategory] = useState<PinCategory>(initial?.category || 'landmark');
+  const [name, setName] = useState(initial?.name || defaultName || '');
+  const [category, setCategory] = useState<PinCategory>(initial?.category || defaultCategory || 'landmark');
   const [notes, setNotes] = useState(initial?.notes || '');
   const nameRef = useRef<HTMLInputElement>(null);
 

@@ -8,14 +8,16 @@ import { useCreatePin, useDeletePin, usePins, useUpdatePin } from '../hooks/useP
 import { getTrip } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon, makePinIcon } from '../lib/google-maps';
+import { MAP_STYLE, makeMarkerIcon, makePinIcon, mapStyleForDropMode } from '../lib/google-maps';
 import { PIN_CATEGORY_META } from '../lib/pin-meta';
-import type { Pin, Stop } from '../lib/types';
+import { guessCategoryFromTypes } from '../lib/place-to-category';
+import type { Pin, PinCategory, Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { DropModeBanner } from '../components/viewer/DropModeBanner';
 import { PinFab } from '../components/viewer/PinFab';
 import { PinList } from '../components/viewer/PinList';
 import { PinModal, type PinDraft } from '../components/viewer/PinModal';
+import { PinSearchBar } from '../components/viewer/PinSearchBar';
 import { SidebarTabs } from '../components/viewer/SidebarTabs';
 import { Toast } from '../components/Toast';
 
@@ -37,7 +39,7 @@ function escapeHtml(s: string) {
 
 type PinModalState =
   | { kind: 'closed' }
-  | { kind: 'create'; lat: number; lng: number }
+  | { kind: 'create'; lat: number; lng: number; defaultName?: string; defaultCategory?: PinCategory }
   | { kind: 'edit'; pin: Pin };
 
 function pinInfoHtml(pin: Pin): string {
@@ -112,6 +114,7 @@ export function Viewer() {
   const pinMarkersRef = useRef<Map<string, google.maps.Marker>>(new globalThis.Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
 
   // Init map
   useEffect(() => {
@@ -241,16 +244,49 @@ export function Viewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maps, pins]);
 
-  // Drop-mode: cursor + map click → open create modal
+  // Drop-mode: cursor + POI labels + map click handler
   useEffect(() => {
     if (!maps || !mapRef.current) return;
-    mapRef.current.setOptions({ draggableCursor: dropMode ? 'crosshair' : undefined });
+    mapRef.current.setOptions({
+      draggableCursor: dropMode ? 'crosshair' : undefined,
+      styles: dropMode ? mapStyleForDropMode() : MAP_STYLE,
+      clickableIcons: dropMode,
+    });
     if (mapClickListenerRef.current) {
       mapClickListenerRef.current.remove();
       mapClickListenerRef.current = null;
     }
     if (dropMode) {
-      mapClickListenerRef.current = mapRef.current.addListener('click', (ev: google.maps.MapMouseEvent) => {
+      mapClickListenerRef.current = mapRef.current.addListener('click', (ev: google.maps.IconMouseEvent) => {
+        // POI click: ev has placeId. Suppress Google's default popup, fetch
+        // details, prefill modal with name + auto-detected category.
+        if (ev.placeId) {
+          ev.stop?.();
+          const fallbackLat = ev.latLng?.lat() ?? 0;
+          const fallbackLng = ev.latLng?.lng() ?? 0;
+          if (!placesServiceRef.current) {
+            placesServiceRef.current = new maps.places.PlacesService(mapRef.current!);
+          }
+          placesServiceRef.current.getDetails(
+            { placeId: ev.placeId, fields: ['name', 'types', 'geometry.location'] },
+            (place, status) => {
+              if (status !== maps.places.PlacesServiceStatus.OK || !place) {
+                setModal({ kind: 'create', lat: fallbackLat, lng: fallbackLng });
+              } else {
+                setModal({
+                  kind: 'create',
+                  lat: place.geometry?.location?.lat() ?? fallbackLat,
+                  lng: place.geometry?.location?.lng() ?? fallbackLng,
+                  defaultName: place.name || '',
+                  defaultCategory: guessCategoryFromTypes(place.types),
+                });
+              }
+              setDropMode(false);
+            },
+          );
+          return;
+        }
+        // Plain map click (open ground)
         if (!ev.latLng) return;
         setModal({ kind: 'create', lat: ev.latLng.lat(), lng: ev.latLng.lng() });
         setDropMode(false);
@@ -261,6 +297,16 @@ export function Viewer() {
       mapClickListenerRef.current = null;
     };
   }, [maps, dropMode]);
+
+  function pinFromSearch(p: { lat: number; lng: number; name: string; category: PinCategory }) {
+    setModal({
+      kind: 'create',
+      lat: p.lat,
+      lng: p.lng,
+      defaultName: p.name,
+      defaultCategory: p.category,
+    });
+  }
 
   // Esc cancels drop mode
   useEffect(() => {
@@ -426,12 +472,15 @@ export function Viewer() {
               ))
             )
           ) : (
-            <PinList
-              pins={pins}
-              onEdit={(p) => setModal({ kind: 'edit', pin: p })}
-              onDelete={handleDeletePin}
-              onFocus={focusPin}
-            />
+            <>
+              <PinSearchBar maps={maps} onSelect={pinFromSearch} />
+              <PinList
+                pins={pins}
+                onEdit={(p) => setModal({ kind: 'edit', pin: p })}
+                onDelete={handleDeletePin}
+                onFocus={focusPin}
+              />
+            </>
           )}
         </div>
       </aside>
@@ -452,6 +501,8 @@ export function Viewer() {
           initial={modal.kind === 'edit' ? modal.pin : null}
           lat={modal.kind === 'edit' ? modal.pin.lat : modal.lat}
           lng={modal.kind === 'edit' ? modal.pin.lng : modal.lng}
+          defaultName={modal.kind === 'create' ? modal.defaultName : undefined}
+          defaultCategory={modal.kind === 'create' ? modal.defaultCategory : undefined}
           saving={createPin.isPending || updatePin.isPending}
           onCancel={() => setModal({ kind: 'closed' })}
           onSave={handleSavePin}

@@ -23,7 +23,7 @@ export function loadMapsSdk(apiKey: string): Promise<typeof google.maps> {
   return loadPromise;
 }
 
-export const MAP_STYLE: google.maps.MapTypeStyle[] = [
+const BASE_STYLE: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry', stylers: [{ color: '#15171c' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#0d0e11' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#9b9080' }] },
@@ -32,7 +32,6 @@ export const MAP_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#3d3e44' }] },
   { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#a89e8a' }] },
   { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1c1f25' }] },
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1c1f25' }] },
   { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#5d564d' }] },
@@ -44,6 +43,25 @@ export const MAP_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5d564d' }] },
   { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#13151a' }] },
 ];
+
+const POI_HIDE: google.maps.MapTypeStyle = {
+  featureType: 'poi',
+  stylers: [{ visibility: 'off' }],
+};
+
+const POI_SHOW_LABELS: google.maps.MapTypeStyle[] = [
+  // POI text labels visible in a muted paper tone; icons stay off via the
+  // global labels.icon rule in BASE_STYLE so the map keeps its editorial feel.
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#a89e8a' }] },
+  { featureType: 'poi', elementType: 'labels.text.stroke', stylers: [{ color: '#0d0e11' }] },
+  { featureType: 'poi.business', elementType: 'labels.text.fill', stylers: [{ color: '#a89e8a' }] },
+];
+
+export const MAP_STYLE: google.maps.MapTypeStyle[] = [...BASE_STYLE, POI_HIDE];
+
+export function mapStyleForDropMode(): google.maps.MapTypeStyle[] {
+  return [...BASE_STYLE, ...POI_SHOW_LABELS];
+}
 
 export function makeMarkerIcon(num: number, ringColor = '#f3ecde'): google.maps.Icon {
   // Cream center with day-color outer ring, dark number — keeps numbers
