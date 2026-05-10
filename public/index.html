@@ -954,11 +954,14 @@
     .stop-route-info .num { color: var(--text); font-weight: 500; margin-right: 2px; }
     .stop-route-info.routing-failed { color: var(--accent); }
     .stop-day-badge {
-      padding: 3px 7px;
+      padding: 3px 8px;
       border-radius: 999px;
       color: var(--bg);
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
       font-weight: 500;
-      letter-spacing: 0.1em;
       white-space: nowrap;
     }
 
@@ -1603,52 +1606,24 @@
     function computeDays(stops) {
       if (stops.length === 0) return;
       const maxKm = (builderState && builderState.maxKmPerDay) || 600;
-
-      // Pass A: natural day per stop (km auto-split + overnight markers, no user offsets)
-      const natural = [];
-      {
-        let day = 1, dayKm = 0;
-        stops.forEach((stop, i) => {
-          if (i === 0) { natural.push(1); dayKm = 0; return; }
-          const seg = stop.kmFromPrevious || 0;
-          if (dayKm + seg > maxKm) { day++; dayKm = seg; } else { dayKm += seg; }
-          natural.push(day);
-          if (stop.type === 'overnight' && i < stops.length - 1) { day++; dayKm = 0; }
-        });
-      }
-
-      // Pass B: candidate = natural + cumulative user offsets. First stop forced to day 1.
-      let cumOff = 0;
-      const candidate = stops.map((s, i) => {
-        if (i === 0) return 1;
-        cumOff += (s.dayOffset || 0);
-        return natural[i] + cumOff;
-      });
-
-      // Pass C: enforce monotonicity (each stop's day ≥ previous — no day time-travel)
-      let prev = 1;
-      for (let i = 0; i < candidate.length; i++) {
-        if (candidate[i] < prev) candidate[i] = prev;
-        prev = candidate[i];
-      }
-
-      // Pass D: collapse to contiguous numbering (no Day 1 → Day 4 → Day 5 gaps)
-      const uniqueDays = [...new Set(candidate)].sort((a, b) => a - b);
-      const dayMap = new Map(uniqueDays.map((d, idx) => [d, idx + 1]));
-      const finalDays = candidate.map((d) => dayMap.get(d));
-
-      // Pass E: assign final days AND normalize offsets so they encode the displayed
-      // state. Without this, user clicks that get clamped become "phantom" stale
-      // offsets — a future + click would burn through them with no visible change.
-      stops.forEach((s, i) => {
-        s.dayNumber = finalDays[i];
+      let day = 1;
+      let dayKm = 0;
+      stops.forEach((stop, i) => {
         if (i === 0) {
-          s.dayOffset = 0;
-        } else {
-          const finalDelta = finalDays[i] - finalDays[i - 1];
-          const naturalDelta = natural[i] - natural[i - 1];
-          s.dayOffset = finalDelta - naturalDelta;
+          stop.dayNumber = 1;
+          dayKm = 0;
+          return;
         }
+        const seg = stop.kmFromPrevious || 0;
+        const prevOvernight = stops[i - 1].type === 'overnight';
+        const forced = stop.forceDayStart === true;
+        if (forced || prevOvernight || dayKm + seg > maxKm) {
+          day++;
+          dayKm = seg;
+        } else {
+          dayKm += seg;
+        }
+        stop.dayNumber = day;
       });
     }
 
@@ -1678,7 +1653,7 @@
           lat: x.lat, lng: x.lng,
           countryCode: x.countryCode || '',
           type: x.type,
-          dayOffset: x.dayOffset || 0,
+          forceDayStart: x.forceDayStart === true,
           highlights: x.highlights || [],
         })),
       });
@@ -1867,10 +1842,10 @@
       recomputeRoutes().then(fitMapToStops);
     }
 
-    function bumpDay(stopId, delta) {
+    function setForceDayStart(stopId, value) {
       const stop = builderState.stops.find((s) => s.id === stopId);
       if (!stop) return;
-      stop.dayOffset = (stop.dayOffset || 0) + delta;
+      stop.forceDayStart = value;
       computeDays(builderState.stops);
       refreshMarkers();
       refreshPolylines();
@@ -2067,23 +2042,25 @@
             el('span', { class: 'stop-day-badge', style: dayBadgeStyle }, `Day ${stop.dayNumber || 1}`),
             (() => {
               const isFirst = i === 0;
-              const prevDay = isFirst ? 1 : (builderState.stops[i - 1].dayNumber || 1);
-              const canDecrease = !isFirst && (stop.dayNumber || 1) > prevDay;
-              const canIncrease = !isFirst;
+              const isForced = stop.forceDayStart === true;
               return el('span', { class: 'day-offset' },
                 el('button', {
                   class: 'day-offset-btn', type: 'button',
-                  'aria-label': 'Move to previous day',
-                  title: isFirst ? 'First stop — locked to Day 1' : (canDecrease ? 'Move to previous day' : 'Already on the earliest possible day'),
-                  disabled: !canDecrease,
-                  onclick: () => bumpDay(stop.id, -1),
+                  'aria-label': 'Merge with previous day',
+                  title: isFirst
+                    ? 'First stop — locked to Day 1'
+                    : (isForced ? 'Merge into the previous day (remove the day break)' : 'Already on the earliest natural day'),
+                  disabled: isFirst || !isForced,
+                  onclick: () => setForceDayStart(stop.id, false),
                 }, '−'),
                 el('button', {
                   class: 'day-offset-btn', type: 'button',
-                  'aria-label': 'Move to next day',
-                  title: isFirst ? 'First stop — locked to Day 1' : 'Push to next day (later stops shift too)',
-                  disabled: !canIncrease,
-                  onclick: () => bumpDay(stop.id, +1),
+                  'aria-label': 'Start a new day at this stop',
+                  title: isFirst
+                    ? 'First stop — locked to Day 1'
+                    : (isForced ? 'Already starts a new day' : 'Start a new day at this stop'),
+                  disabled: isFirst || isForced,
+                  onclick: () => setForceDayStart(stop.id, true),
                 }, '+'),
               );
             })(),
@@ -2227,7 +2204,7 @@
           countryCode: s.countryCode || '',
           type: s.type,
           dayNumber: s.dayNumber || 1,
-          dayOffset: s.dayOffset || 0,
+          forceDayStart: s.forceDayStart === true,
           highlights: s.highlights || [],
           kmFromPrevious: s.kmFromPrevious || 0,
           durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
