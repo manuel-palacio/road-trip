@@ -38,22 +38,20 @@ app.use(configRouter);
 app.use(meRouter);
 app.use(tripsRouter);
 
-// Serve the React build (or fall back to legacy public/ if dist/ isn't built yet locally)
+// Serve the React build
 const distPath = path.join(__dirname, 'dist');
-const legacyPublic = path.join(__dirname, 'public');
-const staticRoot = fs.existsSync(distPath) ? distPath : legacyPublic;
-app.use(express.static(staticRoot));
+app.use(express.static(distPath));
 
-// SPA fallback — any non-API path returns index.html
+// SPA fallback — any non-API path returns index.html so React Router can handle it
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/config') || req.path.startsWith('/health') || req.path.startsWith('/actuator')) {
     return next();
   }
-  const indexFile = path.join(staticRoot, 'index.html');
+  const indexFile = path.join(distPath, 'index.html');
   if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
   return res.status(404).end();
 });
 
 app.listen(PORT, () => {
-  console.log(`roadtrip-map listening on :${PORT} (serving ${path.basename(staticRoot)}/)`);
+  console.log(`roadtrip-map listening on :${PORT}`);
 });
