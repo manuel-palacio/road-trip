@@ -74,7 +74,7 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
           onClick={(e) => e.stopPropagation()}
           aria-label={visible ? 'Hide this day on the map' : 'Show this day on the map'}
           title={visible ? 'Hide this day on the map' : 'Show this day on the map'}
-          className="ml-1 relative w-10 h-5 rounded-full border border-line-strong bg-surface-2 transition-colors duration-200 ease-out-soft data-[state=checked]:bg-accent data-[state=checked]:border-accent outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="ml-1 inline-flex items-center p-0 w-10 h-5 rounded-full border border-line-strong bg-surface-2 transition-colors duration-200 ease-out-soft data-[state=checked]:bg-accent data-[state=checked]:border-accent outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <Switch.Thumb className="block w-4 h-4 rounded-full bg-canvas shadow-sm translate-x-[1px] data-[state=checked]:translate-x-[21px] transition-transform duration-200 ease-out-soft will-change-transform" />
         </Switch.Root>
