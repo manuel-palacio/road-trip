@@ -127,3 +127,33 @@ export type SharedTripResponse = {
 export async function getSharedTrip(token: string): Promise<SharedTripResponse> {
   return handle<SharedTripResponse>(await fetch(`/api/share/${encodeURIComponent(token)}`));
 }
+
+// Authenticated download — fetches the file as a Blob and triggers a browser
+// save dialog via a temporary anchor with the download attribute. Used for
+// /export/pdf and /export/gpx, which need the Authorization header that a
+// plain `<a href>` click can't carry.
+export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(path, await withToken());
+  if (!res.ok) {
+    let msg = res.statusText;
+    let code: string | undefined;
+    try {
+      const body = await res.json();
+      msg = body.error || msg;
+      code = body.code;
+    } catch { /* binary response — fall through */ }
+    throw new ApiError(res.status, msg, code);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get('Content-Disposition') || '';
+  const match = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+  const filename = match ? match[1] : fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}

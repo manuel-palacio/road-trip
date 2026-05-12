@@ -19,7 +19,8 @@
     "@radix-ui/react-switch": "^1.2.6",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "firebase-admin": "^13.0.2"
+    "firebase-admin": "^13.0.2",
+    "pdfkit": "^0.18.0"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.62.7",

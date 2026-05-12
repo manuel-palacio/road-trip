@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const express = require('express');
+const PDFDocument = require('pdfkit');
 const { admin, getDb } = require('../lib/firebase');
 const { authRequired } = require('../middleware/auth');
 
@@ -291,6 +292,183 @@ router.put('/api/trips/:id/pins/:pinId', async (req, res) => {
   } catch (e) {
     console.error('PUT /api/trips/:id/pins/:pinId failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+function escapeXml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&apos;',
+  }[c]));
+}
+
+function sanitizeFilename(s) {
+  const trimmed = String(s || '').trim() || 'road-trip';
+  return trimmed.replace(/[^A-Za-z0-9\-_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'road-trip';
+}
+
+function buildGpx(trip, pins) {
+  const stops = Array.isArray(trip.stops) ? trip.stops : [];
+  const wptLines = [];
+  for (const s of stops) {
+    if (typeof s.lat !== 'number' || typeof s.lng !== 'number') continue;
+    const desc = (s.highlights || []).join(' · ');
+    wptLines.push(
+      `  <wpt lat="${s.lat}" lon="${s.lng}">\n` +
+      `    <name>${escapeXml(s.label || s.name || '')}</name>\n` +
+      (desc ? `    <desc>${escapeXml(desc)}</desc>\n` : '') +
+      `  </wpt>`,
+    );
+  }
+  for (const p of pins) {
+    if (typeof p.lat !== 'number' || typeof p.lng !== 'number') continue;
+    const cat = p.category ? `[${p.category}] ` : '';
+    wptLines.push(
+      `  <wpt lat="${p.lat}" lon="${p.lng}">\n` +
+      `    <name>${escapeXml(cat + (p.name || ''))}</name>\n` +
+      (p.notes ? `    <desc>${escapeXml(p.notes)}</desc>\n` : '') +
+      `  </wpt>`,
+    );
+  }
+  const rtepts = stops
+    .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
+    .map(
+      (s) =>
+        `    <rtept lat="${s.lat}" lon="${s.lng}"><name>${escapeXml(s.label || s.name || '')}</name></rtept>`,
+    )
+    .join('\n');
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<gpx version="1.1" creator="Road Trip" xmlns="http://www.topografix.com/GPX/1/1">',
+    '  <metadata>',
+    `    <name>${escapeXml(trip.name || 'Road trip')}</name>`,
+    trip.description ? `    <desc>${escapeXml(trip.description)}</desc>` : '',
+    '  </metadata>',
+    wptLines.join('\n'),
+    rtepts ? `  <rte>\n    <name>${escapeXml(trip.name || 'Road trip')}</name>\n${rtepts}\n  </rte>` : '',
+    '</gpx>',
+  ].filter(Boolean).join('\n');
+}
+
+function groupStopsByDay(stops) {
+  const map = new Map();
+  for (const s of stops) {
+    const d = s.dayNumber || 1;
+    if (!map.has(d)) map.set(d, []);
+    map.get(d).push(s);
+  }
+  return [...map.entries()].sort((a, b) => a[0] - b[0]);
+}
+
+router.get('/api/trips/:id/export/gpx', async (req, res) => {
+  try {
+    const ref = await loadTripForAccess(req, res, false);
+    if (!ref) return;
+    const snap = await ref.get();
+    const trip = snap.data();
+    const pinsSnap = await ref.collection('pins').orderBy('createdAt', 'asc').get();
+    const pins = pinsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const xml = buildGpx(trip, pins);
+    const filename = `${sanitizeFilename(trip.name)}.gpx`;
+    res.setHeader('Content-Type', 'application/gpx+xml; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(xml);
+  } catch (e) {
+    console.error('GET /api/trips/:id/export/gpx failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.get('/api/trips/:id/export/pdf', async (req, res) => {
+  try {
+    const ref = await loadTripForAccess(req, res, false);
+    if (!ref) return;
+    const snap = await ref.get();
+    const trip = snap.data();
+    const pinsSnap = await ref.collection('pins').orderBy('createdAt', 'asc').get();
+    const pins = pinsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const filename = `${sanitizeFilename(trip.name)}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } });
+    doc.pipe(res);
+
+    // Header
+    doc
+      .font('Times-Italic')
+      .fontSize(28)
+      .text(trip.name || 'Untitled trip', { align: 'left' });
+    if (trip.description) {
+      doc.moveDown(0.4).font('Times-Italic').fontSize(12).fillColor('#555').text(trip.description);
+    }
+
+    // Totals strip
+    const totals = [];
+    if (typeof trip.totalKm === 'number') totals.push(`${trip.totalKm.toLocaleString('en-US')} km`);
+    if (typeof trip.totalDays === 'number') totals.push(`${trip.totalDays} day${trip.totalDays === 1 ? '' : 's'}`);
+    if (Array.isArray(trip.countries) && trip.countries.length) totals.push(trip.countries.join(' '));
+    doc
+      .moveDown(0.8)
+      .fillColor('#000')
+      .font('Helvetica')
+      .fontSize(10)
+      .text(totals.join('  ·  '));
+
+    // Days
+    const stops = Array.isArray(trip.stops) ? trip.stops : [];
+    const grouped = groupStopsByDay(stops);
+    for (const [day, dayStops] of grouped) {
+      doc
+        .moveDown(1.1)
+        .font('Helvetica-Bold')
+        .fontSize(11)
+        .fillColor('#000')
+        .text(`Day ${day}`, { continued: false });
+      doc.moveDown(0.3);
+      for (const stop of dayStops) {
+        const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
+        const dur = stop.durationFromPrevious || '';
+        const meta = [km, dur].filter(Boolean).join(' · ');
+        doc.font('Helvetica').fontSize(11).fillColor('#000').text(stop.label || stop.name || '—', { continued: !!meta });
+        if (meta) {
+          doc.font('Helvetica').fontSize(9).fillColor('#666').text(`   ${meta}`);
+        }
+        if (stop.highlights && stop.highlights.length) {
+          doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${stop.highlights.join(' · ')}`);
+        }
+        doc.moveDown(0.2);
+      }
+    }
+
+    // Pins
+    if (pins.length) {
+      doc
+        .moveDown(1.2)
+        .font('Helvetica-Bold')
+        .fontSize(11)
+        .fillColor('#000')
+        .text('Pins');
+      doc.moveDown(0.3);
+      for (const pin of pins) {
+        const cat = pin.category ? `[${pin.category}] ` : '';
+        doc.font('Helvetica').fontSize(11).fillColor('#000').text(`${cat}${pin.name || ''}`);
+        if (pin.notes) {
+          doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${pin.notes}`);
+        }
+        doc.moveDown(0.15);
+      }
+    }
+
+    doc.moveDown(2);
+    doc.font('Helvetica').fontSize(8).fillColor('#999').text('Generated by Road Trip', { align: 'center' });
+    doc.end();
+  } catch (e) {
+    console.error('GET /api/trips/:id/export/pdf failed:', e);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
   }
 });
 

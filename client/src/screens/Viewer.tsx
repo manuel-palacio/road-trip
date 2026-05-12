@@ -7,7 +7,7 @@ import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePromotePin } from '../hooks/usePromoteAction';
-import { enableShare, getTrip, revokeShare } from '../lib/api';
+import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon } from '../lib/google-maps';
@@ -82,6 +82,22 @@ export function Viewer() {
     const url = `${window.location.origin}/share/${trip.shareToken}`;
     navigator.clipboard?.writeText(url).catch(() => { /* ignore */ });
     setShareToast('Link copied');
+  }
+
+  const [exporting, setExporting] = useState<'pdf' | 'gpx' | null>(null);
+  async function exportTrip(kind: 'pdf' | 'gpx') {
+    if (!tripId || exporting) return;
+    setExporting(kind);
+    try {
+      const path = `/api/trips/${encodeURIComponent(tripId)}/export/${kind}`;
+      const fallback = `${(trip?.name || 'road-trip').replace(/[^A-Za-z0-9\-_]+/g, '-')}.${kind}`;
+      await downloadAuthed(path, fallback);
+    } catch (err) {
+      console.error('Export failed', err);
+      setShareToast(`Could not export ${kind.toUpperCase()}`);
+    } finally {
+      setExporting(null);
+    }
   }
 
   const routes = useRouteSegments(stops, maps);
@@ -342,6 +358,32 @@ export function Viewer() {
             />
           )}
         </div>
+
+        <footer className="border-t border-line px-5 py-2.5 flex items-center justify-between gap-3 bg-canvas">
+          <span className="font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
+            Export
+          </span>
+          <div className="inline-flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => exportTrip('pdf')}
+              disabled={exporting !== null}
+              title="Download a printable PDF of this trip"
+              className="bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === 'pdf' ? '…' : 'PDF'}
+            </button>
+            <button
+              type="button"
+              onClick={() => exportTrip('gpx')}
+              disabled={exporting !== null}
+              title="Download a GPX file for Google Maps, Garmin, etc."
+              className="bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === 'gpx' ? '…' : 'GPX'}
+            </button>
+          </div>
+        </footer>
       </aside>
 
       <div className="relative w-full h-full bg-[#13151a]">
