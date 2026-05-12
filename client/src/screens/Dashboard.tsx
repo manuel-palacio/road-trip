@@ -29,36 +29,37 @@ export function Dashboard({ me }: { me: MeResponse }) {
 
   return (
     <div className="min-h-screen relative">
-      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-9 py-5 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-4 md:px-9 py-4 md:py-5 border-b border-line bg-canvas/85 backdrop-blur-md gap-3">
         <Brand size="sm" />
-        <div className="flex items-center gap-[18px]">
-          <span className={`font-mono text-[9.5px] tracking-[0.18em] uppercase px-[9px] py-[5px] rounded-full border ${
+        <div className="flex items-center gap-2 md:gap-[18px] min-w-0">
+          <span className={`hidden sm:inline-block font-mono text-[9.5px] tracking-[0.18em] uppercase px-[9px] py-[5px] rounded-full border shrink-0 ${
             me.plan === 'pro'
               ? 'text-accent border-accent bg-accent-soft'
               : 'text-paper-dim border-line-strong'
           }`}>
             {me.plan}
           </span>
-          <div className="flex items-center gap-3">
-            <div className="relative w-[34px] h-[34px] rounded-full overflow-hidden bg-surface-2 flex items-center justify-center border border-line">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative w-[34px] h-[34px] rounded-full overflow-hidden bg-surface-2 flex items-center justify-center border border-line shrink-0">
               {me.photoURL ? (
                 <img src={me.photoURL} alt="" className="w-full h-full object-cover" />
               ) : (
                 <span className="font-mono text-[11px] tracking-wide text-paper-dim">{initials(me.displayName || me.email)}</span>
               )}
             </div>
-            <span className="text-[14px] max-w-[180px] truncate">{me.displayName || me.email}</span>
+            {/* Hide name on phones — avatar carries the identity */}
+            <span className="hidden md:inline-block text-[14px] max-w-[180px] truncate">{me.displayName || me.email}</span>
           </div>
           <button
             type="button"
             onClick={() => signOutFirebase()}
-            className="bg-transparent border border-line text-paper-dim px-[14px] py-[7px] rounded text-[12px] transition-colors duration-200 ease-out-soft hover:border-paper-dim hover:text-paper"
+            className="bg-transparent border border-line text-paper-dim px-3 md:px-[14px] py-[6px] md:py-[7px] rounded text-[11px] md:text-[12px] shrink-0 transition-colors duration-200 ease-out-soft hover:border-paper-dim hover:text-paper"
           >
             Sign out
           </button>
         </div>
       </header>
-      <main className="max-w-[1100px] mx-auto pt-[140px] px-9 pb-20">
+      <main className="max-w-[1100px] mx-auto pt-[100px] md:pt-[140px] px-4 md:px-9 pb-20">
         <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted mb-3.5">
           Workspace <span className="text-accent mx-1.5">·</span> trips <span className="text-accent mx-1.5">·</span> {list.length}
         </div>

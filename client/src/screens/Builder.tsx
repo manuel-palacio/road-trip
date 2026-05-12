@@ -75,6 +75,8 @@ export function Builder() {
   const [hydrated, setHydrated] = useState(!isEditing);
   const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  // Mobile drawer state — sidebar slides in from left below md (768px).
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
@@ -426,8 +428,22 @@ export function Builder() {
   }
 
   return (
-    <section className="grid grid-cols-[420px_1fr] h-screen overflow-hidden">
-      <aside className="bg-surface border-r border-line flex flex-col overflow-hidden relative">
+    <section className="relative h-screen overflow-hidden md:grid md:grid-cols-[420px_1fr]">
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/55 z-30 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
+      <aside
+        className={`bg-surface border-r border-line flex flex-col overflow-hidden
+          fixed md:relative inset-y-0 left-0 z-40
+          w-[90vw] max-w-[420px] md:w-auto md:max-w-none
+          transition-transform duration-300 ease-out-soft
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+      >
         <div className="flex items-start gap-3 px-6 pt-[22px] pb-[18px] border-b border-line">
           <button
             type="button"
@@ -570,6 +586,14 @@ export function Builder() {
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="md:hidden absolute top-3 left-3 z-20 bg-canvas/85 backdrop-blur border border-line text-paper-dim w-10 h-10 rounded-md text-[18px] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:text-paper hover:border-paper-dim transition-colors"
+        >
+          ☰
+        </button>
         <div ref={setMapDiv} className="w-full h-full" />
         {state.tripId && (
           <PinMapLayer

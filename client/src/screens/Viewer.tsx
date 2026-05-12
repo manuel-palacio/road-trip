@@ -53,6 +53,9 @@ export function Viewer() {
   const pins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
 
   const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
+  // Mobile drawer state — sidebar slides in from left below md (768px).
+  // Open by default on desktop (where it's static); closed on mobile.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pinModal = usePinModal(tripId || '', { onCreated: () => setActiveTab('pins') });
   const promotePin = usePromotePin(tripId || '', stops);
 
@@ -245,8 +248,23 @@ export function Viewer() {
   }
 
   return (
-    <section className="grid grid-cols-[360px_1fr] h-screen overflow-hidden">
-      <aside className="bg-canvas border-r border-line flex flex-col overflow-hidden">
+    <section className="relative h-screen overflow-hidden md:grid md:grid-cols-[360px_1fr]">
+      {/* Backdrop overlay (mobile only) — tap to close drawer */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/55 z-30 backdrop-blur-sm transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
+      <aside
+        className={`bg-canvas border-r border-line flex flex-col overflow-hidden
+          fixed md:relative inset-y-0 left-0 z-40
+          w-[85vw] max-w-[360px] md:w-auto md:max-w-none
+          transition-transform duration-300 ease-out-soft
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+      >
         <header className="flex items-center gap-3 px-5 py-4 border-b border-line">
           <button
             type="button"
@@ -392,6 +410,15 @@ export function Viewer() {
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}
+        {/* Hamburger — mobile only, opens drawer */}
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="md:hidden absolute top-3 left-3 z-20 bg-canvas/85 backdrop-blur border border-line text-paper-dim w-10 h-10 rounded-md text-[18px] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:text-paper hover:border-paper-dim transition-colors"
+        >
+          ☰
+        </button>
         <div ref={setMapDiv} className="w-full h-full" />
         {tripId && (
           <PinMapLayer
