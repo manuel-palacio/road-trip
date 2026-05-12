@@ -10,7 +10,7 @@ import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon } from '../lib/google-maps';
+import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
 import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { PinList } from '../components/viewer/PinList';
@@ -203,9 +203,7 @@ export function Viewer() {
       const polyline = new maps.Polyline({
         path,
         map,
-        strokeColor: dayColor(stop.dayNumber),
-        strokeOpacity: 0.85,
-        strokeWeight: 4,
+        ...polylineOptionsFor(stop.routeMode, dayColor(stop.dayNumber)),
       });
       polylinesRef.current.push(polyline);
     }

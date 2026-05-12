@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { groupByDay } from '../../lib/compute';
-import type { Stop } from '../../lib/types';
+import type { Stop, StopRouteMode } from '../../lib/types';
 import { DayHeader } from './DayHeader';
 import { StopRow } from './StopRow';
 
@@ -8,6 +8,7 @@ type Props = {
   stops: Stop[];
   startDate: string | null | undefined;
   onChangeType: (id: string, type: Stop['type']) => void;
+  onChangeRouteMode?: (id: string, mode: StopRouteMode) => void;
   onRemove: (id: string) => void;
   onSetForceDayStart: (id: string, value: boolean) => void;
   onAddHighlight: (id: string, text: string) => void;
@@ -49,6 +50,7 @@ export function StopList(p: Props) {
               index={index}
               isFirst={index === 0}
               onChangeType={p.onChangeType}
+              onChangeRouteMode={p.onChangeRouteMode}
               onRemove={p.onRemove}
               onSetForceDayStart={p.onSetForceDayStart}
               onAddHighlight={p.onAddHighlight}

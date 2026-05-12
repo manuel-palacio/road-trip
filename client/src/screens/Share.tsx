@@ -7,7 +7,7 @@ import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon, makePinIcon } from '../lib/google-maps';
+import { MAP_STYLE, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
 import { PIN_CATEGORY_META } from '../lib/pin-meta';
 import type { Pin, Stop } from '../lib/types';
 import { Brand } from '../components/Brand';
@@ -149,9 +149,7 @@ export function Share() {
       const polyline = new maps.Polyline({
         path,
         map,
-        strokeColor: dayColor(stop.dayNumber),
-        strokeOpacity: 0.85,
-        strokeWeight: 4,
+        ...polylineOptionsFor(stop.routeMode, dayColor(stop.dayNumber)),
       });
       polylinesRef.current.push(polyline);
     }

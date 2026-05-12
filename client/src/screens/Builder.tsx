@@ -9,7 +9,7 @@ import { usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon, requestGeolocation } from '../lib/google-maps';
+import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute';
 import type { Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -261,9 +261,7 @@ export function Builder() {
       const polyline = new maps.Polyline({
         path,
         map,
-        strokeColor: dayColor(dayedStops[i].dayNumber),
-        strokeOpacity: 0.85,
-        strokeWeight: 4,
+        ...polylineOptionsFor(dayedStops[i].routeMode, dayColor(dayedStops[i].dayNumber)),
       });
       polylinesRef.current.push(polyline);
     }
@@ -279,6 +277,9 @@ export function Builder() {
     };
   }, []);
 
+  function setStopRouteMode(id: string, mode: import('../lib/types').StopRouteMode) {
+    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? { ...x, routeMode: mode } : x)) }));
+  }
   function setStopType(id: string, type: Stop['type']) {
     setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? { ...x, type } : x)) }));
   }
@@ -347,6 +348,7 @@ export function Builder() {
         type: x.type,
         forceDayStart: x.forceDayStart === true,
         highlights: x.highlights || [],
+        routeMode: x.routeMode || 'fastest',
       })),
     });
   }
@@ -380,6 +382,7 @@ export function Builder() {
           kmFromPrevious: s.kmFromPrevious || 0,
           durationFromPrevious: s.durationFromPrevious || '',
           durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
+          ...(s.routeMode ? { routeMode: s.routeMode } : {}),
         })),
       };
       let saved: Trip;
@@ -522,6 +525,7 @@ export function Builder() {
               stops={dayedStops}
               startDate={state.startDate}
               onChangeType={setStopType}
+              onChangeRouteMode={setStopRouteMode}
               onRemove={removeStop}
               onSetForceDayStart={setForceDayStart}
               onAddHighlight={addHighlight}

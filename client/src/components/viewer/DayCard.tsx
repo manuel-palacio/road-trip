@@ -4,6 +4,14 @@ import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
 import type { DayGroup } from '../../lib/compute';
+import type { StopRouteMode } from '../../lib/types';
+
+const ROUTE_MODE_GLYPH: Record<StopRouteMode, { glyph: string; label: string }> = {
+  fastest: { glyph: '⚡', label: 'Fastest leg' },
+  scenic: { glyph: '🌲', label: 'Scenic leg (avoids highways)' },
+  'no-tolls': { glyph: '🛣', label: 'No-tolls leg' },
+  'scenic-no-tolls': { glyph: '🌲🛣', label: 'Scenic + no-tolls leg' },
+};
 
 type Props = {
   group: DayGroup;
@@ -92,10 +100,20 @@ export function DayCard({ group, startDate, visible, onToggleVisibility }: Props
                   )}
                 </div>
                 {(stop.kmFromPrevious || stop.durationFromPrevious) && i > 0 && (
-                  <div className="mt-0.5 font-mono text-[9.5px] tracking-[0.14em] uppercase text-paper-dim">
-                    <span className="text-paper-muted mr-1">↗</span>
-                    <span className="text-paper font-medium mr-0.5">{stop.kmFromPrevious || 0}</span>km
-                    {stop.durationFromPrevious && <> · {stop.durationFromPrevious}</>}
+                  <div className="mt-0.5 font-mono text-[9.5px] tracking-[0.14em] uppercase text-paper-dim flex items-center gap-1.5 flex-wrap">
+                    <span>
+                      <span className="text-paper-muted mr-1">↗</span>
+                      <span className="text-paper font-medium mr-0.5">{stop.kmFromPrevious || 0}</span>km
+                      {stop.durationFromPrevious && <> · {stop.durationFromPrevious}</>}
+                    </span>
+                    {stop.routeMode && stop.routeMode !== 'fastest' && (
+                      <span
+                        title={ROUTE_MODE_GLYPH[stop.routeMode].label}
+                        className="inline-flex items-center gap-0.5 text-[11px] tracking-normal normal-case text-paper-dim"
+                      >
+                        <span aria-hidden>{ROUTE_MODE_GLYPH[stop.routeMode].glyph}</span>
+                      </span>
+                    )}
                   </div>
                 )}
                 {stop.highlights && stop.highlights.length > 0 && (

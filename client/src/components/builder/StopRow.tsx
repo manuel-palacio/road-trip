@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { flagEmoji } from '../../lib/flags';
 import { dayColor } from '../../lib/compute';
 import { getStopRoutingFailed } from '../../hooks/useRouteSegments';
-import type { Stop } from '../../lib/types';
+import type { Stop, StopRouteMode } from '../../lib/types';
 
 type Props = {
   stop: Stop;
   index: number;
   isFirst: boolean;
   onChangeType: (id: string, type: Stop['type']) => void;
+  onChangeRouteMode?: (id: string, mode: StopRouteMode) => void;
   onRemove: (id: string) => void;
   onSetForceDayStart: (id: string, value: boolean) => void;
   onAddHighlight: (id: string, text: string) => void;
@@ -22,6 +23,13 @@ type Props = {
   onDragLeave: (ev: React.DragEvent) => void;
   onDrop: (id: string, ev: React.DragEvent) => void;
 };
+
+const ROUTE_MODE_OPTIONS: { value: StopRouteMode; label: string; glyph: string }[] = [
+  { value: 'fastest',         label: 'Fastest',          glyph: '⚡' },
+  { value: 'scenic',          label: 'Scenic',           glyph: '🌲' },
+  { value: 'no-tolls',        label: 'No tolls',         glyph: '🛣' },
+  { value: 'scenic-no-tolls', label: 'Scenic · no tolls', glyph: '🌲🛣' },
+];
 
 const TYPE_OPTIONS: { value: Stop['type']; label: string }[] = [
   { value: 'start', label: 'Start' },
@@ -154,6 +162,24 @@ export function StopRow(p: Props) {
               {stop.durationFromPrevious ? <span> · {stop.durationFromPrevious}</span> : null}
             </span>
           ) : null}
+          {index > 0 && p.onChangeRouteMode && (
+            <select
+              value={stop.routeMode || 'fastest'}
+              onChange={(e) => p.onChangeRouteMode!(stop.id, e.target.value as StopRouteMode)}
+              title="Routing strategy for the leg from the previous stop"
+              className="bg-transparent border border-line rounded text-paper-dim font-mono text-[9.5px] tracking-[0.16em] uppercase px-1.5 py-[3px] pr-[18px] appearance-none cursor-pointer hover:border-paper-dim hover:text-paper focus:outline-none focus:border-accent"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path fill='%239b9080' d='M0 0l4 5 4-5z'/></svg>\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 6px center',
+              }}
+            >
+              {ROUTE_MODE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.glyph} {o.label}</option>
+              ))}
+            </select>
+          )}
 
           <span
             className="px-2 py-[3px] rounded-full font-mono text-[9.5px] tracking-[0.16em] uppercase font-medium whitespace-nowrap"

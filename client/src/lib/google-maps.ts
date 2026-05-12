@@ -105,6 +105,43 @@ export function makePinIcon(emoji: string, tint: string, priority: 'must' | 'wan
   };
 }
 
+// Polyline options for a given leg's routeMode. Scenic legs (which avoid
+// highways) render as a dashed pattern of short vertical segments along
+// the path; solid legs use the standard accent stroke. The function only
+// returns the *style* fields — caller still has to provide path + map.
+export function polylineOptionsFor(routeMode: import('./types').StopRouteMode | undefined, color: string): {
+  strokeColor?: string;
+  strokeOpacity?: number;
+  strokeWeight?: number;
+  icons?: google.maps.IconSequence[];
+} {
+  const scenic = routeMode === 'scenic' || routeMode === 'scenic-no-tolls';
+  if (scenic) {
+    return {
+      // Hide the continuous stroke so only the dash icons render.
+      strokeOpacity: 0,
+      icons: [
+        {
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeColor: color,
+            strokeOpacity: 0.95,
+            strokeWeight: 4,
+            scale: 2,
+          },
+          offset: '0',
+          repeat: '14px',
+        },
+      ],
+    };
+  }
+  return {
+    strokeColor: color,
+    strokeOpacity: 0.85,
+    strokeWeight: 4,
+  };
+}
+
 export function requestGeolocation(): Promise<{ lat: number; lng: number } | null> {
   return new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);

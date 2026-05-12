@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Stop } from '../lib/types';
+import type { Stop, StopRouteMode } from '../lib/types';
 import { formatDuration } from '../lib/compute';
 
 type Segment = {
@@ -13,8 +13,18 @@ type Segment = {
    Cleared automatically by browser on full page refresh. */
 const cache = new Map<string, Segment>();
 
-function pairKey(fromId: string, toId: string) {
-  return `${fromId}::${toId}`;
+function pairKey(fromId: string, toId: string, mode: StopRouteMode | undefined) {
+  // Mode is part of the cache key so flipping a leg between fastest/scenic
+  // triggers a fresh fetch with the right routeModifiers instead of
+  // serving a stale path.
+  return `${fromId}::${toId}::${mode || 'fastest'}`;
+}
+
+function routeModifiersFor(mode: StopRouteMode | undefined) {
+  const avoidHighways = mode === 'scenic' || mode === 'scenic-no-tolls';
+  const avoidTolls = mode === 'no-tolls' || mode === 'scenic-no-tolls';
+  if (!avoidHighways && !avoidTolls) return undefined;
+  return { avoidHighways, avoidTolls };
 }
 
 // Minimal types for the new Routes library — @types/google.maps may not carry
@@ -32,6 +42,7 @@ type RoutesLibrary = {
       destination: { lat: number; lng: number };
       travelMode: string;
       fields: string[];
+      routeModifiers?: { avoidHighways?: boolean; avoidTolls?: boolean; avoidFerries?: boolean };
     }) => Promise<{ routes?: RouteResponse[] }>;
   };
 };
@@ -60,12 +71,12 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
     let cancelled = false;
 
     // Determine which pairs are missing from the cache
-    const missing: { from: Stop; to: Stop; key: string }[] = [];
+    const missing: { from: Stop; to: Stop; key: string; mode: StopRouteMode | undefined }[] = [];
     for (let i = 1; i < stops.length; i++) {
       const from = stops[i - 1];
       const to = stops[i];
-      const key = pairKey(from.id, to.id);
-      if (!cache.has(key)) missing.push({ from, to, key });
+      const key = pairKey(from.id, to.id, to.routeMode);
+      if (!cache.has(key)) missing.push({ from, to, key, mode: to.routeMode });
     }
     if (missing.length === 0) return;
 
@@ -79,14 +90,16 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
         setLoading(false);
         return;
       }
-      for (const { from, to, key } of missing) {
+      for (const { from, to, key, mode } of missing) {
         if (cancelled || reqRef.current !== myReq) break;
         try {
+          const modifiers = routeModifiersFor(mode);
           const { routes } = await Route.computeRoutes({
             origin: { lat: from.lat, lng: from.lng },
             destination: { lat: to.lat, lng: to.lng },
             travelMode: 'DRIVING',
             fields: ['distanceMeters', 'durationMillis', 'path'],
+            ...(modifiers ? { routeModifiers: modifiers } : {}),
           });
           const route = routes?.[0];
           if (!route) throw new Error('No route returned');
@@ -122,7 +135,7 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
         };
       }
       const prev = stops[i - 1];
-      const seg = cache.get(pairKey(prev.id, stop.id));
+      const seg = cache.get(pairKey(prev.id, stop.id, stop.routeMode));
       if (!seg) return stop;
       return {
         ...stop,

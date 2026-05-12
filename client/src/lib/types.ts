@@ -39,6 +39,9 @@ export type Stop = {
   kmFromPrevious?: number;
   durationFromPrevious?: string;
   durationSecondsFromPrevious?: number;
+  // Routing strategy for the leg from the previous stop. First stop in a
+  // trip has no inbound leg and ignores this value.
+  routeMode?: StopRouteMode;
   // Optional metadata carried over when this stop was promoted from a pin.
   // Lossless promote/demote keeps these around for Phase 3 unification.
   category?: PinCategory;
@@ -48,6 +51,11 @@ export type Stop = {
 
 export type PinCategory = 'food' | 'hotel' | 'scenic' | 'fuel' | 'landmark' | 'other';
 export type PinPriority = 'must' | 'want' | 'maybe';
+
+// Routing strategy for the leg ARRIVING at a stop. Default 'fastest' if
+// not set. 'scenic' avoids highways (regional roads); 'no-tolls' avoids
+// toll roads; 'scenic-no-tolls' combines both.
+export type StopRouteMode = 'fastest' | 'scenic' | 'no-tolls' | 'scenic-no-tolls';
 
 export type Pin = {
   id: string;
