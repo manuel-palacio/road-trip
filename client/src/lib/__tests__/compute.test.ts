@@ -3,6 +3,8 @@ import {
   DAY_COLORS,
   applyDays,
   dayColor,
+  estimateFuelCost,
+  formatCurrency,
   formatDayDate,
   formatDuration,
   groupByDay,
@@ -147,5 +149,64 @@ describe('tripTotals', () => {
   });
   it('returns zeros for empty array', () => {
     expect(tripTotals([])).toEqual({ totalKm: 0, totalDays: 0, totalDurationSeconds: 0 });
+  });
+});
+
+describe('estimateFuelCost', () => {
+  it('matches the spec example: 500 km @ 7 L/100km × 1.80 €/L → 63 €', () => {
+    const cost = estimateFuelCost(500, 7, 'L/100km', 1.80);
+    expect(cost).toBeCloseTo(63, 5);
+  });
+
+  it('returns null when consumption is missing or non-positive', () => {
+    expect(estimateFuelCost(500, undefined, 'L/100km', 1.80)).toBeNull();
+    expect(estimateFuelCost(500, 0, 'L/100km', 1.80)).toBeNull();
+    expect(estimateFuelCost(500, -5, 'L/100km', 1.80)).toBeNull();
+  });
+
+  it('returns null when price is missing or non-positive', () => {
+    expect(estimateFuelCost(500, 7, 'L/100km', undefined)).toBeNull();
+    expect(estimateFuelCost(500, 7, 'L/100km', 0)).toBeNull();
+  });
+
+  it('returns 0 for zero distance even when consumption + price are set', () => {
+    expect(estimateFuelCost(0, 7, 'L/100km', 1.80)).toBe(0);
+  });
+
+  it('converts MPG units correctly', () => {
+    // 33.6 MPG ≈ 7 L/100km. 500 km @ 33.6 MPG @ ($1.80 * 3.785 ≈ $6.81/gal)
+    // should be close to the equivalent L/100km calculation
+    const lEquiv = estimateFuelCost(500, 7, 'L/100km', 1.80);
+    const mpgEquiv = estimateFuelCost(500, 33.6, 'MPG', 1.80 * 3.785411784);
+    expect(mpgEquiv).toBeCloseTo(lEquiv!, 0);
+  });
+
+  it('scales linearly with distance', () => {
+    const small = estimateFuelCost(100, 8, 'L/100km', 2)!;
+    const big = estimateFuelCost(1000, 8, 'L/100km', 2)!;
+    expect(big).toBeCloseTo(small * 10, 5);
+  });
+});
+
+describe('formatCurrency', () => {
+  it('formats EUR amounts with a currency symbol', () => {
+    const s = formatCurrency(63, 'EUR');
+    expect(s).toMatch(/63/);
+    expect(s).toMatch(/€|EUR/);
+  });
+
+  it('falls back to "<amount> <CODE>" for invalid currency codes', () => {
+    const s = formatCurrency(63, 'NOT-A-CURRENCY');
+    expect(s).toContain('63');
+  });
+
+  it('defaults to EUR when currency is undefined', () => {
+    const s = formatCurrency(50, undefined);
+    expect(s).toMatch(/€|EUR/);
+  });
+
+  it('drops decimal digits for amounts >= 100', () => {
+    const s = formatCurrency(150.42, 'EUR');
+    expect(s).not.toMatch(/\.4/);
   });
 });

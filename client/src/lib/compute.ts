@@ -1,4 +1,4 @@
-import type { Stop } from './types';
+import type { FuelUnit, Stop } from './types';
 
 /* Custom day color palette — muted inks matching the editorial cartography theme.
    Cycles past 10 days. */
@@ -88,6 +88,46 @@ export function groupByDay(stops: Stop[]): DayGroup[] {
     g.durationSeconds += stop.durationSecondsFromPrevious || 0;
   });
   return [...groups.values()].sort((a, b) => a.day - b.day);
+}
+
+/** Estimate fuel cost for a given distance + consumption + price.
+ * Returns null when any input is missing/invalid (caller hides the chip).
+ * MPG is converted to L/100km internally via 235.2146 / mpg. */
+export function estimateFuelCost(
+  km: number,
+  consumption: number | undefined | null,
+  unit: FuelUnit | undefined,
+  pricePerUnit: number | undefined | null,
+): number | null {
+  if (!km || km < 0) return 0;
+  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return null;
+  if (pricePerUnit == null || !Number.isFinite(pricePerUnit) || pricePerUnit <= 0) return null;
+  if (unit === 'MPG') {
+    // miles per US gallon → L/100km
+    const lPer100 = 235.2146 / consumption;
+    const litres = (km / 100) * lPer100;
+    // price is per gallon when unit is MPG — convert litres back to gallons
+    const gallons = litres / 3.785411784;
+    return gallons * pricePerUnit;
+  }
+  // default: L/100km, price per litre
+  const litres = (km / 100) * consumption;
+  return litres * pricePerUnit;
+}
+
+/** Format a monetary amount using Intl.NumberFormat with the browser locale.
+ * Falls back gracefully for invalid currency codes. */
+export function formatCurrency(amount: number, currency: string | undefined): string {
+  const code = (currency || 'EUR').toUpperCase();
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: code,
+      maximumFractionDigits: amount >= 100 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${code}`;
+  }
 }
 
 export function tripTotals(stops: Stop[]): {

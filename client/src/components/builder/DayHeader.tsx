@@ -7,9 +7,10 @@ type Props = {
   durationSeconds: number;
   startDate: string | null | undefined;
   isFirst: boolean;
+  fuelCost?: string | null;
 };
 
-export function DayHeader({ day, stopCount, km, durationSeconds, startDate, isFirst }: Props) {
+export function DayHeader({ day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost }: Props) {
   const date = formatDayDate(day, startDate);
   let aaCls: string;
   let aaLabel: string;
@@ -38,6 +39,12 @@ export function DayHeader({ day, stopCount, km, durationSeconds, startDate, isFi
         <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-paper-dim">
           <span className="text-paper font-medium">{km}</span> km
           {durationSeconds > 0 && <> · {formatDuration(durationSeconds)}</>}
+          {fuelCost && (
+            <>
+              {' · '}
+              <span className="text-paper font-medium tracking-normal normal-case">{fuelCost}</span>
+            </>
+          )}
         </span>
       </div>
       <div className="mt-2 flex items-center gap-2 flex-wrap">

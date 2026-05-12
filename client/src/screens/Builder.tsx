@@ -10,8 +10,8 @@ import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
-import { applyDays, dayColor, formatDuration, tripTotals } from '../lib/compute';
-import type { Stop, Trip } from '../lib/types';
+import { applyDays, dayColor, estimateFuelCost, formatCurrency, formatDuration, tripTotals } from '../lib/compute';
+import type { FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
@@ -25,6 +25,10 @@ type BuilderState = {
   maxKmPerDay: number;
   description: string;
   stops: Stop[];
+  fuelConsumption: string;    // strings so blank fields don't collapse to 0
+  fuelUnit: FuelUnit;
+  fuelPrice: string;
+  fuelCurrency: string;
 };
 
 const empty = (): BuilderState => ({
@@ -35,6 +39,10 @@ const empty = (): BuilderState => ({
   maxKmPerDay: 600,
   description: '',
   stops: [],
+  fuelConsumption: '',
+  fuelUnit: 'L/100km',
+  fuelPrice: '',
+  fuelCurrency: 'EUR',
 });
 
 function reassignTypes(stops: Stop[]): Stop[] {
@@ -92,6 +100,10 @@ export function Builder() {
       maxKmPerDay: typeof t.maxKmPerDay === 'number' && t.maxKmPerDay > 0 ? t.maxKmPerDay : 600,
       description: t.description || '',
       stops: Array.isArray(t.stops) ? t.stops.map((s) => ({ ...s })) : [],
+      fuelConsumption: typeof t.fuelConsumption === 'number' ? String(t.fuelConsumption) : '',
+      fuelUnit: t.fuelUnit === 'MPG' ? 'MPG' : 'L/100km',
+      fuelPrice: typeof t.fuelPrice === 'number' ? String(t.fuelPrice) : '',
+      fuelCurrency: t.fuelCurrency || 'EUR',
     };
     setState(next);
     snapshotRef.current = serializeSnapshot(next);
@@ -173,6 +185,22 @@ export function Builder() {
     [routes.enriched, state.maxKmPerDay],
   );
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
+  // Fuel cost — both consumption and price must be positive numbers to
+  // produce a value; otherwise null = hide the UI chips. Parsed once here
+  // so the day-header callback can reuse them.
+  const fuelConsumptionNum = parseFloat(state.fuelConsumption);
+  const fuelPriceNum = parseFloat(state.fuelPrice);
+  const totalFuelCost = useMemo(
+    () => estimateFuelCost(totals.totalKm, fuelConsumptionNum, state.fuelUnit, fuelPriceNum),
+    [totals.totalKm, fuelConsumptionNum, fuelPriceNum, state.fuelUnit],
+  );
+  const totalFuelCostStr = totalFuelCost != null && totalFuelCost > 0
+    ? formatCurrency(totalFuelCost, state.fuelCurrency)
+    : null;
+  function fuelCostFor(km: number): string | null {
+    const c = estimateFuelCost(km, fuelConsumptionNum, state.fuelUnit, fuelPriceNum);
+    return c != null && c > 0 ? formatCurrency(c, state.fuelCurrency) : null;
+  }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
     [dayedStops],
@@ -341,6 +369,10 @@ export function Builder() {
       startDate: s.startDate || '',
       description: s.description || '',
       maxKmPerDay: s.maxKmPerDay || 600,
+      fuelConsumption: s.fuelConsumption || '',
+      fuelUnit: s.fuelUnit || 'L/100km',
+      fuelPrice: s.fuelPrice || '',
+      fuelCurrency: s.fuelCurrency || 'EUR',
       stops: (s.stops || []).map((x) => ({
         id: x.id, name: x.name, label: x.label,
         lat: x.lat, lng: x.lng,
@@ -372,6 +404,10 @@ export function Builder() {
         countries: flagSet,
         totalKm: totals.totalKm,
         totalDays: totals.totalDays,
+        fuelConsumption: Number.isFinite(fuelConsumptionNum) && fuelConsumptionNum > 0 ? fuelConsumptionNum : undefined,
+        fuelUnit: state.fuelUnit,
+        fuelPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
+        fuelCurrency: state.fuelCurrency || 'EUR',
         stops: stops.map((s) => ({
           id: s.id, name: s.name, label: s.label,
           lat: s.lat, lng: s.lng,
@@ -503,6 +539,58 @@ export function Builder() {
               className="w-full bg-transparent border-0 border-b border-line text-paper-dim font-serif italic text-[14px] py-1 outline-none resize-none min-h-[38px] transition-colors focus:border-accent placeholder:text-paper-muted placeholder:italic"
             />
           </label>
+
+          {/* Fuel cost estimator — all four fields optional. The summary bar
+              and day headers only render a cost when consumption+price are set. */}
+          <div className="grid grid-cols-[1fr_auto_1fr_1fr] gap-3 items-end">
+            <label className="block min-w-0 relative">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Fuel</span>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                inputMode="decimal"
+                placeholder="—"
+                value={state.fuelConsumption}
+                onChange={(e) => setState((s) => ({ ...s, fuelConsumption: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+              />
+            </label>
+            <label className="block">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5 invisible">.</span>
+              <select
+                value={state.fuelUnit}
+                onChange={(e) => setState((s) => ({ ...s, fuelUnit: e.target.value as FuelUnit }))}
+                className="bg-transparent border-0 border-b border-line text-paper text-[12px] py-1 pr-3 outline-none cursor-pointer transition-colors focus:border-accent"
+              >
+                <option value="L/100km">L/100km</option>
+                <option value="MPG">MPG</option>
+              </select>
+            </label>
+            <label className="block min-w-0 relative">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Price</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                inputMode="decimal"
+                placeholder="—"
+                value={state.fuelPrice}
+                onChange={(e) => setState((s) => ({ ...s, fuelPrice: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+              />
+            </label>
+            <label className="block min-w-0">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Cur.</span>
+              <input
+                type="text"
+                maxLength={3}
+                value={state.fuelCurrency}
+                onChange={(e) => setState((s) => ({ ...s, fuelCurrency: e.target.value.toUpperCase().slice(0, 3) }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 uppercase tracking-[0.08em] outline-none transition-colors focus:border-accent"
+              />
+            </label>
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden pt-[18px]">
@@ -524,6 +612,7 @@ export function Builder() {
             <StopList
               stops={dayedStops}
               startDate={state.startDate}
+              fuelCostFor={fuelCostFor}
               onChangeType={setStopType}
               onChangeRouteMode={setStopRouteMode}
               onRemove={removeStop}
@@ -560,6 +649,11 @@ export function Builder() {
           {totals.totalDurationSeconds > 0 && (
             <span className="inline-flex items-baseline gap-1">
               <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
+            </span>
+          )}
+          {totalFuelCostStr && (
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
             </span>
           )}
           <span className="ml-auto font-sans text-[14px] tracking-[0.06em]">{flagSet.join(' ')}</span>

@@ -18,9 +18,10 @@ type Props = {
   startDate: string | null | undefined;
   visible: boolean;
   onToggleVisibility: () => void;
+  fuelCost?: string | null;
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost }: Props) {
   const [expanded, setExpanded] = useState(true);
 
   const stopsOnly = group.stops.map((x) => x.stop);
@@ -60,6 +61,12 @@ export function DayCard({ group, startDate, visible, onToggleVisibility }: Props
         <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-paper-dim">
           <span className="text-paper font-medium">{group.km}</span> km
           {group.durationSeconds > 0 && <> · {formatDuration(group.durationSeconds)}</>}
+          {fuelCost && (
+            <>
+              {' · '}
+              <span className="text-paper font-medium tracking-normal normal-case">{fuelCost}</span>
+            </>
+          )}
         </span>
         <Switch.Root
           checked={visible}

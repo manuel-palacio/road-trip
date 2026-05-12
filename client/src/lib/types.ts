@@ -70,6 +70,8 @@ export type Pin = {
   updatedAt?: unknown;
 };
 
+export type FuelUnit = 'L/100km' | 'MPG';
+
 export type Trip = {
   id: string;
   ownerUid: string;
@@ -85,6 +87,12 @@ export type Trip = {
   totalKm?: number;
   totalDays?: number;
   countries?: string[];
+  // Fuel cost estimator — all four optional. When consumption + price are
+  // both set, the UI displays an estimated cost per day and per trip.
+  fuelConsumption?: number;
+  fuelUnit?: FuelUnit;
+  fuelPrice?: number;        // per litre if L/100km, per gallon if MPG
+  fuelCurrency?: string;     // 3-letter ISO code, e.g. 'EUR', 'USD'
   createdAt?: unknown;
   updatedAt?: unknown;
 };

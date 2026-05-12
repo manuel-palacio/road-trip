@@ -5,7 +5,7 @@ import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { getSharedTrip } from '../lib/api';
-import { applyDays, dayColor, formatDuration, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, estimateFuelCost, formatCurrency, formatDuration, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
 import { PIN_CATEGORY_META } from '../lib/pin-meta';
@@ -70,6 +70,17 @@ export function Share() {
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
+  const totalFuelCost = useMemo(
+    () => estimateFuelCost(totals.totalKm, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice),
+    [totals.totalKm, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice],
+  );
+  const totalFuelCostStr = totalFuelCost != null && totalFuelCost > 0
+    ? formatCurrency(totalFuelCost, trip?.fuelCurrency)
+    : null;
+  function fuelCostFor(km: number): string | null {
+    const c = estimateFuelCost(km, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice);
+    return c != null && c > 0 ? formatCurrency(c, trip?.fuelCurrency) : null;
+  }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
     [dayedStops],
@@ -304,6 +315,11 @@ export function Share() {
                 <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
               </span>
             )}
+            {totalFuelCostStr && (
+              <span className="inline-flex items-baseline gap-1">
+                <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
+              </span>
+            )}
             <span className="ml-auto font-sans text-[14px] tracking-[0.06em]">{flagSet.join(' ')}</span>
           </div>
 
@@ -328,6 +344,7 @@ export function Share() {
                     startDate={trip.startDate}
                     visible={!hiddenDays.has(g.day)}
                     onToggleVisibility={() => toggleDay(g.day)}
+                    fuelCost={fuelCostFor(g.km)}
                   />
                 ))
               )
