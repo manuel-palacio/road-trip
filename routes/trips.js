@@ -539,7 +539,7 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
         if (stop.highlights && stop.highlights.length) {
           doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${stop.highlights.join(' · ')}`);
         }
-        if (stop.type === 'overnight') {
+        if (stop.type === 'overnight' || stop.type === 'destination') {
           const bookingUrl = bookingUrlForStop(stop, trip);
           if (bookingUrl) {
             doc

@@ -161,7 +161,7 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                     ))}
                   </div>
                 )}
-                {stop.type === 'overnight' && (() => {
+                {(stop.type === 'overnight' || stop.type === 'destination') && (() => {
                   const links = accommodationLinks(stop, startDate, bookingAffiliateId);
                   return (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
