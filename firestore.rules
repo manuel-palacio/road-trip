@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Default: deny everything ────────────────────────────────────────
+    // The Express API uses the Firebase Admin SDK which bypasses these
+    // rules entirely. The client SDK is only used for Authentication —
+    // all reads/writes go through the backend. So there's no legitimate
+    // path for a client to talk directly to Firestore. These rules are
+    // defense-in-depth: even if an attacker steals the public web API
+    // key from /config, they still can't read another user's trips.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── Users: own record only ─────────────────────────────────────────
+    // A user can read their own user doc (e.g., to see plan/tripLimit).
+    // Writes are restricted to the server (Admin SDK) — the client should
+    // never overwrite plan, tripLimit, or other server-managed fields.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // ─── Trips: owner or collaborator ───────────────────────────────────
+    // Reads + updates require being on the trip's access list.
+    // Creates require setting yourself as ownerUid (no impersonation).
+    // Deletes are owner-only.
+    match /trips/{tripId} {
+      allow read: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        (resource.data.collaborators is list && request.auth.uid in resource.data.collaborators)
+      );
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        (resource.data.collaborators is list && request.auth.uid in resource.data.collaborators)
+      );
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+
+      // Pins subcollection: same access as parent trip.
+      // Uses get() to fetch the parent doc — costs one document read per
+      // rule evaluation, which is acceptable for the pin volume per trip.
+      match /pins/{pinId} {
+        allow read, write: if request.auth != null
+          && (
+            get(/databases/$(database)/documents/trips/$(tripId)).data.ownerUid == request.auth.uid ||
+            (
+              get(/databases/$(database)/documents/trips/$(tripId)).data.collaborators is list &&
+              request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.collaborators
+            )
+          );
+      }
+    }
+  }
+}
