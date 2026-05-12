@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatDayDate, formatDuration } from '../../lib/compute';
 
 type Props = {
@@ -8,9 +9,14 @@ type Props = {
   startDate: string | null | undefined;
   isFirst: boolean;
   fuelCost?: string | null;
+  // When set, the header becomes a drop target — a drop inserts the
+  // dragged stop just before the first stop currently in this day.
+  onDropAtStart?: () => void;
 };
 
-export function DayHeader({ day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost }: Props) {
+export function DayHeader(p: Props) {
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, onDropAtStart } = p;
+  const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
   let aaCls: string;
   let aaLabel: string;
@@ -27,7 +33,31 @@ export function DayHeader({ day, stopCount, km, durationSeconds, startDate, isFi
   const showKmWarning = km > 800;
 
   return (
-    <div className={`px-1 py-2.5 ${isFirst ? '' : 'pt-3.5 mt-1 border-t border-dashed border-line-strong'}`}>
+    <div
+      className={`relative px-1 py-2.5 ${isFirst ? '' : 'pt-3.5 mt-1 border-t border-dashed border-line-strong'}`}
+      onDragOver={(ev) => {
+        if (!onDropAtStart) return;
+        if (!ev.dataTransfer.types.includes('text/plain')) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        if (!over) setOver(true);
+      }}
+      onDragLeave={(ev) => {
+        if (!onDropAtStart) return;
+        const related = ev.relatedTarget as Node | null;
+        if (related && (ev.currentTarget as HTMLDivElement).contains(related)) return;
+        setOver(false);
+      }}
+      onDrop={(ev) => {
+        if (!onDropAtStart) return;
+        ev.preventDefault();
+        setOver(false);
+        onDropAtStart();
+      }}
+    >
+      {over && (
+        <div className="absolute -top-[3px] left-2 right-2 h-[3px] bg-accent rounded-sm pointer-events-none z-10 shadow-[0_0_14px_rgba(231,111,81,0.7)]" />
+      )}
       <div className="flex items-baseline gap-2.5">
         <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper font-medium">
           Day {day}

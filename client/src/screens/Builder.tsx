@@ -9,6 +9,7 @@ import { usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
+import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, tripTotals } from '../lib/compute';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
@@ -141,6 +142,12 @@ export function Builder() {
   const [savedToast, setSavedToast] = useState(false);
   // Mobile drawer state — sidebar slides in from left below md (768px).
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // When non-null, the next stop added via the search box splices at this
+  // flat index instead of appending. Set by the inline "+ insert" button
+  // between rows; cleared on add or by the user's × on the chip.
+  const [insertIndex, setInsertIndex] = useState<number | null>(null);
+  const insertIndexRef = useRef<number | null>(null);
+  insertIndexRef.current = insertIndex;
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
@@ -189,6 +196,15 @@ export function Builder() {
   const markersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  // Stop id whose InfoWindow is pinned-open by a click. Mouseover/out on
+  // other markers won't override it; map background click clears it.
+  const pinnedMarkerIdRef = useRef<string | null>(null);
+  // Scroll container holding the stop list — used for auto-scroll while
+  // the user drags a stop near the top/bottom edge.
+  const stopScrollRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const autoScrollVelRef = useRef<number>(0);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -347,7 +363,14 @@ export function Builder() {
           highlights: [],
           kmFromPrevious: 0,
         };
-        setState((s) => ({ ...s, stops: reassignTypes([...s.stops, newStop]) }));
+        const idx = insertIndexRef.current;
+        setState((s) => {
+          const stops = [...s.stops];
+          if (idx == null || idx >= stops.length) stops.push(newStop);
+          else stops.splice(Math.max(0, idx), 0, newStop);
+          return { ...s, stops: reassignTypes(stops) };
+        });
+        setInsertIndex(null);
         if (searchInputRef.current) searchInputRef.current.value = '';
       });
     }
@@ -372,15 +395,45 @@ export function Builder() {
   useEffect(() => {
     if (!maps || !map) return;
     markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = dayedStops.map((stop, i) =>
-      new maps.Marker({
+    if (!infoWindowRef.current) {
+      infoWindowRef.current = new maps.InfoWindow({ disableAutoPan: true });
+    }
+    const iw = infoWindowRef.current;
+    // Click outside any marker closes a pinned InfoWindow.
+    const mapClickListener = map.addListener('click', () => {
+      pinnedMarkerIdRef.current = null;
+      iw.close();
+    });
+    markersRef.current = dayedStops.map((stop, i) => {
+      const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
         icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber)),
         title: stop.label || stop.name,
-      }),
-    );
+      });
+      const showInfo = () => {
+        iw.setContent(renderStopInfoHtml(stop, i + 1));
+        iw.open({ map, anchor: marker });
+      };
+      marker.addListener('mouseover', () => {
+        // While another marker is pinned, hover doesn't take over.
+        if (pinnedMarkerIdRef.current && pinnedMarkerIdRef.current !== stop.id) return;
+        showInfo();
+      });
+      marker.addListener('mouseout', () => {
+        if (pinnedMarkerIdRef.current === stop.id) return;
+        iw.close();
+      });
+      marker.addListener('click', () => {
+        pinnedMarkerIdRef.current = stop.id;
+        showInfo();
+      });
+      return marker;
+    });
     fitBounds(map, dayedStops);
+    return () => {
+      maps.event.removeListener(mapClickListener);
+    };
   }, [maps, map, dayedStops]);
 
   // Sync polylines per segment in day color
@@ -407,6 +460,9 @@ export function Builder() {
       markersRef.current = [];
       polylinesRef.current.forEach((p) => p.setMap(null));
       polylinesRef.current = [];
+      infoWindowRef.current?.close();
+      infoWindowRef.current = null;
+      if (autoScrollRafRef.current != null) cancelAnimationFrame(autoScrollRafRef.current);
     };
   }, []);
 
@@ -465,6 +521,74 @@ export function Builder() {
       stops.splice(insertAt, 0, moved);
       return { ...s, stops: reassignTypes(stops) };
     });
+  }
+
+  // Drop on a DayHeader = insert the dragged stop just before the first
+  // stop currently assigned to that day. dayedStops is in render order, so
+  // its first-of-day stop id maps directly into the flat state.stops list.
+  function reorderToDayStart(day: number) {
+    const sourceId = draggedIdRef.current;
+    if (!sourceId) return;
+    const firstOfDay = dayedStops.find((x) => x.dayNumber === day);
+    if (!firstOfDay) return;
+    setState((s) => {
+      const stops = [...s.stops];
+      const fromIdx = stops.findIndex((x) => x.id === sourceId);
+      if (fromIdx < 0) return s;
+      let targetIdx = stops.findIndex((x) => x.id === firstOfDay.id);
+      if (targetIdx < 0) return s;
+      if (sourceId === firstOfDay.id) return s;
+      const [moved] = stops.splice(fromIdx, 1);
+      if (fromIdx < targetIdx) targetIdx -= 1;
+      stops.splice(targetIdx, 0, moved);
+      return { ...s, stops: reassignTypes(stops) };
+    });
+  }
+
+  function startInsertAt(index: number) {
+    setInsertIndex(index);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+      searchInputRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  // Auto-scroll the stop list while a drag is in progress. Triggered when
+  // the cursor approaches the top or bottom edge of the scroll container —
+  // velocity ramps with proximity to the edge (0 outside the 60px zone).
+  function pumpAutoScroll() {
+    const el = stopScrollRef.current;
+    const vel = autoScrollVelRef.current;
+    if (!el || vel === 0) {
+      autoScrollRafRef.current = null;
+      return;
+    }
+    el.scrollTop += vel;
+    autoScrollRafRef.current = requestAnimationFrame(pumpAutoScroll);
+  }
+  function onDragOverScroll(ev: React.DragEvent) {
+    if (!draggedIdRef.current) return;
+    const el = stopScrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const edge = 60;
+    let vel = 0;
+    if (ev.clientY < rect.top + edge) {
+      vel = -Math.ceil(((rect.top + edge - ev.clientY) / edge) * 14);
+    } else if (ev.clientY > rect.bottom - edge) {
+      vel = Math.ceil(((ev.clientY - (rect.bottom - edge)) / edge) * 14);
+    }
+    autoScrollVelRef.current = vel;
+    if (vel !== 0 && autoScrollRafRef.current == null) {
+      autoScrollRafRef.current = requestAnimationFrame(pumpAutoScroll);
+    }
+  }
+  function stopAutoScroll() {
+    autoScrollVelRef.current = 0;
+    if (autoScrollRafRef.current != null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
   }
 
   function serializeSnapshot(s: BuilderState): string {
@@ -787,15 +911,46 @@ export function Builder() {
               ref={searchInputRef}
               type="text"
               autoComplete="off"
-              placeholder="Search for a city or place…"
+              placeholder={insertIndex == null ? 'Search for a city or place…' : 'Search the place to insert…'}
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[11px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />
+            {insertIndex != null && (() => {
+              const before = insertIndex > 0 ? dayedStops[insertIndex - 1] : null;
+              const after = insertIndex < dayedStops.length ? dayedStops[insertIndex] : null;
+              let label: string;
+              if (before && after) label = `Insert between ${before.label || before.name} and ${after.label || after.name}`;
+              else if (before) label = `Insert after ${before.label || before.name}`;
+              else if (after) label = `Insert before ${after.label || after.name}`;
+              else label = 'Insert as first stop';
+              return (
+                <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent-soft border border-accent text-accent font-mono text-[10px] tracking-[0.14em] uppercase max-w-full">
+                  <span className="truncate normal-case tracking-normal font-sans text-[11.5px]">{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => setInsertIndex(null)}
+                    aria-label="Cancel insert"
+                    title="Cancel insert"
+                    className="text-accent hover:text-paper text-[13px] leading-none -mr-1 px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })()}
           </div>
-          <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-6 pb-3">
+          <div
+            ref={stopScrollRef}
+            className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-6 pb-3"
+            onDragOver={onDragOverScroll}
+            onDragLeave={stopAutoScroll}
+            onDrop={stopAutoScroll}
+          >
             <StopList
               stops={dayedStops}
               startDate={state.startDate}
               fuelCostFor={fuelCostForStops}
+              insertIndex={insertIndex}
+              onInsertAt={startInsertAt}
               onChangeType={setStopType}
               onChangeRouteMode={setStopRouteMode}
               onRemove={removeStop}
@@ -811,10 +966,11 @@ export function Builder() {
                   : null
               }
               onDragStart={(id) => { draggedIdRef.current = id; }}
-              onDragEnd={() => { draggedIdRef.current = null; }}
+              onDragEnd={() => { draggedIdRef.current = null; stopAutoScroll(); }}
               onDragOver={() => { /* handled in StopRow */ }}
               onDragLeave={() => { /* handled in StopRow */ }}
               onDrop={(id, ev) => reorder(id, ev)}
+              onDropAtDayStart={reorderToDayStart}
             />
           </div>
         </div>
