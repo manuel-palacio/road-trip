@@ -356,6 +356,7 @@ export function Share() {
                     visible={!hiddenDays.has(g.day)}
                     onToggleVisibility={() => toggleDay(g.day)}
                     fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
+                    bookingAffiliateId={cfg.data?.bookingAffiliateId}
                   />
                 ))
               )

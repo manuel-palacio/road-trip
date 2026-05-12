@@ -4,6 +4,7 @@ import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
 import { phoneShare } from '../../lib/phone-share';
+import { accommodationLinks } from '../../lib/booking-links';
 import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
 import { QrModal } from '../QrModal';
@@ -21,9 +22,10 @@ type Props = {
   visible: boolean;
   onToggleVisibility: () => void;
   fuelCost?: string | null;
+  bookingAffiliateId?: string | null;
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, bookingAffiliateId }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -159,6 +161,31 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                     ))}
                   </div>
                 )}
+                {stop.type === 'overnight' && (() => {
+                  const links = accommodationLinks(stop, startDate, bookingAffiliateId);
+                  return (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <a
+                        href={links.booking}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={links.hasDates ? 'Booking.com — pre-filled with your stay date' : 'Booking.com — search by name'}
+                        className="inline-flex items-center gap-1 px-2 py-[3px] bg-transparent border border-line rounded text-[11px] text-paper-dim hover:text-paper hover:border-paper-dim transition-colors"
+                      >
+                        <span aria-hidden>🏨</span> Booking.com
+                      </a>
+                      <a
+                        href={links.googleHotels}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={links.hasDates ? 'Google Hotels — pre-filled with your stay date' : 'Google Hotels — search by name'}
+                        className="inline-flex items-center gap-1 px-2 py-[3px] bg-transparent border border-line rounded text-[11px] text-paper-dim hover:text-paper hover:border-paper-dim transition-colors"
+                      >
+                        <span aria-hidden>🔍</span> Google Hotels
+                      </a>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}

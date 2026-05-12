@@ -34,6 +34,10 @@ router.get('/config', (req, res) => {
     firebaseConfig,
     mapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
     adminEmail: process.env.ADMIN_EMAIL || '',
+    // Booking.com affiliate partner id — appended to hotel-search links
+    // as `aid=`. Empty string when unset; the frontend treats falsy
+    // values as "no affiliate tag", so unconfigured deploys still work.
+    bookingAffiliateId: process.env.BOOKING_AFFILIATE_ID || '',
   });
 });
 

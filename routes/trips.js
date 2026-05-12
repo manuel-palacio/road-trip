@@ -415,6 +415,36 @@ function formatPdfBreakdown(b) {
   return parts.length === 0 ? null : parts.join(' + ');
 }
 
+function bookingUrlForStop(stop, trip) {
+  // Returns null when the stop has no usable name; otherwise a Booking.com
+  // searchresults URL with dates pre-filled (if trip.startDate is set) and
+  // an aid= affiliate tag (if BOOKING_AFFILIATE_ID is configured).
+  const name = (stop.label || stop.name || '').trim();
+  if (!name) return null;
+  const day = stop.dayNumber && stop.dayNumber > 0 ? stop.dayNumber : 1;
+  let checkin = null;
+  let checkout = null;
+  if (trip.startDate) {
+    const d = new Date(`${trip.startDate}T00:00:00Z`);
+    if (!isNaN(d.getTime())) {
+      const ci = new Date(d);
+      ci.setUTCDate(ci.getUTCDate() + day - 1);
+      const co = new Date(d);
+      co.setUTCDate(co.getUTCDate() + day);
+      checkin = ci.toISOString().slice(0, 10);
+      checkout = co.toISOString().slice(0, 10);
+    }
+  }
+  const params = new URLSearchParams({ ss: name, group_adults: '2' });
+  if (checkin && checkout) {
+    params.set('checkin', checkin);
+    params.set('checkout', checkout);
+  }
+  const aid = process.env.BOOKING_AFFILIATE_ID;
+  if (aid) params.set('aid', aid);
+  return `https://www.booking.com/searchresults.html?${params.toString()}`;
+}
+
 function groupStopsByDay(stops) {
   const map = new Map();
   for (const s of stops) {
@@ -508,6 +538,16 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
         }
         if (stop.highlights && stop.highlights.length) {
           doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${stop.highlights.join(' · ')}`);
+        }
+        if (stop.type === 'overnight') {
+          const bookingUrl = bookingUrlForStop(stop, trip);
+          if (bookingUrl) {
+            doc
+              .font('Helvetica')
+              .fontSize(9)
+              .fillColor('#2a6dba')
+              .text(`   🏨 Find a hotel: ${bookingUrl}`, { link: bookingUrl, underline: false });
+          }
         }
         doc.moveDown(0.2);
       }

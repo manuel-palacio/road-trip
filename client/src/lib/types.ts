@@ -12,6 +12,7 @@ export type AppConfig = {
   firebaseConfig: Partial<FirebaseClientConfig>;
   mapsApiKey: string;
   adminEmail: string;
+  bookingAffiliateId?: string;
 };
 
 export type MeResponse = {
