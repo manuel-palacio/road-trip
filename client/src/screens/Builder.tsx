@@ -1066,7 +1066,7 @@ export function Builder() {
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="bg-accent text-canvas border-0 rounded px-5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+            className="bg-accent text-canvas border border-accent rounded px-3.5 py-[7px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
           >
             {saving ? 'Saving…' : 'Save trip'}
           </button>
