@@ -22,6 +22,7 @@ const UPDATABLE_FIELDS = [
   'fuelUnit',
   'fuelPrice',
   'fuelCurrency',
+  'fuelOverrides',
 ];
 
 const PIN_CATEGORIES = ['food', 'hotel', 'scenic', 'fuel', 'landmark', 'other'];
@@ -384,6 +385,36 @@ function formatPdfCurrency(amount, currency) {
   }
 }
 
+function fuelBreakdownForLegs(stops, trip) {
+  const out = new Map();
+  const consumption = trip.fuelConsumption;
+  if (consumption == null || !isFinite(consumption) || consumption <= 0) return out;
+  const defCur = (trip.fuelCurrency || 'EUR').toUpperCase();
+  const overrides = Array.isArray(trip.fuelOverrides) ? trip.fuelOverrides : [];
+  for (const stop of stops) {
+    const km = stop.kmFromPrevious || 0;
+    if (km <= 0) continue;
+    const cc = (stop.countryCode || '').toUpperCase();
+    const rawOv = cc ? overrides.find((o) => (o.countryCode || '').toUpperCase() === cc) : null;
+    const ov = rawOv && rawOv.price > 0 && rawOv.currency ? rawOv : null;
+    const price = ov ? ov.price : trip.fuelPrice;
+    const currency = (ov ? ov.currency : defCur).toUpperCase();
+    const cost = estimateFuelCost(km, consumption, trip.fuelUnit, price);
+    if (cost == null || cost <= 0) continue;
+    out.set(currency, (out.get(currency) || 0) + cost);
+  }
+  return out;
+}
+
+function formatPdfBreakdown(b) {
+  if (b.size === 0) return null;
+  const parts = [];
+  for (const [currency, amount] of b) {
+    if (amount > 0) parts.push(formatPdfCurrency(amount, currency));
+  }
+  return parts.length === 0 ? null : parts.join(' + ');
+}
+
 function groupStopsByDay(stops) {
   const map = new Map();
   for (const s of stops) {
@@ -442,10 +473,10 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
     if (typeof trip.totalKm === 'number') totals.push(`${trip.totalKm.toLocaleString('en-US')} km`);
     if (typeof trip.totalDays === 'number') totals.push(`${trip.totalDays} day${trip.totalDays === 1 ? '' : 's'}`);
     if (Array.isArray(trip.countries) && trip.countries.length) totals.push(trip.countries.join(' '));
-    const totalCost = estimateFuelCost(trip.totalKm || 0, trip.fuelConsumption, trip.fuelUnit, trip.fuelPrice);
-    if (totalCost != null && totalCost > 0) {
-      totals.push(`Est. fuel ${formatPdfCurrency(totalCost, trip.fuelCurrency)}`);
-    }
+    const stopsForPricing = Array.isArray(trip.stops) ? trip.stops : [];
+    const totalBreakdown = fuelBreakdownForLegs(stopsForPricing, trip);
+    const totalBreakdownStr = formatPdfBreakdown(totalBreakdown);
+    if (totalBreakdownStr) totals.push(`Est. fuel ${totalBreakdownStr}`);
     doc
       .moveDown(0.8)
       .fillColor('#000')
@@ -458,10 +489,8 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
     const grouped = groupStopsByDay(stops);
     for (const [day, dayStops] of grouped) {
       const dayKm = dayStops.reduce((acc, s) => acc + (s.kmFromPrevious || 0), 0);
-      const dayCost = estimateFuelCost(dayKm, trip.fuelConsumption, trip.fuelUnit, trip.fuelPrice);
-      const dayCostStr = dayCost != null && dayCost > 0
-        ? `  ·  ${formatPdfCurrency(dayCost, trip.fuelCurrency)}`
-        : '';
+      const dayBreakdownStr = formatPdfBreakdown(fuelBreakdownForLegs(dayStops, trip));
+      const dayCostStr = dayBreakdownStr ? `  ·  ${dayBreakdownStr}` : '';
       doc
         .moveDown(1.1)
         .font('Helvetica-Bold')

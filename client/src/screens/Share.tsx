@@ -5,7 +5,7 @@ import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { getSharedTrip } from '../lib/api';
-import { applyDays, dayColor, estimateFuelCost, formatCurrency, formatDuration, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
 import { PIN_CATEGORY_META } from '../lib/pin-meta';
@@ -70,16 +70,27 @@ export function Share() {
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
-  const totalFuelCost = useMemo(
-    () => estimateFuelCost(totals.totalKm, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice),
-    [totals.totalKm, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice],
-  );
-  const totalFuelCostStr = totalFuelCost != null && totalFuelCost > 0
-    ? formatCurrency(totalFuelCost, trip?.fuelCurrency)
-    : null;
-  function fuelCostFor(km: number): string | null {
-    const c = estimateFuelCost(km, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice);
-    return c != null && c > 0 ? formatCurrency(c, trip?.fuelCurrency) : null;
+  const totalFuelCostStr = useMemo(() => {
+    const b = fuelBreakdownForLegs(
+      dayedStops,
+      trip?.fuelConsumption,
+      trip?.fuelUnit,
+      trip?.fuelPrice,
+      trip?.fuelCurrency,
+      trip?.fuelOverrides,
+    );
+    return formatBreakdown(b);
+  }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice, trip?.fuelCurrency, trip?.fuelOverrides]);
+  function fuelCostFor(stopsForDay: Stop[]): string | null {
+    const b = fuelBreakdownForLegs(
+      stopsForDay,
+      trip?.fuelConsumption,
+      trip?.fuelUnit,
+      trip?.fuelPrice,
+      trip?.fuelCurrency,
+      trip?.fuelOverrides,
+    );
+    return formatBreakdown(b);
   }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
@@ -344,7 +355,7 @@ export function Share() {
                     startDate={trip.startDate}
                     visible={!hiddenDays.has(g.day)}
                     onToggleVisibility={() => toggleDay(g.day)}
-                    fuelCost={fuelCostFor(g.km)}
+                    fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
                   />
                 ))
               )

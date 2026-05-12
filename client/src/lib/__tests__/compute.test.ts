@@ -4,9 +4,11 @@ import {
   applyDays,
   dayColor,
   estimateFuelCost,
+  formatBreakdown,
   formatCurrency,
   formatDayDate,
   formatDuration,
+  fuelBreakdownForLegs,
   groupByDay,
   tripTotals,
 } from '../compute';
@@ -185,6 +187,96 @@ describe('estimateFuelCost', () => {
     const small = estimateFuelCost(100, 8, 'L/100km', 2)!;
     const big = estimateFuelCost(1000, 8, 'L/100km', 2)!;
     expect(big).toBeCloseTo(small * 10, 5);
+  });
+});
+
+describe('fuelBreakdownForLegs', () => {
+  it('returns empty map when consumption is missing', () => {
+    const stops = [stop({ id: 'a' }), stop({ id: 'b', kmFromPrevious: 100, countryCode: 'FR' })];
+    const b = fuelBreakdownForLegs(stops, undefined, 'L/100km', 1.80, 'EUR', undefined);
+    expect(b.size).toBe(0);
+  });
+
+  it('sums all legs into the default currency when no overrides match', () => {
+    // 100 km @ 8 L/100km × €2 = €16; 200 km same = €32. Total €48.
+    const stops = [
+      stop({ id: 'a' }),
+      stop({ id: 'b', kmFromPrevious: 100, countryCode: 'FR' }),
+      stop({ id: 'c', kmFromPrevious: 200, countryCode: 'BE' }),
+    ];
+    const b = fuelBreakdownForLegs(stops, 8, 'L/100km', 2, 'EUR', []);
+    expect(b.size).toBe(1);
+    expect(b.get('EUR')).toBeCloseTo(48, 5);
+  });
+
+  it('routes a leg to override price + currency when destination country matches', () => {
+    // FR leg uses EUR default (€1.80, 100km @ 7L/100km = €12.60)
+    // SE leg uses SEK override (kr18, 200km @ 7L/100km = 252 kr)
+    const stops = [
+      stop({ id: 'a' }),
+      stop({ id: 'b', kmFromPrevious: 100, countryCode: 'FR' }),
+      stop({ id: 'c', kmFromPrevious: 200, countryCode: 'SE' }),
+    ];
+    const b = fuelBreakdownForLegs(stops, 7, 'L/100km', 1.80, 'EUR', [
+      { countryCode: 'SE', price: 18, currency: 'SEK' },
+    ]);
+    expect(b.size).toBe(2);
+    expect(b.get('EUR')).toBeCloseTo(12.60, 5);
+    expect(b.get('SEK')).toBeCloseTo(252, 5);
+  });
+
+  it('country lookup is case-insensitive on the country code', () => {
+    const stops = [
+      stop({ id: 'a' }),
+      stop({ id: 'b', kmFromPrevious: 100, countryCode: 'se' }), // lowercase on stop
+    ];
+    const b = fuelBreakdownForLegs(stops, 7, 'L/100km', 1.80, 'EUR', [
+      { countryCode: 'SE', price: 18, currency: 'SEK' },
+    ]);
+    expect(b.get('SEK')).toBeCloseTo(7 * 18, 5); // 100km @ 7L/100km × 18 = 126
+  });
+
+  it('falls back to default when an override has zero or negative price', () => {
+    const stops = [
+      stop({ id: 'a' }),
+      stop({ id: 'b', kmFromPrevious: 100, countryCode: 'SE' }),
+    ];
+    const b = fuelBreakdownForLegs(stops, 7, 'L/100km', 1.80, 'EUR', [
+      { countryCode: 'SE', price: 0, currency: 'SEK' },
+    ]);
+    expect(b.size).toBe(1);
+    expect(b.get('EUR')).toBeCloseTo(7 * 1.80, 5);
+  });
+
+  it('skips legs with zero or missing kmFromPrevious', () => {
+    const stops = [
+      stop({ id: 'a' }), // no kmFromPrevious — skipped
+      stop({ id: 'b', kmFromPrevious: 0, countryCode: 'FR' }), // zero — skipped
+      stop({ id: 'c', kmFromPrevious: 100, countryCode: 'FR' }),
+    ];
+    const b = fuelBreakdownForLegs(stops, 7, 'L/100km', 1.80, 'EUR', []);
+    expect(b.get('EUR')).toBeCloseTo(7 * 1.80, 5);
+  });
+});
+
+describe('formatBreakdown', () => {
+  it('returns null for empty breakdown', () => {
+    expect(formatBreakdown(new Map())).toBeNull();
+  });
+
+  it('formats a single-currency breakdown like formatCurrency', () => {
+    const out = formatBreakdown(new Map([['EUR', 63]]));
+    expect(out).toMatch(/63/);
+    expect(out).toMatch(/€|EUR/);
+  });
+
+  it('joins multi-currency entries with " + " in insertion order', () => {
+    const out = formatBreakdown(new Map([['EUR', 100], ['SEK', 500]]));
+    expect(out).toMatch(/.+ \+ .+/);
+    // EUR entry comes first (insertion order)
+    const parts = (out || '').split(' + ');
+    expect(parts[0]).toMatch(/€|EUR/);
+    expect(parts[1]).toMatch(/SEK|kr/);
   });
 });
 

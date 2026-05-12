@@ -10,12 +10,21 @@ import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
-import { applyDays, dayColor, estimateFuelCost, formatCurrency, formatDuration, tripTotals } from '../lib/compute';
-import type { FuelUnit, Stop, Trip } from '../lib/types';
+import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, tripTotals } from '../lib/compute';
+import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
+
+// Override row uses string fields so blank inputs don't collapse to 0
+// before the user finishes typing. Converted to numbers only on save.
+type FuelOverrideDraft = {
+  id: string;
+  countryCode: string;
+  price: string;
+  currency: string;
+};
 
 type BuilderState = {
   tripId: string | null;
@@ -29,7 +38,53 @@ type BuilderState = {
   fuelUnit: FuelUnit;
   fuelPrice: string;
   fuelCurrency: string;
+  fuelOverrides: FuelOverrideDraft[];
 };
+
+// Curated currency dropdown — covers Europe + the usual road-trip suspects.
+const FUEL_CURRENCIES: ReadonlyArray<{ code: string; label: string }> = [
+  { code: 'EUR', label: 'EUR €' },
+  { code: 'GBP', label: 'GBP £' },
+  { code: 'USD', label: 'USD $' },
+  { code: 'SEK', label: 'SEK kr' },
+  { code: 'NOK', label: 'NOK kr' },
+  { code: 'DKK', label: 'DKK kr' },
+  { code: 'CHF', label: 'CHF' },
+  { code: 'CAD', label: 'CAD $' },
+  { code: 'AUD', label: 'AUD $' },
+  { code: 'JPY', label: 'JPY ¥' },
+  { code: 'PLN', label: 'PLN zł' },
+  { code: 'CZK', label: 'CZK Kč' },
+  { code: 'HUF', label: 'HUF Ft' },
+  { code: 'ISK', label: 'ISK kr' },
+];
+
+// Curated country dropdown for per-country overrides. The defaultCurrency
+// is used to preselect a sensible currency when the row is created.
+const FUEL_COUNTRIES: ReadonlyArray<{ code: string; name: string; defaultCurrency: string }> = [
+  { code: 'FR', name: 'France', defaultCurrency: 'EUR' },
+  { code: 'DE', name: 'Germany', defaultCurrency: 'EUR' },
+  { code: 'IT', name: 'Italy', defaultCurrency: 'EUR' },
+  { code: 'ES', name: 'Spain', defaultCurrency: 'EUR' },
+  { code: 'PT', name: 'Portugal', defaultCurrency: 'EUR' },
+  { code: 'NL', name: 'Netherlands', defaultCurrency: 'EUR' },
+  { code: 'BE', name: 'Belgium', defaultCurrency: 'EUR' },
+  { code: 'LU', name: 'Luxembourg', defaultCurrency: 'EUR' },
+  { code: 'CH', name: 'Switzerland', defaultCurrency: 'CHF' },
+  { code: 'AT', name: 'Austria', defaultCurrency: 'EUR' },
+  { code: 'GB', name: 'United Kingdom', defaultCurrency: 'GBP' },
+  { code: 'IE', name: 'Ireland', defaultCurrency: 'EUR' },
+  { code: 'DK', name: 'Denmark', defaultCurrency: 'DKK' },
+  { code: 'SE', name: 'Sweden', defaultCurrency: 'SEK' },
+  { code: 'NO', name: 'Norway', defaultCurrency: 'NOK' },
+  { code: 'FI', name: 'Finland', defaultCurrency: 'EUR' },
+  { code: 'IS', name: 'Iceland', defaultCurrency: 'ISK' },
+  { code: 'PL', name: 'Poland', defaultCurrency: 'PLN' },
+  { code: 'CZ', name: 'Czech Rep.', defaultCurrency: 'CZK' },
+  { code: 'HU', name: 'Hungary', defaultCurrency: 'HUF' },
+  { code: 'US', name: 'United States', defaultCurrency: 'USD' },
+  { code: 'CA', name: 'Canada', defaultCurrency: 'CAD' },
+];
 
 const empty = (): BuilderState => ({
   tripId: null,
@@ -43,6 +98,7 @@ const empty = (): BuilderState => ({
   fuelUnit: 'L/100km',
   fuelPrice: '',
   fuelCurrency: 'EUR',
+  fuelOverrides: [],
 });
 
 function reassignTypes(stops: Stop[]): Stop[] {
@@ -104,6 +160,14 @@ export function Builder() {
       fuelUnit: t.fuelUnit === 'MPG' ? 'MPG' : 'L/100km',
       fuelPrice: typeof t.fuelPrice === 'number' ? String(t.fuelPrice) : '',
       fuelCurrency: t.fuelCurrency || 'EUR',
+      fuelOverrides: Array.isArray(t.fuelOverrides)
+        ? t.fuelOverrides.map((o) => ({
+            id: crypto.randomUUID(),
+            countryCode: (o.countryCode || '').toUpperCase(),
+            price: typeof o.price === 'number' ? String(o.price) : '',
+            currency: (o.currency || 'EUR').toUpperCase(),
+          }))
+        : [],
     };
     setState(next);
     snapshotRef.current = serializeSnapshot(next);
@@ -185,26 +249,67 @@ export function Builder() {
     [routes.enriched, state.maxKmPerDay],
   );
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
-  // Fuel cost — both consumption and price must be positive numbers to
-  // produce a value; otherwise null = hide the UI chips. Parsed once here
-  // so the day-header callback can reuse them.
+  // Fuel cost — multi-currency breakdown. Each leg is priced by its
+  // destination's countryCode against fuelOverrides, falling back to the
+  // trip-level default. Returns null when consumption + price aren't set.
   const fuelConsumptionNum = parseFloat(state.fuelConsumption);
   const fuelPriceNum = parseFloat(state.fuelPrice);
-  const totalFuelCost = useMemo(
-    () => estimateFuelCost(totals.totalKm, fuelConsumptionNum, state.fuelUnit, fuelPriceNum),
-    [totals.totalKm, fuelConsumptionNum, fuelPriceNum, state.fuelUnit],
+  const compiledOverrides = useMemo<FuelOverride[]>(
+    () =>
+      state.fuelOverrides
+        .map((o) => ({ countryCode: o.countryCode, price: parseFloat(o.price), currency: o.currency }))
+        .filter((o) => o.countryCode && Number.isFinite(o.price) && o.price > 0 && o.currency),
+    [state.fuelOverrides],
   );
-  const totalFuelCostStr = totalFuelCost != null && totalFuelCost > 0
-    ? formatCurrency(totalFuelCost, state.fuelCurrency)
-    : null;
-  function fuelCostFor(km: number): string | null {
-    const c = estimateFuelCost(km, fuelConsumptionNum, state.fuelUnit, fuelPriceNum);
-    return c != null && c > 0 ? formatCurrency(c, state.fuelCurrency) : null;
+  const totalFuelCostStr = useMemo(() => {
+    const b = fuelBreakdownForLegs(
+      dayedStops,
+      fuelConsumptionNum,
+      state.fuelUnit,
+      fuelPriceNum,
+      state.fuelCurrency,
+      compiledOverrides,
+    );
+    return formatBreakdown(b);
+  }, [dayedStops, fuelConsumptionNum, fuelPriceNum, state.fuelUnit, state.fuelCurrency, compiledOverrides]);
+  function fuelCostForStops(stops: Stop[]): string | null {
+    const b = fuelBreakdownForLegs(
+      stops,
+      fuelConsumptionNum,
+      state.fuelUnit,
+      fuelPriceNum,
+      state.fuelCurrency,
+      compiledOverrides,
+    );
+    return formatBreakdown(b);
   }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
     [dayedStops],
   );
+
+  function addFuelOverride() {
+    // Pre-select the first country that isn't already overridden, falling
+    // back to the first in the list. Currency follows the country default.
+    const used = new Set(state.fuelOverrides.map((o) => o.countryCode));
+    const pick = FUEL_COUNTRIES.find((c) => !used.has(c.code)) || FUEL_COUNTRIES[0];
+    setState((s) => ({
+      ...s,
+      fuelOverrides: [
+        ...s.fuelOverrides,
+        { id: crypto.randomUUID(), countryCode: pick.code, price: '', currency: pick.defaultCurrency },
+      ],
+    }));
+  }
+  function updateFuelOverride(id: string, patch: Partial<FuelOverrideDraft>) {
+    setState((s) => ({
+      ...s,
+      fuelOverrides: s.fuelOverrides.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+    }));
+  }
+  function removeFuelOverride(id: string) {
+    setState((s) => ({ ...s, fuelOverrides: s.fuelOverrides.filter((o) => o.id !== id) }));
+  }
 
   // Init map + autocomplete once SDK ready
   useEffect(() => {
@@ -373,6 +478,11 @@ export function Builder() {
       fuelUnit: s.fuelUnit || 'L/100km',
       fuelPrice: s.fuelPrice || '',
       fuelCurrency: s.fuelCurrency || 'EUR',
+      fuelOverrides: (s.fuelOverrides || []).map((o) => ({
+        countryCode: o.countryCode || '',
+        price: o.price || '',
+        currency: o.currency || '',
+      })),
       stops: (s.stops || []).map((x) => ({
         id: x.id, name: x.name, label: x.label,
         lat: x.lat, lng: x.lng,
@@ -408,6 +518,7 @@ export function Builder() {
         fuelUnit: state.fuelUnit,
         fuelPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
         fuelCurrency: state.fuelCurrency || 'EUR',
+        fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
         stops: stops.map((s) => ({
           id: s.id, name: s.name, label: s.label,
           lat: s.lat, lng: s.lng,
@@ -582,15 +693,87 @@ export function Builder() {
             </label>
             <label className="block min-w-0">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Cur.</span>
-              <input
-                type="text"
-                maxLength={3}
+              <select
                 value={state.fuelCurrency}
-                onChange={(e) => setState((s) => ({ ...s, fuelCurrency: e.target.value.toUpperCase().slice(0, 3) }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 uppercase tracking-[0.08em] outline-none transition-colors focus:border-accent"
-              />
+                onChange={(e) => setState((s) => ({ ...s, fuelCurrency: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent"
+              >
+                {FUEL_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
             </label>
           </div>
+
+          {/* Per-country fuel overrides. When a leg's destination has a
+              matching countryCode, its (price, currency) replaces the trip
+              defaults. Used in the breakdown shown in summary + day rows. */}
+          {state.fuelOverrides.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
+                Per-country prices
+              </span>
+              {state.fuelOverrides.map((o) => (
+                <div key={o.id} className="grid grid-cols-[1.2fr_1fr_1fr_auto] gap-2 items-center">
+                  <select
+                    value={o.countryCode}
+                    onChange={(e) => {
+                      const nextCc = e.target.value;
+                      const country = FUEL_COUNTRIES.find((c) => c.code === nextCc);
+                      // Bump currency to the country's default when the user
+                      // switches country — but only if they haven't yet set
+                      // a price (less likely they intend the same currency).
+                      const nextCur = !o.price && country ? country.defaultCurrency : o.currency;
+                      updateFuelOverride(o.id, { countryCode: nextCc, currency: nextCur });
+                    }}
+                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
+                    aria-label="Country"
+                  >
+                    {FUEL_COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.code} · {c.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    inputMode="decimal"
+                    placeholder="Price"
+                    value={o.price}
+                    onChange={(e) => updateFuelOverride(o.id, { price: e.target.value })}
+                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted min-w-0"
+                    aria-label="Price"
+                  />
+                  <select
+                    value={o.currency}
+                    onChange={(e) => updateFuelOverride(o.id, { currency: e.target.value })}
+                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
+                    aria-label="Currency"
+                  >
+                    {FUEL_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeFuelOverride(o.id)}
+                    aria-label="Remove override"
+                    title="Remove override"
+                    className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[14px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={addFuelOverride}
+            className="self-start bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[10px] tracking-[0.16em] uppercase transition-colors hover:text-paper hover:border-paper-dim"
+          >
+            + Country override
+          </button>
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden pt-[18px]">
@@ -612,7 +795,7 @@ export function Builder() {
             <StopList
               stops={dayedStops}
               startDate={state.startDate}
-              fuelCostFor={fuelCostFor}
+              fuelCostFor={fuelCostForStops}
               onChangeType={setStopType}
               onChangeRouteMode={setStopRouteMode}
               onRemove={removeStop}

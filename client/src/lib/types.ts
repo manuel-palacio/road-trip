@@ -72,6 +72,14 @@ export type Pin = {
 
 export type FuelUnit = 'L/100km' | 'MPG';
 
+// Per-country fuel override. Consumption stays trip-wide (the car has one
+// mileage), but price + currency can differ per country crossed.
+export type FuelOverride = {
+  countryCode: string;       // ISO 3166-1 alpha-2, uppercase
+  price: number;             // per litre if L/100km, per gallon if MPG
+  currency: string;          // 3-letter ISO code
+};
+
 export type Trip = {
   id: string;
   ownerUid: string;
@@ -91,8 +99,9 @@ export type Trip = {
   // both set, the UI displays an estimated cost per day and per trip.
   fuelConsumption?: number;
   fuelUnit?: FuelUnit;
-  fuelPrice?: number;        // per litre if L/100km, per gallon if MPG
+  fuelPrice?: number;        // default per-litre/gallon price
   fuelCurrency?: string;     // 3-letter ISO code, e.g. 'EUR', 'USD'
+  fuelOverrides?: FuelOverride[];
   createdAt?: unknown;
   updatedAt?: unknown;
 };

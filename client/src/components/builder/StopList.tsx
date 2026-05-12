@@ -7,7 +7,7 @@ import { StopRow } from './StopRow';
 type Props = {
   stops: Stop[];
   startDate: string | null | undefined;
-  fuelCostFor?: (km: number) => string | null;
+  fuelCostFor?: (stops: Stop[]) => string | null;
   onChangeType: (id: string, type: Stop['type']) => void;
   onChangeRouteMode?: (id: string, mode: StopRouteMode) => void;
   onRemove: (id: string) => void;
@@ -43,7 +43,7 @@ export function StopList(p: Props) {
             durationSeconds={g.durationSeconds}
             startDate={p.startDate}
             isFirst={gi === 0}
-            fuelCost={p.fuelCostFor ? p.fuelCostFor(g.km) : null}
+            fuelCost={p.fuelCostFor ? p.fuelCostFor(g.stops.map((x) => x.stop)) : null}
           />
           {g.stops.map(({ stop, index }) => (
             <StopRow

@@ -1,4 +1,4 @@
-import type { FuelUnit, Stop } from './types';
+import type { FuelOverride, FuelUnit, Stop } from './types';
 
 /* Custom day color palette — muted inks matching the editorial cartography theme.
    Cycles past 10 days. */
@@ -113,6 +113,57 @@ export function estimateFuelCost(
   // default: L/100km, price per litre
   const litres = (km / 100) * consumption;
   return litres * pricePerUnit;
+}
+
+/** Breakdown of fuel cost grouped by currency. Map order = first-seen order
+ * across the legs, so the default trip currency typically comes first. */
+export type FuelBreakdown = Map<string, number>;
+
+/** Compute a per-currency breakdown of fuel cost across a set of legs.
+ * Each stop contributes a leg priced by its destination's countryCode:
+ * if an override matches, use override's (price, currency); otherwise the
+ * trip-level defaults. Stops missing kmFromPrevious (e.g. the first stop)
+ * contribute nothing. */
+export function fuelBreakdownForLegs(
+  stops: Stop[],
+  consumption: number | undefined | null,
+  unit: FuelUnit | undefined,
+  defaultPrice: number | undefined | null,
+  defaultCurrency: string | undefined,
+  overrides: FuelOverride[] | undefined,
+): FuelBreakdown {
+  const out: FuelBreakdown = new Map();
+  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return out;
+  const defCur = (defaultCurrency || 'EUR').toUpperCase();
+  for (const stop of stops) {
+    const km = stop.kmFromPrevious || 0;
+    if (km <= 0) continue;
+    const cc = (stop.countryCode || '').toUpperCase();
+    const rawOv = cc && overrides
+      ? overrides.find((o) => (o.countryCode || '').toUpperCase() === cc)
+      : undefined;
+    // Only honour an override when both price and currency are valid —
+    // otherwise the override is incomplete and we'd display the default
+    // price under the override's currency, which is semantically wrong.
+    const ov = rawOv && rawOv.price > 0 && rawOv.currency ? rawOv : undefined;
+    const price = ov ? ov.price : (defaultPrice ?? 0);
+    const currency = (ov ? ov.currency : defCur).toUpperCase();
+    const cost = estimateFuelCost(km, consumption, unit, price);
+    if (cost == null || cost <= 0) continue;
+    out.set(currency, (out.get(currency) || 0) + cost);
+  }
+  return out;
+}
+
+/** Format a multi-currency breakdown as "€98 + £15 + 158 kr". Returns null
+ * when the breakdown is empty (caller hides the chip). */
+export function formatBreakdown(b: FuelBreakdown): string | null {
+  if (b.size === 0) return null;
+  const parts: string[] = [];
+  for (const [currency, amount] of b) {
+    if (amount > 0) parts.push(formatCurrency(amount, currency));
+  }
+  return parts.length === 0 ? null : parts.join(' + ');
 }
 
 /** Format a monetary amount using Intl.NumberFormat with the browser locale.

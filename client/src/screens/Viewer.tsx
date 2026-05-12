@@ -8,7 +8,7 @@ import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
-import { applyDays, dayColor, estimateFuelCost, formatCurrency, formatDuration, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
 import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
 import type { Stop } from '../lib/types';
@@ -110,16 +110,27 @@ export function Viewer() {
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
-  const totalFuelCost = useMemo(
-    () => estimateFuelCost(totals.totalKm, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice),
-    [totals.totalKm, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice],
-  );
-  const totalFuelCostStr = totalFuelCost != null && totalFuelCost > 0
-    ? formatCurrency(totalFuelCost, trip?.fuelCurrency)
-    : null;
-  function fuelCostFor(km: number): string | null {
-    const c = estimateFuelCost(km, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice);
-    return c != null && c > 0 ? formatCurrency(c, trip?.fuelCurrency) : null;
+  const totalFuelCostStr = useMemo(() => {
+    const b = fuelBreakdownForLegs(
+      dayedStops,
+      trip?.fuelConsumption,
+      trip?.fuelUnit,
+      trip?.fuelPrice,
+      trip?.fuelCurrency,
+      trip?.fuelOverrides,
+    );
+    return formatBreakdown(b);
+  }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice, trip?.fuelCurrency, trip?.fuelOverrides]);
+  function fuelCostFor(stopsForDay: Stop[]): string | null {
+    const b = fuelBreakdownForLegs(
+      stopsForDay,
+      trip?.fuelConsumption,
+      trip?.fuelUnit,
+      trip?.fuelPrice,
+      trip?.fuelCurrency,
+      trip?.fuelOverrides,
+    );
+    return formatBreakdown(b);
   }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
@@ -289,6 +300,16 @@ export function Viewer() {
               {trip.name || 'Untitled trip'}
             </h1>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/builder/${trip.id}`)}
+            aria-label="Edit trip in builder"
+            title="Edit this trip"
+            className="bg-transparent border border-line text-paper-dim px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim transition-colors inline-flex items-center gap-1.5"
+          >
+            <span aria-hidden>✎</span>
+            Edit
+          </button>
           {isShared ? (
             <div className="inline-flex items-center gap-1.5">
               <button
@@ -376,7 +397,7 @@ export function Viewer() {
                   startDate={trip.startDate}
                   visible={!hiddenDays.has(g.day)}
                   onToggleVisibility={() => toggleDay(g.day)}
-                  fuelCost={fuelCostFor(g.km)}
+                  fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
                 />
               ))
             )
