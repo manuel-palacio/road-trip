@@ -164,21 +164,23 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
           ))}
 
           {url ? (
-            <div className="mt-1 flex items-stretch gap-1.5 flex-wrap">
+            <div className="mt-1 flex items-center gap-1.5">
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 min-w-[180px] inline-flex items-center justify-center gap-2 bg-accent text-canvas rounded px-3.5 py-2 font-mono text-[10.5px] tracking-[0.14em] uppercase font-medium transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0"
+                aria-label="Open this day's route in Google Maps"
+                title="Open in Google Maps"
+                className="bg-accent text-canvas border border-accent w-8 h-7 rounded font-mono text-[13px] hover:opacity-90 transition-opacity flex items-center justify-center"
               >
-                <span>↗</span> Open in Google Maps
+                <span aria-hidden>↗</span>
               </a>
               <button
                 type="button"
                 onClick={() => setQrOpen(true)}
                 aria-label="Show QR code for this day's Maps route"
                 title="Show QR code — scan with phone camera"
-                className="bg-transparent border border-line text-paper-dim w-9 px-2 rounded font-mono text-[14px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
+                className="bg-transparent border border-line text-paper-dim w-8 h-7 rounded font-mono text-[13px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
               >
                 <span aria-hidden>▦</span>
               </button>
@@ -187,7 +189,7 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                 onClick={onShareClick}
                 aria-label="Share this day's route to phone"
                 title="Share to phone"
-                className="bg-transparent border border-line text-paper-dim w-9 px-2 rounded font-mono text-[14px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
+                className="bg-transparent border border-line text-paper-dim w-8 h-7 rounded font-mono text-[13px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
               >
                 <span aria-hidden>⤴</span>
               </button>
