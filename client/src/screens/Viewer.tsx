@@ -14,6 +14,7 @@ import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor } from '../lib/google-map
 import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { PinList } from '../components/viewer/PinList';
+import { QrModal } from '../components/QrModal';
 import { PinMapLayer, type PinMapLayerHandle } from '../components/viewer/PinMapLayer';
 import { SidebarTabs } from '../components/viewer/SidebarTabs';
 import { Toast } from '../components/Toast';
@@ -88,6 +89,7 @@ export function Viewer() {
   }
 
   const [exporting, setExporting] = useState<'pdf' | 'gpx' | null>(null);
+  const [handoffOpen, setHandoffOpen] = useState(false);
   async function exportTrip(kind: 'pdf' | 'gpx') {
     if (!tripId || exporting) return;
     setExporting(kind);
@@ -310,6 +312,16 @@ export function Viewer() {
             <span aria-hidden>✎</span>
             Edit
           </button>
+          <button
+            type="button"
+            onClick={() => setHandoffOpen(true)}
+            aria-label="Send to phone"
+            title="Send to phone — scan with your phone camera to open the hand-off page"
+            className="bg-transparent border border-line text-paper-dim px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim transition-colors inline-flex items-center gap-1.5"
+          >
+            <span aria-hidden>▦</span>
+            Phone
+          </button>
           {isShared ? (
             <div className="inline-flex items-center gap-1.5">
               <button
@@ -476,6 +488,22 @@ export function Viewer() {
         onDismiss={routes.clearFailure}
       />
       <Toast message={shareToast} variant="success" onDismiss={() => setShareToast(null)} durationMs={2200} />
+      {handoffOpen && trip && (
+        <QrModal
+          url={
+            trip.isShared && trip.shareToken
+              ? `${window.location.origin}/handoff/share/${trip.shareToken}`
+              : `${window.location.origin}/handoff/${trip.id}`
+          }
+          title="Send to phone"
+          subtitle={
+            trip.isShared
+              ? 'Public link · works on any device, no login needed'
+              : 'Owner link · sign in on the phone with the same account'
+          }
+          onClose={() => setHandoffOpen(false)}
+        />
+      )}
     </section>
   );
 }

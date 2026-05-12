@@ -20,7 +20,8 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase-admin": "^13.0.2",
-    "pdfkit": "^0.18.0"
+    "pdfkit": "^0.18.0",
+    "qrcode.react": "^3.2.0"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.62.7",

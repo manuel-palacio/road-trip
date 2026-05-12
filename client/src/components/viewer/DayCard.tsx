@@ -3,8 +3,10 @@ import * as Switch from '@radix-ui/react-switch';
 import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
+import { phoneShare } from '../../lib/phone-share';
 import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
+import { QrModal } from '../QrModal';
 
 const ROUTE_MODE_GLYPH: Record<StopRouteMode, { glyph: string; label: string }> = {
   fastest: { glyph: '⚡', label: 'Fastest leg' },
@@ -23,12 +25,30 @@ type Props = {
 
 export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost }: Props) {
   const [expanded, setExpanded] = useState(true);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [shareLabel, setShareLabel] = useState<string | null>(null);
 
   const stopsOnly = group.stops.map((x) => x.stop);
   const date = formatDayDate(group.day, startDate);
   const status = aaStatus(group.stops.length);
   const url = buildDayMapsUrl(stopsOnly);
   const color = dayColor(group.day);
+  const dayLabel = `Day ${group.day}${date ? ` · ${date}` : ''}`;
+  const routeBriefly = stopsOnly.length > 1
+    ? `${stopsOnly[0].label || stopsOnly[0].name} → ${stopsOnly[stopsOnly.length - 1].label || stopsOnly[stopsOnly.length - 1].name}`
+    : (stopsOnly[0]?.label || stopsOnly[0]?.name || '');
+
+  async function onShareClick() {
+    if (!url) return;
+    const result = await phoneShare({
+      url,
+      title: dayLabel,
+      text: routeBriefly ? `${dayLabel} — ${routeBriefly}` : dayLabel,
+    });
+    if (result.kind === 'shared' || result.kind === 'cancelled') return;
+    setShareLabel(result.kind === 'copied' ? 'Link copied' : 'Could not share');
+    setTimeout(() => setShareLabel(null), 1600);
+  }
 
   const aaPalette = {
     ready: 'bg-[rgba(122,154,114,0.16)] border-[rgba(122,154,114,0.4)] text-[#9bbf91]',
@@ -144,14 +164,34 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
           ))}
 
           {url ? (
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 inline-flex items-center justify-center gap-2 bg-accent text-canvas rounded px-3.5 py-2 font-mono text-[10.5px] tracking-[0.14em] uppercase font-medium transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0"
-            >
-              <span>↗</span> Open this day in Google Maps
-            </a>
+            <div className="mt-1 flex items-stretch gap-1.5 flex-wrap">
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-w-[180px] inline-flex items-center justify-center gap-2 bg-accent text-canvas rounded px-3.5 py-2 font-mono text-[10.5px] tracking-[0.14em] uppercase font-medium transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0"
+              >
+                <span>↗</span> Open in Google Maps
+              </a>
+              <button
+                type="button"
+                onClick={() => setQrOpen(true)}
+                aria-label="Show QR code for this day's Maps route"
+                title="Show QR code — scan with phone camera"
+                className="bg-transparent border border-line text-paper-dim w-9 px-2 rounded font-mono text-[14px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
+              >
+                <span aria-hidden>▦</span>
+              </button>
+              <button
+                type="button"
+                onClick={onShareClick}
+                aria-label="Share this day's route to phone"
+                title="Share to phone"
+                className="bg-transparent border border-line text-paper-dim w-9 px-2 rounded font-mono text-[14px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
+              >
+                <span aria-hidden>⤴</span>
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -162,7 +202,18 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
               {status === 'over' ? 'Too many stops · split this day' : 'No route to open'}
             </button>
           )}
+          {shareLabel && (
+            <div className="text-paper-muted font-mono text-[9.5px] tracking-[0.14em] uppercase mt-1">{shareLabel}</div>
+          )}
         </div>
+      )}
+      {qrOpen && url && (
+        <QrModal
+          url={url}
+          title={dayLabel}
+          subtitle={routeBriefly ? `${routeBriefly} · ${group.km} km` : `${group.km} km`}
+          onClose={() => setQrOpen(false)}
+        />
       )}
     </article>
   );
