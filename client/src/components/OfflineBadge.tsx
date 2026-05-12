@@ -1,0 +1,18 @@
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+/** Small fixed badge in the top-right of the viewport when the browser
+ * is offline. Returns null while online so it stays out of the way. */
+export function OfflineBadge() {
+  const online = useOnlineStatus();
+  if (online) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed top-3 right-3 z-50 inline-flex items-center gap-1.5 bg-[rgba(214,90,63,0.18)] border border-[rgba(214,90,63,0.5)] text-[#ec8e74] px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.18em] uppercase backdrop-blur"
+    >
+      <span aria-hidden className="block w-1.5 h-1.5 rounded-full bg-[#ec8e74]" />
+      Offline
+    </div>
+  );
+}

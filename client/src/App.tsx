@@ -12,6 +12,7 @@ import { Builder } from './screens/Builder';
 import { Viewer } from './screens/Viewer';
 import { Share } from './screens/Share';
 import { Handoff } from './screens/Handoff';
+import { OfflineBadge } from './components/OfflineBadge';
 import type { MeResponse } from './lib/types';
 
 export default function App() {
@@ -24,14 +25,17 @@ export default function App() {
 
   initFirebase(cfg.data.firebaseConfig as any);
   return (
-    <Routes>
-      {/* Public — no auth gate. Anyone with a valid share token can view. */}
-      <Route path="/share/:token" element={<Share />} />
-      {/* Public mobile-first hand-off page; the share token gates access. */}
-      <Route path="/handoff/share/:token" element={<Handoff />} />
-      {/* Everything else funnels through the authed shell. */}
-      <Route path="*" element={<AppAuthed />} />
-    </Routes>
+    <>
+      <OfflineBadge />
+      <Routes>
+        {/* Public — no auth gate. Anyone with a valid share token can view. */}
+        <Route path="/share/:token" element={<Share />} />
+        {/* Public mobile-first hand-off page; the share token gates access. */}
+        <Route path="/handoff/share/:token" element={<Handoff />} />
+        {/* Everything else funnels through the authed shell. */}
+        <Route path="*" element={<AppAuthed />} />
+      </Routes>
+    </>
   );
 }
 

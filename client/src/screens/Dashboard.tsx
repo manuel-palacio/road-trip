@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { signOutFirebase } from '../lib/firebase';
 import type { MeResponse, Trip } from '../lib/types';
 import { Brand } from '../components/Brand';
+import { InstallAppButton } from '../components/InstallAppButton';
 import { TripCard } from '../components/TripCard';
 import { NewTripTile } from '../components/NewTripTile';
 import { useDeleteTrip, useTrips } from '../hooks/useTrips';
@@ -50,6 +51,7 @@ export function Dashboard({ me }: { me: MeResponse }) {
             {/* Hide name on phones — avatar carries the identity */}
             <span className="hidden md:inline-block text-[14px] max-w-[180px] truncate">{me.displayName || me.email}</span>
           </div>
+          <InstallAppButton />
           <button
             type="button"
             onClick={() => signOutFirebase()}
