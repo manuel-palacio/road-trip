@@ -140,8 +140,21 @@ export function Builder() {
   const [hydrated, setHydrated] = useState(!isEditing);
   const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
-  // Mobile drawer state — sidebar slides in from left below md (768px).
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Trip-details disclosure. Expanded by default for brand-new trips so
+  // first-time users see all the fields; collapsed by default when
+  // editing an existing trip so the stop list gets more vertical room.
+  const [detailsOpen, setDetailsOpen] = useState(!isEditing);
+  // Mobile bottom-sheet snap state. Below md (768px) the sidebar lives
+  // at the bottom of the screen with three heights: peek (only the
+  // handle + summary visible), normal (~55dvh, both map and stops
+  // visible), full (~92dvh). Ignored on desktop where md: classes win.
+  const [sheetState, setSheetState] = useState<'peek' | 'normal' | 'full'>('normal');
+  function cycleSheetUp() {
+    setSheetState((s) => (s === 'peek' ? 'normal' : 'full'));
+  }
+  function cycleSheetDown() {
+    setSheetState((s) => (s === 'full' ? 'normal' : 'peek'));
+  }
   // When non-null, the next stop added via the search box splices at this
   // flat index instead of appending. Set by the inline "+ insert" button
   // between rows; cleared on add or by the user's × on the chip.
@@ -547,6 +560,7 @@ export function Builder() {
 
   function startInsertAt(index: number) {
     setInsertIndex(index);
+    setSheetState('full');
     if (searchInputRef.current) {
       searchInputRef.current.focus();
       searchInputRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -702,22 +716,49 @@ export function Builder() {
   }
 
   return (
-    <section className="relative h-screen overflow-hidden md:grid md:grid-cols-[420px_1fr]">
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black/55 z-30 backdrop-blur-sm"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden
-        />
-      )}
+    <section className="relative h-screen overflow-hidden md:grid md:grid-cols-[360px_1fr]">
       <aside
-        className={`bg-surface border-r border-line flex flex-col overflow-hidden
-          fixed md:relative inset-y-0 left-0 z-40
-          w-[90vw] max-w-[420px] md:w-auto md:max-w-none
-          transition-transform duration-300 ease-out-soft
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        className={`bg-surface border-line flex flex-col overflow-hidden
+          fixed left-0 right-0 bottom-0 z-40
+          border-t rounded-t-2xl shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.55)]
+          transition-[height] duration-300 ease-out-soft
+          ${sheetState === 'peek' ? 'h-[64px]' : sheetState === 'normal' ? 'h-[55dvh]' : 'h-[92dvh]'}
+          md:relative md:left-auto md:right-auto md:bottom-auto md:h-auto
+          md:rounded-none md:border-t-0 md:border-r md:shadow-none md:transition-none
+          md:max-w-none md:w-auto
         `}
       >
+        {/* Mobile-only sheet handle. Two small chevrons flank a drag pill;
+            tap the pill to cycle up. The chevrons appear only when the
+            corresponding direction is available. */}
+        <div className="md:hidden flex items-center justify-center gap-3 pt-2 pb-0.5 shrink-0">
+          {sheetState !== 'peek' && (
+            <button
+              type="button"
+              onClick={cycleSheetDown}
+              aria-label="Collapse stop sheet"
+              className="text-paper-muted hover:text-paper text-[11px] leading-none px-1"
+            >
+              ▼
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={cycleSheetUp}
+            aria-label={sheetState === 'full' ? 'Sheet at maximum height' : 'Expand stop sheet'}
+            className="block w-12 h-1.5 bg-line-strong rounded-full hover:bg-paper-muted transition-colors"
+          />
+          {sheetState !== 'full' && (
+            <button
+              type="button"
+              onClick={cycleSheetUp}
+              aria-label="Expand stop sheet"
+              className="text-paper-muted hover:text-paper text-[11px] leading-none px-1"
+            >
+              ▲
+            </button>
+          )}
+        </div>
         <div className="flex items-start gap-3 px-6 pt-[22px] pb-[18px] border-b border-line">
           <button
             type="button"
@@ -738,7 +779,20 @@ export function Builder() {
           />
         </div>
 
-        <div className="px-6 pt-[18px] pb-1.5 border-b border-line flex flex-col gap-4">
+        <div className="border-b border-line">
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((o) => !o)}
+            aria-expanded={detailsOpen}
+            aria-controls="trip-details-panel"
+            className="w-full flex items-center justify-between px-6 py-2.5 font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors"
+          >
+            <span>Trip details</span>
+            <span aria-hidden className="text-[12px]">{detailsOpen ? '▾' : '▸'}</span>
+          </button>
+        </div>
+        {detailsOpen && (
+        <div id="trip-details-panel" className="px-6 pt-1 pb-3 border-b border-line flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-[18px]">
             <label className="block min-w-0">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Start date</span>
@@ -899,6 +953,7 @@ export function Builder() {
             + Country override
           </button>
         </div>
+        )}
 
         <div className="flex-1 flex flex-col overflow-hidden pt-[18px]">
           <div className="px-6 pb-3 font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted flex items-center gap-3">
@@ -912,6 +967,7 @@ export function Builder() {
               type="text"
               autoComplete="off"
               placeholder={insertIndex == null ? 'Search for a city or place…' : 'Search the place to insert…'}
+              onFocus={() => setSheetState('full')}
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[11px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />
             {insertIndex != null && (() => {
@@ -1023,14 +1079,6 @@ export function Builder() {
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open menu"
-          className="md:hidden absolute top-3 left-3 z-20 bg-canvas/85 backdrop-blur border border-line text-paper-dim w-10 h-10 rounded-md text-[18px] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:text-paper hover:border-paper-dim transition-colors"
-        >
-          ☰
-        </button>
         <div ref={setMapDiv} className="w-full h-full" />
         {state.tripId && (
           <PinMapLayer
