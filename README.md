@@ -6,21 +6,83 @@ A small SaaS for planning multi-day driving trips: drop stops on a map, watch da
 
 ---
 
-## Quick start (local dev)
+## Local development
 
-Once you've already finished the GCP/Firebase setup below at least once:
+You can do everything locally against the same Firebase project that's deployed to Cloud Run — there's no separate dev environment. Trip data you create on `localhost` goes into the same Firestore as production, so it's live for whichever account you log in with.
+
+### Prerequisites
+
+- **Node.js ≥ 20** (`node --version`) — see `package.json` `engines`.
+- **npm** — comes with Node.
+- A Firebase project + Maps API key. If you haven't set one up yet, walk through [First-time setup](#first-time-setup--fresh-gcp-project-to-running-deploy) below first.
+
+### First run
 
 ```bash
+git clone https://github.com/manuel-palacio/road-trip.git
+cd road-trip
 npm install
-cp .env.example .env       # fill in the values
-npm run dev                # server at :8080, vite client at :5173
+cp .env.example .env
 ```
 
-The server proxies `/api/*` to itself; the Vite dev server hot-reloads the React client.
+Fill in `.env`. The four values that **must** be set for the app to start locally are:
 
-- App: http://localhost:8080 (or 5173 in dev with client HMR)
+| Var | Source |
+|---|---|
+| `FIREBASE_PROJECT_ID` | Firebase console → Project Settings → "Project ID" |
+| `FIREBASE_CLIENT_CONFIG` | Firebase console → Project Settings → Your apps → Web app → "SDK setup and configuration" → "Config". Paste the whole JSON object on one line. |
+| `GOOGLE_MAPS_API_KEY` | GCP Console → Credentials. Make sure `http://localhost:8080` and `http://localhost:5173` are in the HTTP-referrer allowlist of the key. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to a Firebase Admin service account JSON file (see below). |
+
+To get the service account JSON:
+
+1. GCP Console → IAM & Admin → Service Accounts.
+2. Find or create a service account with the `Firebase Admin SDK Administrator Service Agent` role.
+3. Keys tab → Add Key → Create new key → JSON. Download.
+4. Save it somewhere outside the repo (it's secret) and put the absolute path in `GOOGLE_APPLICATION_CREDENTIALS`.
+
+`ALLOWED_EMAILS` should include your own Google account email or login will be refused. `ADMIN_EMAIL` controls the visibility of admin links (server still re-verifies on every admin route).
+
+### Run it
+
+```bash
+npm run dev
+```
+
+This runs two processes in parallel via `concurrently`:
+
+- **server** (`nodemon server.js`) — Express on `:8080`, restarts on backend file changes.
+- **client** (`vite`) — Vite dev server on `:5173` with HMR.
+
+Open **http://localhost:5173** for the React client with hot reload. The Vite server proxies `/api/*`, `/config`, `/health`, and `/actuator` to the Express server on `:8080` — so the frontend talks to a real backend the same way it does in production.
+
+You can also hit the Express server directly on `:8080` (it serves the production-built `dist/` if you've run `npm run build`, otherwise nothing useful for the SPA).
+
+Quick health checks:
+
+- App: http://localhost:5173
 - Health: http://localhost:8080/health
 - Public config: http://localhost:8080/config
+
+### Common tasks
+
+| Command | Does |
+|---|---|
+| `npm run dev` | Start server + client in dev mode with hot reload (default). |
+| `npm run dev:server` | Server only (`nodemon`). Useful when iterating on `routes/*.js`. |
+| `npm run dev:client` | Vite client only — assumes `:8080` is already running. |
+| `npm test` | Run the Vitest suite (frontend unit tests). |
+| `npm run build` | Production build into `dist/`. Generates the SW + PWA manifest too. |
+| `npm start` | Run the production server (`node server.js`) — used by Cloud Run. |
+
+### Troubleshooting
+
+- **`Error: Firebase Admin not initialized`** on the server → `GOOGLE_APPLICATION_CREDENTIALS` is unset or points to a missing file. Verify the path is absolute and readable.
+- **Login redirect spins forever** → your Google account isn't in `ALLOWED_EMAILS`, or `FIREBASE_CLIENT_CONFIG` is malformed (must be a single-line JSON object). Check the browser console.
+- **Map doesn't load**, console says `referer not allowed` → add `http://localhost:5173` (and `:8080`) to the Maps API key's HTTP-referrer allowlist in GCP Console.
+- **CORS / 404 on `/api/...`** → you're hitting `:5173` directly without the Vite dev server, OR you ran `vite` instead of `npm run dev`. The proxy only works through `npm run dev:client` / `npm run dev`.
+- **Service worker caching stale code in dev** → SW is disabled in dev (`devOptions.enabled: false` in `vite.config.ts`). If you previously visited a production build at `localhost:5173`, unregister any leftover SW: DevTools → Application → Service Workers → Unregister.
+- **Want to test the PWA / offline behavior locally** → run `npm run build && npx vite preview` and hit the previewed URL. The SW only registers in production builds.
 
 ---
 
