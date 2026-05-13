@@ -6,9 +6,10 @@ type Props = {
   onEdit: (id: string) => void;
   onView: (id: string) => void;
   onDelete: (id: string) => void | Promise<unknown>;
+  onTemplate?: (trip: Trip) => void;
 };
 
-export function TripCard({ trip, onEdit, onView, onDelete }: Props) {
+export function TripCard({ trip, onEdit, onView, onDelete, onTemplate }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -27,6 +28,14 @@ export function TripCard({ trip, onEdit, onView, onDelete }: Props) {
 
   return (
     <article className="relative flex flex-col gap-3.5 px-[26px] pt-[26px] pb-4 bg-surface border border-line rounded-lg min-h-[240px] transition-all duration-200 ease-out-soft hover:border-line-strong hover:-translate-y-px">
+      {trip.isTemplate && (
+        <span
+          title={`Published as template${typeof trip.cloneCount === 'number' ? ` · ${trip.cloneCount} clones` : ''}`}
+          className="absolute top-3.5 right-3.5 inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-accent-soft border border-accent text-accent font-mono text-[9px] tracking-[0.16em] uppercase"
+        >
+          <span aria-hidden>★</span> Template
+        </span>
+      )}
       <div className="text-[40px] leading-none">{trip.coverEmoji || '🚗'}</div>
       <h3 className="font-serif italic font-normal text-[26px] leading-[1.1] tracking-tight text-paper [overflow-wrap:anywhere]">
         {trip.name || 'Untitled trip'}
@@ -56,6 +65,16 @@ export function TripCard({ trip, onEdit, onView, onDelete }: Props) {
           >
             View
           </button>
+          {onTemplate && (
+            <button
+              type="button"
+              onClick={() => onTemplate(trip)}
+              title={trip.isTemplate ? 'Manage template' : 'Publish as template'}
+              className="bg-transparent border-0 px-2 py-1.5 rounded text-[12px] tracking-wide text-paper-dim transition-colors duration-150 hover:text-paper"
+            >
+              {trip.isTemplate ? 'Template ✓' : 'Template'}
+            </button>
+          )}
           <span className="flex-1" />
           <button
             type="button"

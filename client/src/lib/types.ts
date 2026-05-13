@@ -103,6 +103,31 @@ export type Trip = {
   fuelPrice?: number;        // default per-litre/gallon price
   fuelCurrency?: string;     // 3-letter ISO code, e.g. 'EUR', 'USD'
   fuelOverrides?: FuelOverride[];
+  // Community templates — when isTemplate=true the trip is visible at
+  // /api/templates (public, no auth) and clonable by anyone. The owner
+  // controls publishing; cloneCount is server-incremented on each clone.
+  isTemplate?: boolean;
+  templateDescription?: string;
+  templateTags?: string[];
+  cloneCount?: number;
+  publishedAt?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
+};
+
+// Public-facing template card data. The /api/templates endpoint returns a
+// curated subset that's safe to expose without auth — no ownerUid,
+// shareToken, or collaborators, plus owner display name + photo for credit.
+export type TemplateCard = {
+  id: string;
+  name: string;
+  coverEmoji?: string;
+  templateDescription?: string;
+  templateTags?: string[];
+  totalKm?: number;
+  totalDays?: number;
+  countries?: string[];
+  cloneCount?: number;
+  owner: { displayName: string; photoURL: string };
+  publishedAt?: unknown;
 };

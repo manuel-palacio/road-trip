@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ApiError, publishTemplate, unpublishTemplate } from '../lib/api';
 import { signOutFirebase } from '../lib/firebase';
 import type { MeResponse, Trip } from '../lib/types';
 import { Brand } from '../components/Brand';
 import { InstallAppButton } from '../components/InstallAppButton';
+import { PublishTemplateModal } from '../components/PublishTemplateModal';
 import { TripCard } from '../components/TripCard';
 import { NewTripTile } from '../components/NewTripTile';
 import { useDeleteTrip, useTrips } from '../hooks/useTrips';
@@ -20,13 +24,45 @@ function showUpgradeAlert() {
 
 export function Dashboard({ me }: { me: MeResponse }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const trips = useTrips(true);
   const del = useDeleteTrip();
 
   const list: Trip[] = trips.data?.trips ?? [];
   const isEmpty = !trips.isLoading && list.length === 0;
   const isFree = me.plan === 'free';
-  const atLimit = isFree && me.tripCount >= me.tripLimit;
+  const isPro = me.plan === 'pro';
+  const atLimit = me.tripCount >= me.tripLimit;
+
+  const [templateTrip, setTemplateTrip] = useState<Trip | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const publishMut = useMutation({
+    mutationFn: (vars: { tripId: string; templateDescription: string; templateTags: string[] }) =>
+      publishTemplate(vars.tripId, {
+        templateDescription: vars.templateDescription,
+        templateTags: vars.templateTags,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      setTemplateTrip(null);
+      setTemplateError(null);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) setTemplateError(err.message);
+      else setTemplateError('Could not publish template.');
+    },
+  });
+  const unpublishMut = useMutation({
+    mutationFn: (tripId: string) => unpublishTemplate(tripId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      setTemplateTrip(null);
+      setTemplateError(null);
+    },
+    onError: (err: unknown) => {
+      setTemplateError(err instanceof ApiError ? err.message : 'Could not unpublish.');
+    },
+  });
 
   return (
     <div className="min-h-screen relative">
@@ -51,6 +87,13 @@ export function Dashboard({ me }: { me: MeResponse }) {
             {/* Hide name on phones — avatar carries the identity */}
             <span className="hidden md:inline-block text-[14px] max-w-[180px] truncate">{me.displayName || me.email}</span>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate('/templates')}
+            className="bg-transparent border border-line text-paper-dim px-3 md:px-[14px] py-[6px] md:py-[7px] rounded text-[11px] md:text-[12px] shrink-0 transition-colors duration-200 ease-out-soft hover:border-paper-dim hover:text-paper"
+          >
+            Templates
+          </button>
           <InstallAppButton />
           <button
             type="button"
@@ -115,6 +158,7 @@ export function Dashboard({ me }: { me: MeResponse }) {
               onEdit={(id) => navigate(`/builder/${id}`)}
               onView={(id) => navigate(`/viewer/${id}`)}
               onDelete={(id) => del.mutateAsync(id)}
+              onTemplate={(t) => { setTemplateError(null); setTemplateTrip(t); }}
             />
           ))}
           <NewTripTile
@@ -131,6 +175,23 @@ export function Dashboard({ me }: { me: MeResponse }) {
           </p>
         )}
       </main>
+      {templateTrip && (
+        <PublishTemplateModal
+          trip={templateTrip}
+          isPro={isPro}
+          busy={publishMut.isPending || unpublishMut.isPending}
+          errorMessage={templateError}
+          onPublish={(input) =>
+            publishMut.mutate({
+              tripId: templateTrip.id,
+              templateDescription: input.templateDescription,
+              templateTags: input.templateTags,
+            })
+          }
+          onUnpublish={() => unpublishMut.mutate(templateTrip.id)}
+          onClose={() => { setTemplateTrip(null); setTemplateError(null); }}
+        />
+      )}
     </div>
   );
 }

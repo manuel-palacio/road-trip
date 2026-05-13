@@ -9,6 +9,7 @@ const configRouter = require('./routes/config');
 const meRouter = require('./routes/me');
 const tripsRouter = require('./routes/trips');
 const shareRouter = require('./routes/share');
+const templatesRouter = require('./routes/templates');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -39,6 +40,7 @@ app.use(configRouter);
 app.use(meRouter);
 app.use(tripsRouter);
 app.use(shareRouter);
+app.use(templatesRouter);
 
 // Serve the React build
 const distPath = path.join(__dirname, 'dist');

@@ -1,5 +1,5 @@
 import { getFirebaseAuth } from './firebase';
-import type { AppConfig, MeResponse, Pin, Trip } from './types';
+import type { AppConfig, MeResponse, Pin, TemplateCard, Trip } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -132,6 +132,39 @@ export async function getSharedTrip(token: string): Promise<SharedTripResponse> 
 // save dialog via a temporary anchor with the download attribute. Used for
 // /export/pdf and /export/gpx, which need the Authorization header that a
 // plain `<a href>` click can't carry.
+export type PublishTemplateInput = {
+  templateDescription: string;
+  templateTags: string[];
+};
+
+export async function publishTemplate(tripId: string, body: PublishTemplateInput): Promise<{ ok: boolean; isTemplate: boolean }> {
+  return handle(await fetch(`/api/trips/${encodeURIComponent(tripId)}/publish-template`, await withToken({
+    method: 'POST',
+    body: JSON.stringify(body),
+  })));
+}
+
+export async function unpublishTemplate(tripId: string): Promise<{ ok: boolean; isTemplate: boolean }> {
+  return handle(await fetch(`/api/trips/${encodeURIComponent(tripId)}/publish-template`, await withToken({
+    method: 'DELETE',
+  })));
+}
+
+// Public — no auth required. Pass tag to filter to a single tag.
+export async function listTemplates(opts: { tag?: string; limit?: number } = {}): Promise<{ items: TemplateCard[] }> {
+  const params = new URLSearchParams();
+  if (opts.tag) params.set('tag', opts.tag);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return handle(await fetch(`/api/templates${qs ? `?${qs}` : ''}`));
+}
+
+export async function cloneTemplate(templateId: string): Promise<Trip> {
+  return handle<Trip>(await fetch(`/api/templates/${encodeURIComponent(templateId)}/clone`, await withToken({
+    method: 'POST',
+  })));
+}
+
 export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {
   const res = await fetch(path, await withToken());
   if (!res.ok) {

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const PDFDocument = require('pdfkit');
 const { admin, getDb } = require('../lib/firebase');
+const { effectiveTripLimit } = require('../lib/limits');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -112,26 +113,26 @@ router.post('/api/trips', async (req, res) => {
   try {
     const db = getDb();
 
-    // Plan limit enforcement: free users are capped at FREE_TRIP_LIMIT.
-    // Pro users (or anyone explicitly marked plan='pro') skip the check.
+    // Plan limit enforcement: both Free and Pro have caps now (1 / 10
+    // by default). Resolved through effectiveTripLimit so future env
+    // changes apply uniformly.
     const userSnap = await db.collection('users').doc(req.uid).get();
     const user = userSnap.exists ? userSnap.data() : null;
-    if (!user || user.plan !== 'pro') {
-      const limit = (user && typeof user.tripLimit === 'number')
-        ? user.tripLimit
-        : parseInt(process.env.FREE_TRIP_LIMIT || '2', 10);
-      const countSnap = await db
-        .collection('trips')
-        .where('ownerUid', '==', req.uid)
-        .count()
-        .get();
-      if (countSnap.data().count >= limit) {
-        return res.status(402).json({
-          error: `Free plan is capped at ${limit} trips. Upgrade to create more.`,
-          code: 'TRIP_LIMIT_REACHED',
-          limit,
-        });
-      }
+    const limit = effectiveTripLimit(user);
+    const countSnap = await db
+      .collection('trips')
+      .where('ownerUid', '==', req.uid)
+      .count()
+      .get();
+    if (countSnap.data().count >= limit) {
+      const isPro = user && user.plan === 'pro';
+      return res.status(402).json({
+        error: isPro
+          ? `Pro plan is capped at ${limit} trip${limit === 1 ? '' : 's'}. Contact support to raise the cap.`
+          : `Free plan is capped at ${limit} trip${limit === 1 ? '' : 's'}. Upgrade to Pro to create more.`,
+        code: 'TRIP_LIMIT_REACHED',
+        limit,
+      });
     }
 
     const body = req.body || {};
@@ -635,6 +636,97 @@ router.delete('/api/trips/:id/share', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('DELETE /api/trips/:id/share failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+const TEMPLATE_MIN_STOPS = 3;
+const TEMPLATE_DESCRIPTION_MAX = 500;
+const TEMPLATE_TAGS_MAX = 8;
+const TEMPLATE_TAG_LENGTH_MAX = 24;
+
+function normaliseTemplateTags(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const t of raw) {
+    if (typeof t !== 'string') continue;
+    const clean = t.trim().toLowerCase().slice(0, TEMPLATE_TAG_LENGTH_MAX);
+    if (!clean) continue;
+    if (seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+    if (out.length >= TEMPLATE_TAGS_MAX) break;
+  }
+  return out;
+}
+
+router.post('/api/trips/:id/publish-template', async (req, res) => {
+  try {
+    const db = getDb();
+    const userSnap = await db.collection('users').doc(req.uid).get();
+    const user = userSnap.exists ? userSnap.data() : null;
+    if (!user || user.plan !== 'pro') {
+      return res.status(403).json({
+        error: 'Publishing templates is a Pro feature.',
+        code: 'PRO_REQUIRED',
+      });
+    }
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Trip not found', code: 'NOT_FOUND' });
+    const trip = snap.data();
+    if (trip.ownerUid !== req.uid) {
+      return res.status(403).json({ error: 'Owner only', code: 'FORBIDDEN' });
+    }
+    const stopCount = Array.isArray(trip.stops) ? trip.stops.length : 0;
+    if (stopCount < TEMPLATE_MIN_STOPS) {
+      return res.status(400).json({
+        error: `Templates need at least ${TEMPLATE_MIN_STOPS} stops. This trip has ${stopCount}.`,
+        code: 'TEMPLATE_TOO_FEW_STOPS',
+      });
+    }
+    const body = req.body || {};
+    const description = typeof body.templateDescription === 'string'
+      ? body.templateDescription.trim().slice(0, TEMPLATE_DESCRIPTION_MAX)
+      : '';
+    const tags = normaliseTemplateTags(body.templateTags);
+    const update = {
+      isTemplate: true,
+      templateDescription: description,
+      templateTags: tags,
+      publishedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    // Initialise cloneCount only on first publish — re-publishing
+    // shouldn't reset the score the template has already earned.
+    if (typeof trip.cloneCount !== 'number') update.cloneCount = 0;
+    await ref.update(update);
+    res.json({ ok: true, isTemplate: true });
+  } catch (e) {
+    console.error('POST /api/trips/:id/publish-template failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.delete('/api/trips/:id/publish-template', async (req, res) => {
+  try {
+    const db = getDb();
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Trip not found', code: 'NOT_FOUND' });
+    if (snap.data().ownerUid !== req.uid) {
+      return res.status(403).json({ error: 'Owner only', code: 'FORBIDDEN' });
+    }
+    // Soft retract — keep templateDescription/templateTags/cloneCount so
+    // re-publishing later preserves the metadata.
+    await ref.update({
+      isTemplate: false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true, isTemplate: false });
+  } catch (e) {
+    console.error('DELETE /api/trips/:id/publish-template failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
   }
 });

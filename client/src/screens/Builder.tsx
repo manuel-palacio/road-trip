@@ -687,7 +687,8 @@ export function Builder() {
     } catch (err) {
       console.error('Save failed', err);
       if (err instanceof ApiError && err.code === 'TRIP_LIMIT_REACHED') {
-        alert(`${err.message}\n\nUpgrade to Pro to keep building new trips. (Paddle integration ships in Slice 12.)`);
+        // Server message is plan-aware (different copy for free vs pro)
+        alert(err.message);
         navigate('/');
       } else {
         alert('Could not save trip.');

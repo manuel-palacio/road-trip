@@ -12,6 +12,7 @@ import { Builder } from './screens/Builder';
 import { Viewer } from './screens/Viewer';
 import { Share } from './screens/Share';
 import { Handoff } from './screens/Handoff';
+import { Templates } from './screens/Templates';
 import { OfflineBadge } from './components/OfflineBadge';
 import type { MeResponse } from './lib/types';
 
@@ -32,6 +33,8 @@ export default function App() {
         <Route path="/share/:token" element={<Share />} />
         {/* Public mobile-first hand-off page; the share token gates access. */}
         <Route path="/handoff/share/:token" element={<Handoff />} />
+        {/* Public templates library — browsable without auth, clone needs sign-in. */}
+        <Route path="/templates" element={<Templates />} />
         {/* Everything else funnels through the authed shell. */}
         <Route path="*" element={<AppAuthed />} />
       </Routes>

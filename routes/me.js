@@ -1,5 +1,6 @@
 const express = require('express');
 const { admin, getDb } = require('../lib/firebase');
+const { effectiveTripLimit } = require('../lib/limits');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -12,13 +13,14 @@ router.get('/api/me', authRequired, async (req, res) => {
 
     let user;
     if (!snap.exists) {
-      const tripLimit = parseInt(process.env.FREE_TRIP_LIMIT || '2', 10);
+      // Don't store tripLimit on the user doc — it's computed from
+      // env + plan via effectiveTripLimit. Storing it freezes the limit
+      // at signup-time and makes env changes invisible to existing users.
       await userRef.set({
         email: req.userEmail,
         displayName: req.userName,
         photoURL: req.userPicture,
         plan: 'free',
-        tripLimit,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       user = (await userRef.get()).data();
@@ -35,6 +37,7 @@ router.get('/api/me', authRequired, async (req, res) => {
     res.json({
       uid: req.uid,
       ...user,
+      tripLimit: effectiveTripLimit(user),
       tripCount: tripsSnap.data().count,
     });
   } catch (e) {
