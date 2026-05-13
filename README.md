@@ -281,15 +281,14 @@ The friend has to sign in with the **exact** Google account email — `@gmail.co
 
 ### Promote a user to Pro
 
-Until Paddle ships (Slice 12), promote users by hand in Firestore:
+Until Paddle ships (Slice 12), promote users via the bundled script (uses your local `.env` + service-account JSON):
 
-```
-collection: users
-document:   <their-uid>
-field:      plan = "pro"
+```bash
+node scripts/set-user-plan.js emanuel.palacio@gmail.com pro
+node scripts/set-user-plan.js friend@example.com free   # demote
 ```
 
-You can find the UID via Firebase Console → Authentication → Users.
+Or by hand in Firebase Console → Firestore → `users` → `<uid>` → `plan = "pro"`. UID is in Firebase Console → Authentication → Users.
 
 ### Verify the latest deploy
 
