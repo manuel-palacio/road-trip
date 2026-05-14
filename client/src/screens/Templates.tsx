@@ -54,7 +54,7 @@ export function Templates() {
   return (
     <div className="min-h-screen">
       <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 md:px-9 py-4 md:py-5 border-b border-line bg-canvas/85 backdrop-blur-md gap-3">
-        <Brand size="sm" />
+        <Brand size="sm" to="/" />
         <button
           type="button"
           onClick={() => navigate('/')}
