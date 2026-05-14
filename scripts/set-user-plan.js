@@ -1,4 +1,4 @@
-add #!/usr/bin/env node
+#!/usr/bin/env node
 // Flip a user's plan in Firestore. Useful until Paddle (Slice 12) ships
 // a self-serve upgrade flow.
 //
