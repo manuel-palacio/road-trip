@@ -279,16 +279,41 @@ gcloud run services update road-trip --region=europe-north1 \
 
 The friend has to sign in with the **exact** Google account email — `@gmail.com` and `@googlemail.com` aliases don't match.
 
-### Promote a user to Pro
+### Update a user's plan
 
-Until Paddle ships (Slice 12), promote users via the bundled script (uses your local `.env` + service-account JSON):
+Until Paddle (Slice 12) ships a self-serve upgrade flow, the admin flips users between Free and Pro by hand. The `users/{uid}.plan` field controls which trip-count cap applies:
+
+| Plan | Default cap | Env var (server) |
+|---|---|---|
+| `free` | 1 trip | `FREE_TRIP_LIMIT` |
+| `pro` | 10 trips | `PRO_TRIP_LIMIT` |
+
+Per-user override: set `users/{uid}.tripLimit = N` in Firestore to give a specific user a different cap (admin grant, beta tester, etc.). When set, it wins over the env-var defaults.
+
+**Via the bundled script** (recommended):
 
 ```bash
 node scripts/set-user-plan.js emanuel.palacio@gmail.com pro
 node scripts/set-user-plan.js friend@example.com free   # demote
 ```
 
-Or by hand in Firebase Console → Firestore → `users` → `<uid>` → `plan = "pro"`. UID is in Firebase Console → Authentication → Users.
+The script reads the same `.env` as the server. Three env vars must be set for it to work:
+
+- `GOOGLE_APPLICATION_CREDENTIALS` — absolute path to a Firebase Admin service-account JSON, or run `gcloud auth application-default set-quota-project <project-id>` if you'd rather use your gcloud user creds.
+- `FIREBASE_PROJECT_ID` — e.g. `road-trip-service`.
+- `FIRESTORE_DATABASE_ID` — e.g. `road-trip-db` (must match the actual database name; check with `gcloud firestore databases list`).
+
+Effect is immediate — the user just needs to hard-refresh the app for the plan badge in the Dashboard header to flip.
+
+**Common errors:**
+
+- `PERMISSION_DENIED ... requires a quota project` → you're on user ADC creds. Run `gcloud auth application-default set-quota-project <project-id>` once and retry.
+- `5 NOT_FOUND` → almost always a missing or wrong `FIRESTORE_DATABASE_ID` in `.env`. Verify against `gcloud firestore databases list`.
+- `auth/user-not-found` → the email hasn't signed in to the app yet, so there's no Firebase Auth record. Have them sign in first.
+
+**Fallback — Firebase Console** (no local creds needed):
+
+Firebase Console → Authentication → Users → copy the UID for the email you want to update. Then Firebase Console → Firestore → `users` → `<uid>` → edit the `plan` field to `"pro"` or `"free"`. Save.
 
 ### Verify the latest deploy
 
