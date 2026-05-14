@@ -285,7 +285,7 @@ Until Paddle (Slice 12) ships a self-serve upgrade flow, the admin flips users b
 
 | Plan | Default cap | Env var (server) |
 |---|---|---|
-| `free` | 1 trip | `FREE_TRIP_LIMIT` |
+| `free` | 2 trips | `FREE_TRIP_LIMIT` |
 | `pro` | 10 trips | `PRO_TRIP_LIMIT` |
 
 Per-user override: set `users/{uid}.tripLimit = N` in Firestore to give a specific user a different cap (admin grant, beta tester, etc.). When set, it wins over the env-var defaults.
