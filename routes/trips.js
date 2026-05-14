@@ -24,6 +24,7 @@ const UPDATABLE_FIELDS = [
   'fuelPrice',
   'fuelCurrency',
   'fuelOverrides',
+  'dataVersion',
 ];
 
 const PIN_CATEGORIES = ['food', 'hotel', 'scenic', 'fuel', 'landmark', 'other'];

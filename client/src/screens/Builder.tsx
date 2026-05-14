@@ -102,6 +102,25 @@ const empty = (): BuilderState => ({
   fuelOverrides: [],
 });
 
+/** One-shot migration for trips saved before the type='overnight' fix.
+ * Pre-aa4674d, every newly added stop got type='overnight' as a default
+ * the user never opted into — which then forced applyDays to roll the
+ * next stop to a new day. For trips lacking dataVersion (or <2), flatten
+ * every intermediate stop to 'waypoint'. Genuine overnight markers are
+ * lost in the process, but per the bug history none of them were
+ * intentional. After save we stamp dataVersion=2 so this runs at most
+ * once per trip. */
+function migrateLegacyStopTypes(rawStops: Stop[], dataVersion: number | undefined): Stop[] {
+  const stops = rawStops.map((s) => ({ ...s }));
+  if ((dataVersion ?? 1) >= 2) return stops;
+  const n = stops.length;
+  return stops.map((s, i) => {
+    if (i === 0) return { ...s, type: 'start' as const };
+    if (i === n - 1) return { ...s, type: 'destination' as const };
+    return { ...s, type: 'waypoint' as const };
+  });
+}
+
 function reassignTypes(stops: Stop[]): Stop[] {
   const n = stops.length;
   return stops.map((s, i) => ({
@@ -181,7 +200,7 @@ export function Builder() {
       startDate: t.startDate || '',
       maxKmPerDay: typeof t.maxKmPerDay === 'number' && t.maxKmPerDay > 0 ? t.maxKmPerDay : 600,
       description: t.description || '',
-      stops: Array.isArray(t.stops) ? t.stops.map((s) => ({ ...s })) : [],
+      stops: Array.isArray(t.stops) ? migrateLegacyStopTypes(t.stops, t.dataVersion) : [],
       fuelConsumption: typeof t.fuelConsumption === 'number' ? String(t.fuelConsumption) : '',
       fuelUnit: t.fuelUnit === 'MPG' ? 'MPG' : 'L/100km',
       fuelPrice: typeof t.fuelPrice === 'number' ? String(t.fuelPrice) : '',
@@ -670,6 +689,7 @@ export function Builder() {
         fuelPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
         fuelCurrency: state.fuelCurrency || 'EUR',
         fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
+        dataVersion: 2,
         stops: stops.map((s) => ({
           id: s.id, name: s.name, label: s.label,
           lat: s.lat, lng: s.lng,

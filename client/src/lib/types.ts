@@ -111,6 +111,12 @@ export type Trip = {
   templateTags?: string[];
   cloneCount?: number;
   publishedAt?: unknown;
+  // Schema-version stamp. Trips saved before aa4674d (the
+  // type='overnight' default fix) stored every added stop as
+  // 'overnight'; on load the Builder normalizes intermediate
+  // overnights to 'waypoint' and writes dataVersion=2 on next save
+  // so the migration runs at most once per trip.
+  dataVersion?: number;
   createdAt?: unknown;
   updatedAt?: unknown;
 };
