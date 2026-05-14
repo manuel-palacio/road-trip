@@ -56,7 +56,7 @@ export function reassignStopTypes(stops: readonly Stop[]): Stop[] {
       ? 'start'
       : i === n - 1
         ? 'destination'
-        : (s.type === 'waypoint' ? 'waypoint' : 'overnight'),
+        : (s.type === 'overnight' ? 'overnight' : 'waypoint'),
   }));
 }
 
