@@ -189,8 +189,8 @@ export function Handoff() {
                         setShareToast(r.kind === 'copied' ? 'Link copied' : 'Could not share');
                         setTimeout(() => setShareToast(null), 1600);
                       }}
-                      aria-label="Share to phone"
-                      title="Share"
+                      aria-label="Share this day's route"
+                      title="Share route"
                       className="bg-transparent border border-line text-paper-dim w-12 rounded-lg text-[16px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
                     >
                       <span aria-hidden>⤴</span>

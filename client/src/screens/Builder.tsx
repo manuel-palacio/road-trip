@@ -106,7 +106,13 @@ function reassignTypes(stops: Stop[]): Stop[] {
   const n = stops.length;
   return stops.map((s, i) => ({
     ...s,
-    type: i === 0 ? 'start' : i === n - 1 ? 'destination' : (s.type === 'waypoint' ? 'waypoint' : 'overnight'),
+    // Index 0 → start, last → destination, otherwise preserve only an
+    // EXPLICIT overnight; everything else (including stops that used
+    // to be 'destination' but are no longer last) becomes 'waypoint'.
+    // Waypoints don't force a day boundary in applyDays, so adding a
+    // new stop after an existing one keeps the existing stop on the
+    // same day instead of silently rolling it to a new day.
+    type: i === 0 ? 'start' : i === n - 1 ? 'destination' : (s.type === 'overnight' ? 'overnight' : 'waypoint'),
   }));
 }
 
@@ -232,7 +238,11 @@ export function Builder() {
         label: draft.name,
         lat: draft.lat,
         lng: draft.lng,
-        type: 'overnight',
+        // Default to 'waypoint' — overnight stops force a day boundary
+        // for the next stop in applyDays, which surprises users who
+        // expect new stops to land on the same day. The user can flip
+        // a stop to 'overnight' explicitly via the per-row select.
+        type: 'waypoint',
         highlights: draft.notes ? [draft.notes] : [],
         kmFromPrevious: 0,
         category: draft.category,
@@ -372,7 +382,10 @@ export function Builder() {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
           countryCode: extractCountryCode(place.address_components),
-          type: 'overnight',
+          // 'waypoint' instead of 'overnight' — see the comment on the
+          // pin→stop conversion above. New stops land on the same day
+          // by default; users mark overnight ones explicitly.
+          type: 'waypoint',
           highlights: [],
           kmFromPrevious: 0,
         };

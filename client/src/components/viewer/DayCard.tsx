@@ -214,8 +214,8 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
               <button
                 type="button"
                 onClick={onShareClick}
-                aria-label="Share this day's route to phone"
-                title="Share to phone"
+                aria-label="Share this day's route"
+                title="Share route — copies the Maps link or opens the OS share sheet"
                 className="bg-transparent border border-line text-paper-dim w-8 h-7 rounded font-mono text-[13px] hover:border-paper-dim hover:text-paper transition-colors flex items-center justify-center"
               >
                 <span aria-hidden>⤴</span>
