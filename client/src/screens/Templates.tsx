@@ -123,10 +123,27 @@ export function Templates() {
 
         {templates.isLoading ? (
           <p className="text-center font-serif italic text-paper-muted py-12">Loading templates…</p>
+        ) : templates.error ? (
+          <div className="text-center py-12 max-w-[480px] mx-auto">
+            <p className="font-serif italic text-[18px] text-[#ec8e74] mb-2">
+              Couldn't load templates
+            </p>
+            <p className="text-paper-dim text-[13px] leading-snug">
+              {templates.error instanceof Error ? templates.error.message : String(templates.error)}
+            </p>
+            <button
+              type="button"
+              onClick={() => templates.refetch()}
+              className="mt-4 bg-transparent border border-line text-paper-dim px-3 py-1.5 rounded font-mono text-[10.5px] tracking-[0.16em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         ) : templates.data && templates.data.items.length === 0 ? (
           <p className="text-center font-serif italic text-[16px] text-paper-dim py-12 max-w-[480px] mx-auto">
-            No templates published yet. Build a trip, then publish it from your
-            dashboard to seed the library.
+            {tag
+              ? `No templates tagged "${tag}" yet.`
+              : 'No templates published yet. Build a trip, then publish it from your dashboard to seed the library.'}
           </p>
         ) : (
           <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(290px,1fr))]">

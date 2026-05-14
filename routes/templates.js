@@ -58,27 +58,38 @@ router.get('/api/templates', async (req, res) => {
       ? req.query.tag.trim().toLowerCase()
       : null;
 
+    // Sort in JS instead of orderBy() so we don't need a Firestore
+    // composite index for (isTemplate, cloneCount) — auto-indexes only
+    // cover single fields, and adding a composite index is a manual
+    // console step that breaks fresh deploys. Fetch a generous slice
+    // to give the in-memory sort enough range, then trim to `limit`.
+    const fetchSize = Math.min(MAX_PAGE_SIZE * 4, 240);
     let q = db.collection('trips')
       .where('isTemplate', '==', true)
-      .orderBy('cloneCount', 'desc')
-      .orderBy('publishedAt', 'desc')
-      .limit(limit);
+      .limit(fetchSize);
     if (tagFilter) {
-      q = db.collection('trips')
-        .where('isTemplate', '==', true)
-        .where('templateTags', 'array-contains', tagFilter)
-        .orderBy('cloneCount', 'desc')
-        .limit(limit);
+      q = q.where('templateTags', 'array-contains', tagFilter);
     }
 
     const snap = await q.get();
     const owners = await resolveOwners(db, snap.docs.map((d) => d.data().ownerUid));
-    const items = snap.docs.map((d) =>
-      templateCardFromTrip(d.id, d.data(), owners.get(d.data().ownerUid) || {
-        displayName: 'A road tripper',
-        photoURL: '',
-      }),
-    );
+    const items = snap.docs
+      .map((d) =>
+        templateCardFromTrip(d.id, d.data(), owners.get(d.data().ownerUid) || {
+          displayName: 'A road tripper',
+          photoURL: '',
+        }),
+      )
+      .sort((a, b) => {
+        const byClones = (b.cloneCount || 0) - (a.cloneCount || 0);
+        if (byClones !== 0) return byClones;
+        // Tiebreak: most recently published first. publishedAt is a
+        // Firestore Timestamp serialised as { _seconds, _nanoseconds }.
+        const aT = a.publishedAt && a.publishedAt._seconds || 0;
+        const bT = b.publishedAt && b.publishedAt._seconds || 0;
+        return bT - aT;
+      })
+      .slice(0, limit);
     res.json({ items });
   } catch (e) {
     console.error('GET /api/templates failed:', e);
