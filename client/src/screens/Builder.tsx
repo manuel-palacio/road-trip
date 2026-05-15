@@ -10,13 +10,15 @@ import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
-import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
+import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
+import { useTheme } from '../hooks/useTheme';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { findFuelSearchTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { FuelStopFinder, type FuelStopResult } from '../components/builder/FuelStopFinder';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
 
@@ -154,6 +156,7 @@ export function Builder() {
   const navigate = useNavigate();
   const cfg = useConfig();
   const { maps } = useGoogleMaps(cfg.data?.mapsApiKey || null);
+  const theme = useTheme();
   const queryClient = useQueryClient();
 
   const isEditing = !!tripId;
@@ -414,11 +417,11 @@ export function Builder() {
     const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
-      styles: MAP_STYLE,
+      styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
-      backgroundColor: '#13151a',
+      backgroundColor: theme.resolved === 'light' ? '#efe8d4' : '#13151a',
       clickableIcons: false,
     });
     setMap(m);
@@ -460,6 +463,14 @@ export function Builder() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maps, mapDiv]);
+
+  // Re-skin the map when the user flips themes. Setting `styles` is
+  // cheap — just swaps the in-memory style array; tiles re-paint on the
+  // next interaction.
+  useEffect(() => {
+    if (!map) return;
+    map.setOptions({ styles: mapStyleForTheme(theme.resolved) });
+  }, [map, theme.resolved]);
 
   // Geolocation centering for new trips (once map is ready)
   useEffect(() => {
@@ -700,6 +711,9 @@ export function Builder() {
         forceDayStart: x.forceDayStart === true,
         highlights: x.highlights || [],
         routeMode: x.routeMode || 'fastest',
+        category: x.category || '',
+        priority: x.priority || '',
+        notes: x.notes || '',
       })),
     });
   }
@@ -740,6 +754,10 @@ export function Builder() {
           durationFromPrevious: s.durationFromPrevious || '',
           durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
           ...(s.routeMode ? { routeMode: s.routeMode } : {}),
+          ...(s.category ? { category: s.category } : {}),
+          ...(s.priority ? { priority: s.priority } : {}),
+          ...(s.notes ? { notes: s.notes } : {}),
+          ...(s.forceDayStart ? { forceDayStart: true } : {}),
         })),
       };
       let saved: Trip;
@@ -850,6 +868,9 @@ export function Builder() {
             onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
             className="flex-1 bg-transparent border-0 text-paper font-serif italic text-[26px] leading-[1.15] tracking-tight py-1 outline-none min-w-0 placeholder:text-paper-muted placeholder:italic"
           />
+          <div className="mt-[6px]">
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="border-b border-line">
