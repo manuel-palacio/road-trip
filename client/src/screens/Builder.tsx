@@ -11,10 +11,12 @@ import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
-import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { findFuelSearchTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
+import { FuelStopFinder, type FuelStopResult } from '../components/builder/FuelStopFinder';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
 
@@ -186,6 +188,9 @@ export function Builder() {
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
   const insertIndexRef = useRef<number | null>(null);
   insertIndexRef.current = insertIndex;
+  // Resolved gas-station search target (longest leg of a day) when the
+  // user opens the FuelStopFinder. Null = modal closed.
+  const [fuelTarget, setFuelTarget] = useState<FuelSearchTarget | null>(null);
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
@@ -307,6 +312,40 @@ export function Builder() {
     [routes.enriched, state.maxKmPerDay],
   );
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
+  // Per-day groupings — used by the StopList's render path AND by the
+  // gas-station picker to find the longest leg of a given day.
+  const dayGroups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  function fuelTargetForDay(day: number): FuelSearchTarget | null {
+    const g = dayGroups.find((x) => x.day === day);
+    if (!g) return null;
+    return findFuelSearchTarget(g, dayedStops, getStopPath);
+  }
+  function openFuelForDay(day: number) {
+    const target = fuelTargetForDay(day);
+    if (!target) return;
+    setFuelTarget(target);
+  }
+  function onFuelStopSelected(result: FuelStopResult) {
+    if (!fuelTarget) return;
+    const newStop: Stop = {
+      id: crypto.randomUUID(),
+      name: result.name,
+      label: result.name,
+      lat: result.lat,
+      lng: result.lng,
+      type: 'waypoint',
+      category: 'fuel',
+      highlights: [],
+      kmFromPrevious: 0,
+    };
+    setState((s) => {
+      const stops = [...s.stops];
+      const idx = Math.max(0, Math.min(fuelTarget.insertAtFlatIndex, stops.length));
+      stops.splice(idx, 0, newStop);
+      return { ...s, stops: reassignTypes(stops) };
+    });
+    setFuelTarget(null);
+  }
   // Fuel cost — multi-currency breakdown. Each leg is priced by its
   // destination's countryCode against fuelOverrides, falling back to the
   // trip-level default. Returns null when consumption + price aren't set.
@@ -1061,6 +1100,8 @@ export function Builder() {
               onDragLeave={() => { /* handled in StopRow */ }}
               onDrop={(id, ev) => reorder(id, ev)}
               onDropAtDayStart={reorderToDayStart}
+              onFindFuelForDay={openFuelForDay}
+              canFindFuelForDay={(day) => fuelTargetForDay(day) !== null}
             />
           </div>
         </div>
@@ -1127,6 +1168,16 @@ export function Builder() {
       </div>
 
       {pinModal.modalElement}
+
+      {fuelTarget && maps && map && (
+        <FuelStopFinder
+          target={fuelTarget}
+          maps={maps}
+          map={map}
+          onSelect={onFuelStopSelected}
+          onClose={() => setFuelTarget(null)}
+        />
+      )}
 
       {savedToast && (
         <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />

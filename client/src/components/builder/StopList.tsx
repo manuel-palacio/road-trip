@@ -24,6 +24,11 @@ type Props = {
   onDragLeave: (ev: React.DragEvent) => void;
   onDrop: (id: string, ev: React.DragEvent) => void;
   onDropAtDayStart?: (day: number) => void;
+  // When set, each DayHeader gets a "+ Fuel stop" button. Predicate
+  // (canFindFuelForDay) hides the button on days with no targetable
+  // leg (single-stop days, unrouted legs, etc.).
+  onFindFuelForDay?: (day: number) => void;
+  canFindFuelForDay?: (day: number) => boolean;
 };
 
 export function StopList(p: Props) {
@@ -48,6 +53,11 @@ export function StopList(p: Props) {
             isFirst={gi === 0}
             fuelCost={p.fuelCostFor ? p.fuelCostFor(g.stops.map((x) => x.stop)) : null}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
+            onFindFuel={
+              p.onFindFuelForDay && (!p.canFindFuelForDay || p.canFindFuelForDay(g.day))
+                ? () => p.onFindFuelForDay!(g.day)
+                : undefined
+            }
           />
           {g.stops.map(({ stop, index }, rowIdxInDay) => (
             <Fragment key={stop.id}>

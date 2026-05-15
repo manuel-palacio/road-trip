@@ -12,10 +12,13 @@ type Props = {
   // When set, the header becomes a drop target — a drop inserts the
   // dragged stop just before the first stop currently in this day.
   onDropAtStart?: () => void;
+  // When set, renders a "+ Fuel stop" button that opens the gas-station
+  // picker for this day. Set only by the Builder; viewer/handoff omit.
+  onFindFuel?: () => void;
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, onDropAtStart } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, onDropAtStart, onFindFuel } = p;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
   let aaCls: string;
@@ -86,6 +89,16 @@ export function DayHeader(p: Props) {
           <span className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#ec8e74] px-2 py-[3px] rounded border border-dashed border-[rgba(214,90,63,0.5)]">
             Over 800 km · long day
           </span>
+        )}
+        {onFindFuel && (
+          <button
+            type="button"
+            onClick={onFindFuel}
+            title="Find a gas station along this day's longest leg"
+            className="ml-auto inline-flex items-center gap-1 bg-transparent border border-line text-paper-dim px-2 py-[3px] rounded font-mono text-[9.5px] tracking-[0.14em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
+          >
+            <span aria-hidden>⛽</span> + Fuel stop
+          </button>
         )}
       </div>
     </div>
