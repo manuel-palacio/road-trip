@@ -20,7 +20,7 @@
      * client/src/hooks/useTheme.ts. */
     (function () {
       try {
-        var pref = localStorage.getItem('roadtrip:theme') || 'auto';
+        var pref = localStorage.getItem('roadtrip:theme') || 'dark';
         var light = pref === 'light' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
         if (light) document.documentElement.classList.add('theme-light');
       } catch (e) { /* ignore */ }

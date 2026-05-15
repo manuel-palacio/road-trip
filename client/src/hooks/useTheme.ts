@@ -6,10 +6,12 @@ export type ResolvedTheme = 'light' | 'dark';
 const STORAGE_KEY = 'roadtrip:theme';
 
 function readStored(): ThemePreference {
-  if (typeof localStorage === 'undefined') return 'auto';
+  if (typeof localStorage === 'undefined') return 'dark';
   const v = localStorage.getItem(STORAGE_KEY);
   if (v === 'light' || v === 'dark' || v === 'auto') return v;
-  return 'auto';
+  // Default to the original dark editorial look. Users opt into auto
+  // (OS-following) or light explicitly via the toggle button.
+  return 'dark';
 }
 
 function osPrefersLight(): boolean {

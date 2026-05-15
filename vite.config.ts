@@ -90,6 +90,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Allow Firebase Auth's signInWithPopup to communicate back across
+    // the OAuth popup boundary. Default Vite COOP would block window.closed
+    // checks and break the popup flow on dev.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     proxy: {
       '/api':       'http://localhost:8080',
       '/config':    'http://localhost:8080',

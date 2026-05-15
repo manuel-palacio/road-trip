@@ -82,7 +82,7 @@ export function Login() {
         <button
           type="button"
           onClick={onSignIn}
-          className="inline-flex items-center gap-3.5 px-[22px] py-[13px] bg-paper text-[#1a1a1a] rounded-md text-[14px] font-medium tracking-[0.005em] transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_10px_30px_-8px_rgba(231,111,81,0.35)] active:translate-y-0 animate-rise [animation-delay:0.46s]"
+          className="inline-flex items-center gap-3.5 px-[22px] py-[13px] bg-paper text-canvas rounded-md text-[14px] font-medium tracking-[0.005em] transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_10px_30px_-8px_rgba(231,111,81,0.35)] active:translate-y-0 animate-rise [animation-delay:0.46s]"
         >
           <GoogleG />
           Continue with Google
