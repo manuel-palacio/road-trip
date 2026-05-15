@@ -10,11 +10,13 @@ import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
+import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
+import { useTheme } from '../hooks/useTheme';
 import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { PinList } from '../components/viewer/PinList';
 import { QrModal } from '../components/QrModal';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { PinMapLayer, type PinMapLayerHandle } from '../components/viewer/PinMapLayer';
 import { SidebarTabs } from '../components/viewer/SidebarTabs';
 import { Toast } from '../components/Toast';
@@ -39,6 +41,7 @@ export function Viewer() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const cfg = useConfig();
+  const theme = useTheme();
   const { maps } = useGoogleMaps(cfg.data?.mapsApiKey || null);
 
   const tripQuery = useQuery({
@@ -167,7 +170,7 @@ export function Viewer() {
     const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
-      styles: MAP_STYLE,
+      styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
@@ -177,6 +180,12 @@ export function Viewer() {
     stopInfoWindowRef.current = new maps.InfoWindow();
     setMap(m);
   }, [maps, mapDiv, map]);
+
+  // Re-skin the map when the user flips themes.
+  useEffect(() => {
+    if (!map) return;
+    map.setOptions({ styles: mapStyleForTheme(theme.resolved) });
+  }, [map, theme.resolved]);
 
   // Sync stop markers + polylines to dayedStops + hiddenDays
   useEffect(() => {
@@ -302,6 +311,7 @@ export function Viewer() {
               {trip.name || 'Untitled trip'}
             </h1>
           </div>
+          <ThemeToggle />
           <button
             type="button"
             onClick={() => navigate(`/builder/${trip.id}`)}

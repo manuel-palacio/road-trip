@@ -63,6 +63,52 @@ export function mapStyleForDropMode(): google.maps.MapTypeStyle[] {
   return [...BASE_STYLE, ...POI_SHOW_LABELS];
 }
 
+// Light-theme map palette — warm cream paper background, ink labels, soft
+// olive water/landscape. Tuned to sit alongside the editorial light theme
+// without the clinical white/grey look most "default" Maps styles have.
+const BASE_STYLE_LIGHT: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#efe8d4' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#f4eede' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#5b5446' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#bcb39f' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#3a3429' }] },
+  { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#fbf6e7' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#dccfa8' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#857c69' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#fff8df' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#c8b88a' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#3d3629' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c2d4cf' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5b5446' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#e7dfca' }] },
+];
+
+const POI_SHOW_LABELS_LIGHT: google.maps.MapTypeStyle[] = [
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#5b5446' }] },
+  { featureType: 'poi', elementType: 'labels.text.stroke', stylers: [{ color: '#f4eede' }] },
+  { featureType: 'poi.business', elementType: 'labels.text.fill', stylers: [{ color: '#5b5446' }] },
+];
+
+export const MAP_STYLE_LIGHT: google.maps.MapTypeStyle[] = [...BASE_STYLE_LIGHT, POI_HIDE];
+
+export function mapStyleForDropMode_light(): google.maps.MapTypeStyle[] {
+  return [...BASE_STYLE_LIGHT, ...POI_SHOW_LABELS_LIGHT];
+}
+
+/** Resolve the appropriate base map style for the active theme. Pass the
+ * theme value from `useTheme().resolved`. */
+export function mapStyleForTheme(theme: 'light' | 'dark'): google.maps.MapTypeStyle[] {
+  return theme === 'light' ? MAP_STYLE_LIGHT : MAP_STYLE;
+}
+
+export function mapStyleForDropModeForTheme(theme: 'light' | 'dark'): google.maps.MapTypeStyle[] {
+  return theme === 'light' ? mapStyleForDropMode_light() : mapStyleForDropMode();
+}
+
 export function makeMarkerIcon(num: number, ringColor = '#f3ecde', isFuel = false): google.maps.Icon {
   // Cream center with day-color outer ring, dark number — keeps numbers
   // legible across all day color hues. Fuel stops swap the number for

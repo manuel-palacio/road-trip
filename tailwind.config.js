@@ -4,16 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: '#0d0e11',
-        surface: '#16181c',
-        'surface-2': '#1c1f25',
-        paper: '#f3ecde',
-        'paper-dim': '#9b9080',
-        'paper-muted': '#5d564d',
-        accent: '#e76f51',
-        'accent-soft': 'rgba(231, 111, 81, 0.14)',
-        line: 'rgba(243, 236, 222, 0.08)',
-        'line-strong': 'rgba(243, 236, 222, 0.16)',
+        // All tokens read CSS variables defined in globals.css. The
+        // dark theme is the default (set on :root); light mode is
+        // applied by adding .theme-light to <html>.
+        canvas: 'rgb(var(--color-canvas) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        'surface-2': 'rgb(var(--color-surface-2) / <alpha-value>)',
+        paper: 'rgb(var(--color-paper) / <alpha-value>)',
+        'paper-dim': 'rgb(var(--color-paper-dim) / <alpha-value>)',
+        'paper-muted': 'rgb(var(--color-paper-muted) / <alpha-value>)',
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        'accent-soft': 'rgb(var(--color-accent) / 0.14)',
+        line: 'rgb(var(--color-line) / 0.10)',
+        'line-strong': 'rgb(var(--color-line) / 0.20)',
       },
       fontFamily: {
         serif: ['Fraunces', 'Georgia', 'serif'],

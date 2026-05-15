@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens. RGB triplets (space-separated) so Tailwind's
+ * `rgb(var(...) / <alpha-value>)` syntax can compose them with
+ * arbitrary opacities. Dark is the default. Adding `.theme-light`
+ * to <html> swaps the values; everything Tailwind-styled flips
+ * automatically. */
+:root {
+  --color-canvas: 13 14 17;
+  --color-surface: 22 24 28;
+  --color-surface-2: 28 31 37;
+  --color-paper: 243 236 222;
+  --color-paper-dim: 155 144 128;
+  --color-paper-muted: 93 86 77;
+  --color-accent: 231 111 81;
+  /* Subtle hairlines: paper at 10% opacity over dark backgrounds. */
+  --color-line: 243 236 222;
+}
+
+html.theme-light {
+  /* Warm cream paper, not pure white — matches the editorial feel. */
+  --color-canvas: 244 238 224;
+  --color-surface: 252 246 232;
+  --color-surface-2: 234 226 208;
+  /* Ink, not pitch — a touch warmer than #000 for the same paper tone. */
+  --color-paper: 28 26 22;
+  --color-paper-dim: 92 85 72;
+  --color-paper-muted: 142 132 116;
+  --color-accent: 198 88 60;
+  /* Hairlines flip to ink at low opacity over light backgrounds. */
+  --color-line: 28 26 22;
+}
+
 @layer base {
   html, body, #root {
     height: 100%;
@@ -47,11 +78,12 @@
 
 /* Pin name label under map marker — Google Maps Marker.label className target.
  * Anchor is at the teardrop tip (bottom of marker), so the label sits below
- * the tip with a small gap. */
+ * the tip with a small gap. Theme-aware via canvas/paper/accent tokens. */
 .gm-style .pin-name-label {
   transform: translateY(14px);
-  background: rgba(13, 14, 17, 0.82);
-  border: 1px solid rgba(243, 236, 222, 0.1);
+  background: rgb(var(--color-canvas) / 0.82);
+  border: 1px solid rgb(var(--color-paper) / 0.10);
+  color: rgb(var(--color-paper));
   border-radius: 4px;
   padding: 2px 6px;
   white-space: nowrap;
@@ -60,8 +92,8 @@
   pointer-events: none;
 }
 .gm-style .pin-name-label--must {
-  border-color: rgba(231, 111, 81, 0.55);
-  background: rgba(231, 111, 81, 0.14);
+  border-color: rgb(var(--color-accent) / 0.55);
+  background: rgb(var(--color-accent) / 0.14);
 }
 
 /* Restyle Google Places Autocomplete dropdown */

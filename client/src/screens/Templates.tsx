@@ -5,6 +5,7 @@ import { ApiError, cloneTemplate, listTemplates } from '../lib/api';
 import { getFirebaseAuth } from '../lib/firebase';
 import type { TemplateCard } from '../lib/types';
 import { Brand } from '../components/Brand';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /** Public templates library. Anyone can browse. Cloning requires login —
  * unauthenticated visitors get a "Sign in to clone" prompt. */
@@ -55,13 +56,16 @@ export function Templates() {
     <div className="min-h-screen">
       <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 md:px-9 py-4 md:py-5 border-b border-line bg-canvas/85 backdrop-blur-md gap-3">
         <Brand size="sm" to="/" />
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="bg-transparent border border-line text-paper-dim px-3 md:px-[14px] py-[6px] md:py-[7px] rounded text-[11px] md:text-[12px] shrink-0 transition-colors hover:border-paper-dim hover:text-paper"
-        >
-          {getFirebaseAuth().currentUser ? '← Dashboard' : 'Sign in →'}
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="bg-transparent border border-line text-paper-dim px-3 md:px-[14px] py-[6px] md:py-[7px] rounded text-[11px] md:text-[12px] shrink-0 transition-colors hover:border-paper-dim hover:text-paper"
+          >
+            {getFirebaseAuth().currentUser ? '← Dashboard' : 'Sign in →'}
+          </button>
+        </div>
       </header>
 
       <main className="max-w-[1100px] mx-auto pt-[100px] md:pt-[140px] px-4 md:px-9 pb-20">

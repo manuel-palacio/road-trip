@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { MAP_STYLE, makePinIcon, mapStyleForDropMode } from '../../lib/google-maps';
+import { makePinIcon, mapStyleForDropModeForTheme, mapStyleForTheme } from '../../lib/google-maps';
+import { useTheme } from '../../hooks/useTheme';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 import { guessCategoryFromTypes } from '../../lib/place-to-category';
 import type { Pin, PinCategory } from '../../lib/types';
@@ -57,6 +58,7 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
   ref,
 ) {
   const [dropMode, setDropMode] = useState(false);
+  const theme = useTheme();
   const pinMarkersRef = useRef<Map<string, google.maps.Marker>>(new globalThis.Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
@@ -126,7 +128,7 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
     if (!maps || !map) return;
     map.setOptions({
       draggableCursor: dropMode ? 'crosshair' : undefined,
-      styles: dropMode ? mapStyleForDropMode() : MAP_STYLE,
+      styles: dropMode ? mapStyleForDropModeForTheme(theme.resolved) : mapStyleForTheme(theme.resolved),
       clickableIcons: dropMode,
     });
     if (mapClickListenerRef.current) {
@@ -169,7 +171,7 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
       mapClickListenerRef.current?.remove();
       mapClickListenerRef.current = null;
     };
-  }, [maps, map, dropMode]);
+  }, [maps, map, dropMode, theme.resolved]);
 
   // ESC cancels drop mode
   useEffect(() => {

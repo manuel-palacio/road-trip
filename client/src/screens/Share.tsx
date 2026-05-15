@@ -7,7 +7,8 @@ import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { flagEmoji } from '../lib/flags';
-import { MAP_STYLE, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
+import { mapStyleForTheme, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
+import { useTheme } from '../hooks/useTheme';
 import { PIN_CATEGORY_META } from '../lib/pin-meta';
 import type { Pin, Stop } from '../lib/types';
 import { Brand } from '../components/Brand';
@@ -36,6 +37,7 @@ export function Share() {
   const { token } = useParams();
   const navigate = useNavigate();
   const cfg = useConfig();
+  const theme = useTheme();
   const { maps } = useGoogleMaps(cfg.data?.mapsApiKey || null);
 
   const sharedQuery = useQuery({
@@ -113,7 +115,7 @@ export function Share() {
     const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
-      styles: MAP_STYLE,
+      styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
@@ -123,6 +125,12 @@ export function Share() {
     infoWindowRef.current = new maps.InfoWindow();
     setMap(m);
   }, [maps, mapDiv, map]);
+
+  // Re-skin the map when the user flips themes.
+  useEffect(() => {
+    if (!map) return;
+    map.setOptions({ styles: mapStyleForTheme(theme.resolved) });
+  }, [map, theme.resolved]);
 
   // Stop markers + polylines
   useEffect(() => {

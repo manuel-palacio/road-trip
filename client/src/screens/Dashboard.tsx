@@ -6,6 +6,7 @@ import { signOutFirebase } from '../lib/firebase';
 import type { MeResponse, Trip } from '../lib/types';
 import { Brand } from '../components/Brand';
 import { InstallAppButton } from '../components/InstallAppButton';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { PublishTemplateModal } from '../components/PublishTemplateModal';
 import { TripCard } from '../components/TripCard';
 import { NewTripTile } from '../components/NewTripTile';
@@ -94,6 +95,7 @@ export function Dashboard({ me }: { me: MeResponse }) {
           >
             Templates
           </button>
+          <ThemeToggle />
           <InstallAppButton />
           <button
             type="button"

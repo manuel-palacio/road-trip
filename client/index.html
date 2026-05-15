@@ -14,6 +14,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@300..600&family=Geist+Mono:wght@400..500&display=swap" />
+  <script>
+    /* Apply saved theme before React mounts so a user who picked light
+     * doesn't flash dark on cold load. Mirrors the resolution logic in
+     * client/src/hooks/useTheme.ts. */
+    (function () {
+      try {
+        var pref = localStorage.getItem('roadtrip:theme') || 'auto';
+        var light = pref === 'light' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+        if (light) document.documentElement.classList.add('theme-light');
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>
