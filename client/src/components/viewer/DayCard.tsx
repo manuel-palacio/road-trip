@@ -127,6 +127,15 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
+                  {stop.category === 'fuel' && (
+                    <span
+                      aria-label="Fuel stop"
+                      title="Fuel stop"
+                      className="inline-flex items-center justify-center w-[18px] h-[18px] rounded bg-[rgba(244,211,94,0.18)] border border-[rgba(244,211,94,0.5)] text-[11px] leading-none shrink-0"
+                    >
+                      <span aria-hidden>⛽</span>
+                    </span>
+                  )}
                   <span className="text-[13px] text-paper [overflow-wrap:anywhere]">{stop.label || stop.name}</span>
                   {flagEmoji(stop.countryCode) && (
                     <span className="text-[13px] leading-none">{flagEmoji(stop.countryCode)}</span>

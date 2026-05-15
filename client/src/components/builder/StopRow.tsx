@@ -131,6 +131,15 @@ export function StopRow(p: Props) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
+          {stop.category === 'fuel' && (
+            <span
+              aria-label="Fuel stop"
+              title="Fuel stop"
+              className="inline-flex items-center justify-center w-[20px] h-[20px] rounded bg-[rgba(244,211,94,0.18)] border border-[rgba(244,211,94,0.5)] text-[12px] leading-none shrink-0"
+            >
+              <span aria-hidden>⛽</span>
+            </span>
+          )}
           <span className="text-[14px] text-paper [overflow-wrap:anywhere]">{stop.label || stop.name}</span>
           {flag && <span className="text-[14px] leading-none">{flag}</span>}
         </div>

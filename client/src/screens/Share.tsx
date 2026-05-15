@@ -138,7 +138,7 @@ export function Share() {
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
-        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber)),
+        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber), stop.category === 'fuel'),
         title: stop.label || stop.name,
       });
       marker.addListener('click', () => {

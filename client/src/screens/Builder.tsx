@@ -492,7 +492,7 @@ export function Builder() {
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
-        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber)),
+        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber), stop.category === 'fuel'),
         title: stop.label || stop.name,
       });
       const showInfo = () => {
