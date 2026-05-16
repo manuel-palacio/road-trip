@@ -16,7 +16,6 @@ import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
 import { PinList } from '../components/viewer/PinList';
 import { QrModal } from '../components/QrModal';
-import { ThemeToggle } from '../components/ThemeToggle';
 import { PinMapLayer, type PinMapLayerHandle } from '../components/viewer/PinMapLayer';
 import { SidebarTabs } from '../components/viewer/SidebarTabs';
 import { Toast } from '../components/Toast';
@@ -311,7 +310,6 @@ export function Viewer() {
               {trip.name || 'Untitled trip'}
             </h1>
           </div>
-          <ThemeToggle />
           <button
             type="button"
             onClick={() => navigate(`/builder/${trip.id}`)}
@@ -332,44 +330,6 @@ export function Viewer() {
             <span aria-hidden>▦</span>
             Phone
           </button>
-          {isShared ? (
-            <div className="inline-flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={copyExistingShare}
-                aria-label="Copy share link"
-                title="Copy share link"
-                className="bg-accent-soft border border-accent text-accent px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:bg-accent hover:text-canvas transition-colors"
-              >
-                Copy link
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Revoke this share link? Anyone with the URL will see a 404.')) {
-                    revokeShareMut.mutate();
-                  }
-                }}
-                disabled={revokeShareMut.isPending}
-                aria-label="Revoke share link"
-                title="Revoke share link"
-                className="bg-transparent border border-line text-paper-muted px-2 py-[7px] rounded font-mono text-[12px] hover:text-accent hover:border-accent disabled:opacity-50 transition-colors"
-              >
-                ×
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => enableShareMut.mutate()}
-              disabled={enableShareMut.isPending}
-              aria-label="Create share link"
-              title="Create a public read-only link"
-              className="bg-transparent border border-line text-paper-dim px-2.5 py-[7px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim disabled:opacity-50 transition-colors"
-            >
-              {enableShareMut.isPending ? 'Sharing…' : 'Share'}
-            </button>
-          )}
         </header>
 
         <div className="flex items-center gap-4 px-5 py-3 border-b border-line font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim">
@@ -437,10 +397,50 @@ export function Viewer() {
         </div>
 
         <footer className="border-t border-line px-5 py-2.5 flex items-center justify-between gap-3 bg-canvas">
-          <span className="font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
-            Export
-          </span>
           <div className="inline-flex items-center gap-1.5">
+            {isShared ? (
+              <>
+                <button
+                  type="button"
+                  onClick={copyExistingShare}
+                  aria-label="Copy share link"
+                  title="Copy share link"
+                  className="bg-accent-soft border border-accent text-accent px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:bg-accent hover:text-canvas transition-colors"
+                >
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Revoke this share link? Anyone with the URL will see a 404.')) {
+                      revokeShareMut.mutate();
+                    }
+                  }}
+                  disabled={revokeShareMut.isPending}
+                  aria-label="Revoke share link"
+                  title="Revoke share link"
+                  className="bg-transparent border border-line text-paper-muted w-7 h-7 rounded text-[12px] flex items-center justify-center hover:text-accent hover:border-accent disabled:opacity-50 transition-colors"
+                >
+                  ×
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => enableShareMut.mutate()}
+                disabled={enableShareMut.isPending}
+                aria-label="Create share link"
+                title="Create a public read-only link"
+                className="bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim disabled:opacity-50 transition-colors"
+              >
+                {enableShareMut.isPending ? 'Sharing…' : 'Share'}
+              </button>
+            )}
+          </div>
+          <div className="inline-flex items-center gap-1.5">
+            <span className="font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
+              Export
+            </span>
             <button
               type="button"
               onClick={() => exportTrip('pdf')}

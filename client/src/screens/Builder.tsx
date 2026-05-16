@@ -18,7 +18,6 @@ import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { FuelStopFinder, type FuelStopResult } from '../components/builder/FuelStopFinder';
-import { ThemeToggle } from '../components/ThemeToggle';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
 
@@ -868,9 +867,6 @@ export function Builder() {
             onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
             className="flex-1 bg-transparent border-0 text-paper font-serif italic text-[26px] leading-[1.15] tracking-tight py-1 outline-none min-w-0 placeholder:text-paper-muted placeholder:italic"
           />
-          <div className="mt-[6px]">
-            <ThemeToggle />
-          </div>
         </div>
 
         <div className="border-b border-line">
