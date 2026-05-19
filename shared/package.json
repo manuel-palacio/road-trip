@@ -1,0 +1,5 @@
+{
+  "name": "@roadtrip/shared",
+  "private": true,
+  "type": "module"
+}

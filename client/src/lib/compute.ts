@@ -1,4 +1,15 @@
-import type { FuelOverride, FuelUnit, Stop } from './types';
+import type { Stop } from './types';
+
+// Fuel cost helpers live in shared/ so the PDF export endpoint can use the same
+// implementation. Re-exported here so the existing `from '../lib/compute'`
+// import surface keeps working for every screen and test.
+export {
+  estimateFuelCost,
+  fuelBreakdownForLegs,
+  formatCurrency,
+  formatBreakdown,
+} from '../../../shared/fuel';
+export type { FuelBreakdown } from '../../../shared/fuel';
 
 /* Custom day color palette — muted inks matching the editorial cartography theme.
    Cycles past 10 days. */
@@ -88,97 +99,6 @@ export function groupByDay(stops: Stop[]): DayGroup[] {
     g.durationSeconds += stop.durationSecondsFromPrevious || 0;
   });
   return [...groups.values()].sort((a, b) => a.day - b.day);
-}
-
-/** Estimate fuel cost for a given distance + consumption + price.
- * Returns null when any input is missing/invalid (caller hides the chip).
- * MPG is converted to L/100km internally via 235.2146 / mpg. */
-export function estimateFuelCost(
-  km: number,
-  consumption: number | undefined | null,
-  unit: FuelUnit | undefined,
-  pricePerUnit: number | undefined | null,
-): number | null {
-  if (!km || km < 0) return 0;
-  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return null;
-  if (pricePerUnit == null || !Number.isFinite(pricePerUnit) || pricePerUnit <= 0) return null;
-  if (unit === 'MPG') {
-    // miles per US gallon → L/100km
-    const lPer100 = 235.2146 / consumption;
-    const litres = (km / 100) * lPer100;
-    // price is per gallon when unit is MPG — convert litres back to gallons
-    const gallons = litres / 3.785411784;
-    return gallons * pricePerUnit;
-  }
-  // default: L/100km, price per litre
-  const litres = (km / 100) * consumption;
-  return litres * pricePerUnit;
-}
-
-/** Breakdown of fuel cost grouped by currency. Map order = first-seen order
- * across the legs, so the default trip currency typically comes first. */
-export type FuelBreakdown = Map<string, number>;
-
-/** Compute a per-currency breakdown of fuel cost across a set of legs.
- * Each stop contributes a leg priced by its destination's countryCode:
- * if an override matches, use override's (price, currency); otherwise the
- * trip-level defaults. Stops missing kmFromPrevious (e.g. the first stop)
- * contribute nothing. */
-export function fuelBreakdownForLegs(
-  stops: Stop[],
-  consumption: number | undefined | null,
-  unit: FuelUnit | undefined,
-  defaultPrice: number | undefined | null,
-  defaultCurrency: string | undefined,
-  overrides: FuelOverride[] | undefined,
-): FuelBreakdown {
-  const out: FuelBreakdown = new Map();
-  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return out;
-  const defCur = (defaultCurrency || 'EUR').toUpperCase();
-  for (const stop of stops) {
-    const km = stop.kmFromPrevious || 0;
-    if (km <= 0) continue;
-    const cc = (stop.countryCode || '').toUpperCase();
-    const rawOv = cc && overrides
-      ? overrides.find((o) => (o.countryCode || '').toUpperCase() === cc)
-      : undefined;
-    // Only honour an override when both price and currency are valid —
-    // otherwise the override is incomplete and we'd display the default
-    // price under the override's currency, which is semantically wrong.
-    const ov = rawOv && rawOv.price > 0 && rawOv.currency ? rawOv : undefined;
-    const price = ov ? ov.price : (defaultPrice ?? 0);
-    const currency = (ov ? ov.currency : defCur).toUpperCase();
-    const cost = estimateFuelCost(km, consumption, unit, price);
-    if (cost == null || cost <= 0) continue;
-    out.set(currency, (out.get(currency) || 0) + cost);
-  }
-  return out;
-}
-
-/** Format a multi-currency breakdown as "€98 + £15 + 158 kr". Returns null
- * when the breakdown is empty (caller hides the chip). */
-export function formatBreakdown(b: FuelBreakdown): string | null {
-  if (b.size === 0) return null;
-  const parts: string[] = [];
-  for (const [currency, amount] of b) {
-    if (amount > 0) parts.push(formatCurrency(amount, currency));
-  }
-  return parts.length === 0 ? null : parts.join(' + ');
-}
-
-/** Format a monetary amount using Intl.NumberFormat with the browser locale.
- * Falls back gracefully for invalid currency codes. */
-export function formatCurrency(amount: number, currency: string | undefined): string {
-  const code = (currency || 'EUR').toUpperCase();
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: code,
-      maximumFractionDigits: amount >= 100 ? 0 : 2,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${code}`;
-  }
 }
 
 export function tripTotals(stops: Stop[]): {
