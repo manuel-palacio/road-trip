@@ -43,6 +43,7 @@ type BuilderState = {
   fuelPrice: string;
   fuelCurrency: string;
   fuelOverrides: FuelOverrideDraft[];
+  tankRangeKm: number;
 };
 
 // Curated currency dropdown — covers Europe + the usual road-trip suspects.
@@ -103,6 +104,7 @@ const empty = (): BuilderState => ({
   fuelPrice: '',
   fuelCurrency: 'EUR',
   fuelOverrides: [],
+  tankRangeKm: 500,
 });
 
 /** One-shot per-version migrations applied on read. v2 normalised legacy
@@ -227,6 +229,7 @@ export function Builder() {
             currency: (o.currency || 'EUR').toUpperCase(),
           }))
         : [],
+      tankRangeKm: typeof t.tankRangeKm === 'number' && t.tankRangeKm > 0 ? t.tankRangeKm : 500,
     };
     setState(next);
     snapshotRef.current = serializeSnapshot(next);
@@ -327,7 +330,7 @@ export function Builder() {
   function fuelTargetForDay(day: number): FuelSearchTarget | null {
     const g = dayGroups.find((x) => x.day === day);
     if (!g) return null;
-    return findFuelSearchTarget(g, dayedStops, getStopPath);
+    return findFuelSearchTarget(g, dayedStops, getStopPath, state.tankRangeKm);
   }
   function openFuelForDay(day: number) {
     const target = fuelTargetForDay(day);
@@ -709,6 +712,7 @@ export function Builder() {
         price: o.price || '',
         currency: o.currency || '',
       })),
+      tankRangeKm: s.tankRangeKm || 500,
       stops: (s.stops || []).map((x) => ({
         id: x.id, name: x.name, label: x.label,
         lat: x.lat, lng: x.lng,
@@ -748,6 +752,7 @@ export function Builder() {
         fuelPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
         fuelCurrency: state.fuelCurrency || 'EUR',
         fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
+        tankRangeKm: state.tankRangeKm > 0 ? state.tankRangeKm : undefined,
         dataVersion: 3,
         stops: stops.map((s) => ({
           id: s.id, name: s.name, label: s.label,
@@ -890,7 +895,7 @@ export function Builder() {
         </div>
         {detailsOpen && (
         <div id="trip-details-panel" className="px-6 pt-1 pb-3 border-b border-line flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-[18px]">
+          <div className="grid grid-cols-3 gap-[18px]">
             <label className="block min-w-0">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Start date</span>
               <input
@@ -910,6 +915,25 @@ export function Builder() {
                 inputMode="numeric"
                 value={state.maxKmPerDay}
                 onChange={(e) => setState((s) => ({ ...s, maxKmPerDay: parseInt(e.target.value, 10) || 600 }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
+            </label>
+            <label className="block min-w-0 relative">
+              <span
+                className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
+                title="Approximate distance the car covers on a full tank. Days with a single leg longer than this surface a refuel warning + the 'Find fuel stop' suggester."
+              >
+                Tank range
+              </span>
+              <input
+                type="number"
+                min={100}
+                max={1500}
+                step={50}
+                inputMode="numeric"
+                value={state.tankRangeKm}
+                onChange={(e) => setState((s) => ({ ...s, tankRangeKm: parseInt(e.target.value, 10) || 500 }))}
                 className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
@@ -1126,6 +1150,7 @@ export function Builder() {
               onDropAtDayStart={reorderToDayStart}
               onFindFuelForDay={openFuelForDay}
               canFindFuelForDay={(day) => fuelTargetForDay(day) !== null}
+              tankRangeKm={state.tankRangeKm}
             />
           </div>
         </div>

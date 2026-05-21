@@ -28,6 +28,7 @@ const UPDATABLE_FIELDS = [
   'fuelPrice',
   'fuelCurrency',
   'fuelOverrides',
+  'tankRangeKm',
   'dataVersion',
 ];
 

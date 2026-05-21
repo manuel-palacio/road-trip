@@ -6,6 +6,7 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { longestLegOverRange } from '../lib/fuel-stops';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
@@ -365,6 +366,7 @@ export function Share() {
                     onToggleVisibility={() => toggleDay(g.day)}
                     fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
                     bookingAffiliateId={cfg.data?.bookingAffiliateId}
+                    longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                   />
                 ))
               )

@@ -9,6 +9,7 @@ import { usePinModal } from '../hooks/usePinModal';
 import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { longestLegOverRange } from '../lib/fuel-stops';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
@@ -381,6 +382,7 @@ export function Viewer() {
                   onToggleVisibility={() => toggleDay(g.day)}
                   fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
                   bookingAffiliateId={cfg.data?.bookingAffiliateId}
+                  longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                 />
               ))
             )

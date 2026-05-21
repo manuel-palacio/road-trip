@@ -24,9 +24,12 @@ type Props = {
   onToggleVisibility: () => void;
   fuelCost?: string | null;
   bookingAffiliateId?: string | null;
+  /** Longest single leg in the day that exceeds the trip's tank range, in km.
+   * 0 (or omitted) hides the chip. */
+  longLegKm?: number;
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, bookingAffiliateId }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, bookingAffiliateId, longLegKm = 0 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -110,13 +113,22 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
         </Switch.Root>
       </header>
 
-      <div className="px-4 pb-3 -mt-1">
+      <div className="px-4 pb-3 -mt-1 flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.14em] uppercase font-medium border ${aaPalette}`}
         >
           <span className="text-[11px]">🚗</span>
           {aaText}
         </span>
+        {longLegKm > 0 && (
+          <span
+            title="A single leg in this day exceeds the trip's tank range — consider a fuel stop."
+            className="inline-flex items-center gap-1 px-2 py-[3px] rounded font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#e0b86d] border border-dashed border-[rgba(212,164,74,0.5)]"
+          >
+            <span aria-hidden>⛽</span>
+            {longLegKm} km without refuel
+          </span>
+        )}
       </div>
 
       {expanded && (

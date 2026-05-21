@@ -103,6 +103,10 @@ export type Trip = {
   fuelPrice?: number;        // default per-litre/gallon price
   fuelCurrency?: string;     // 3-letter ISO code, e.g. 'EUR', 'USD'
   fuelOverrides?: FuelOverride[];
+  // Approximate distance the car can cover on a full tank. Used by the
+  // fuel-stop suggester (findFuelSearchTarget) and the per-day "long leg"
+  // warning chip. Defaults to 500 km when unset.
+  tankRangeKm?: number;
   // Community templates — when isTemplate=true the trip is visible at
   // /api/templates (public, no auth) and clonable by anyone. The owner
   // controls publishing; cloneCount is server-incremented on each clone.

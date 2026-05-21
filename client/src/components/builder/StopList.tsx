@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { groupByDay, isFuelStop } from '../../lib/compute';
+import { longestLegOverRange } from '../../lib/fuel-stops';
 import type { Stop, StopRouteMode } from '../../lib/types';
 import { DayHeader } from './DayHeader';
 import { StopRow } from './StopRow';
@@ -30,6 +31,9 @@ type Props = {
   // leg (single-stop days, unrouted legs, etc.).
   onFindFuelForDay?: (day: number) => void;
   canFindFuelForDay?: (day: number) => boolean;
+  /** Tank range used to flag days with a long single leg. Defaults to 500
+   * inside longestLegOverRange when undefined. */
+  tankRangeKm?: number;
 };
 
 export function StopList(p: Props) {
@@ -53,6 +57,7 @@ export function StopList(p: Props) {
             startDate={p.startDate}
             isFirst={gi === 0}
             fuelCost={p.fuelCostFor ? p.fuelCostFor(g.stops.map((x) => x.stop)) : null}
+            longLegKm={longestLegOverRange(g, p.tankRangeKm)}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
             onFindFuel={
               p.onFindFuelForDay && (!p.canFindFuelForDay || p.canFindFuelForDay(g.day))
