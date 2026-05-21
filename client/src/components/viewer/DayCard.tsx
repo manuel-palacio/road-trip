@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import * as Switch from '@radix-ui/react-switch';
-import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
+import { dayColor, formatDayDate, formatDuration, isFuelStop } from '../../lib/compute';
 import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
 import { phoneShare } from '../../lib/phone-share';
 import { accommodationLinks } from '../../lib/booking-links';
 import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
+import { FuelStopChip } from '../FuelStopChip';
 import { QrModal } from '../QrModal';
 
 const ROUTE_MODE_GLYPH: Record<StopRouteMode, { glyph: string; label: string }> = {
@@ -31,8 +32,11 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
   const [shareLabel, setShareLabel] = useState<string | null>(null);
 
   const stopsOnly = group.stops.map((x) => x.stop);
+  // Fuel stops are pit-stop suggestions, not turn points — they don't count
+  // toward the Android Auto 10-stop limit and don't appear in the Maps URL.
+  const routableCount = stopsOnly.filter((s) => !isFuelStop(s)).length;
   const date = formatDayDate(group.day, startDate);
-  const status = aaStatus(group.stops.length);
+  const status = aaStatus(routableCount);
   const url = buildDayMapsUrl(stopsOnly);
   const color = dayColor(group.day);
   const dayLabel = `Day ${group.day}${date ? ` · ${date}` : ''}`;
@@ -58,9 +62,9 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
     over: 'bg-[rgba(214,90,63,0.18)] border-[rgba(214,90,63,0.5)] text-[#ec8e74]',
   }[status];
   const aaText = {
-    ready: `Android Auto: Ready (${group.stops.length}/10 stops)`,
-    limit: `Android Auto: At limit (${group.stops.length}/10 stops)`,
-    over: `Android Auto: Too many stops (${group.stops.length}/10) · split this day`,
+    ready: `Android Auto: Ready (${routableCount}/10 stops)`,
+    limit: `Android Auto: At limit (${routableCount}/10 stops)`,
+    over: `Android Auto: Too many stops (${routableCount}/10) · split this day`,
   }[status];
 
   return (
@@ -117,7 +121,9 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
 
       {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-2.5">
-          {stopsOnly.map((stop, i) => (
+          {stopsOnly.map((stop, i) => isFuelStop(stop) ? (
+            <FuelStopChip key={stop.id} stop={stop} />
+          ) : (
             <div key={stop.id} className="flex items-start gap-2.5">
               <div
                 className="w-[20px] h-[20px] font-mono text-[10px] font-semibold rounded-full flex items-center justify-center shrink-0 mt-0.5"
@@ -127,15 +133,6 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {stop.category === 'fuel' && (
-                    <span
-                      aria-label="Fuel stop"
-                      title="Fuel stop"
-                      className="inline-flex items-center justify-center w-[18px] h-[18px] rounded bg-[rgba(244,211,94,0.18)] border border-[rgba(244,211,94,0.5)] text-[11px] leading-none shrink-0"
-                    >
-                      <span aria-hidden>⛽</span>
-                    </span>
-                  )}
                   <span className="text-[13px] text-paper [overflow-wrap:anywhere]">{stop.label || stop.name}</span>
                   {flagEmoji(stop.countryCode) && (
                     <span className="text-[13px] leading-none">{flagEmoji(stop.countryCode)}</span>

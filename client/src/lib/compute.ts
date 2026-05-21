@@ -30,6 +30,14 @@ export function dayColor(n: number | undefined): string {
   return DAY_COLORS[((n || 1) - 1) % DAY_COLORS.length];
 }
 
+/** A stop is treated as a fuel/refuel pit-stop when its type is 'fuel', or
+ * when it's a legacy fuel waypoint (saved before issue #52 as type='waypoint'
+ * + category='fuel'). Used wherever fuel stops are visually compacted or
+ * excluded from Android Auto stop counts. */
+export function isFuelStop(s: Stop): boolean {
+  return s.type === 'fuel' || (s.type === 'waypoint' && s.category === 'fuel');
+}
+
 export function formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0) return '';
   const hours = seconds / 3600;
@@ -38,7 +46,9 @@ export function formatDuration(seconds: number): string {
 }
 
 /** Computes dayNumber for each stop based on kmFromPrevious + max km/day + overnight markers
- * + per-stop forceDayStart flag. First stop is forced to Day 1.
+ * + per-stop forceDayStart flag. First stop is forced to Day 1. Fuel stops
+ * are transparent to day planning: they never trigger a boundary themselves,
+ * so a 600 km day with a refuel in the middle stays on one day.
  * Pure: returns a new array, doesn't mutate input. */
 export function applyDays(stops: Stop[], maxKm: number): Stop[] {
   if (stops.length === 0) return stops;
@@ -55,7 +65,8 @@ export function applyDays(stops: Stop[], maxKm: number): Stop[] {
     const seg = stop.kmFromPrevious || 0;
     const prevOvernight = stops[i - 1].type === 'overnight';
     const forced = stop.forceDayStart === true;
-    if (forced || prevOvernight || dayKm + seg > maxKm) {
+    const isFuel = stop.type === 'fuel';
+    if (forced || prevOvernight || (!isFuel && dayKm + seg > maxKm)) {
       day++;
       dayKm = seg;
     } else {

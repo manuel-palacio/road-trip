@@ -105,37 +105,44 @@ const empty = (): BuilderState => ({
   fuelOverrides: [],
 });
 
-/** One-shot migration for trips saved before the type='overnight' fix.
- * Pre-aa4674d, every newly added stop got type='overnight' as a default
- * the user never opted into — which then forced applyDays to roll the
- * next stop to a new day. For trips lacking dataVersion (or <2), flatten
- * every intermediate stop to 'waypoint'. Genuine overnight markers are
- * lost in the process, but per the bug history none of them were
- * intentional. After save we stamp dataVersion=2 so this runs at most
- * once per trip. */
+/** One-shot per-version migrations applied on read. v2 normalised legacy
+ * type='overnight' defaults to 'waypoint' (pre-aa4674d those defaults were
+ * unintentional). v3 promotes legacy fuel waypoints — saved as
+ * type='waypoint' + category='fuel' before issue #52 — to first-class
+ * type='fuel'. After save we stamp the current dataVersion so each
+ * migration runs at most once per trip. */
 function migrateLegacyStopTypes(rawStops: Stop[], dataVersion: number | undefined): Stop[] {
-  const stops = rawStops.map((s) => ({ ...s }));
-  if ((dataVersion ?? 1) >= 2) return stops;
-  const n = stops.length;
-  return stops.map((s, i) => {
-    if (i === 0) return { ...s, type: 'start' as const };
-    if (i === n - 1) return { ...s, type: 'destination' as const };
-    return { ...s, type: 'waypoint' as const };
-  });
+  const version = dataVersion ?? 1;
+  let stops = rawStops.map((s) => ({ ...s }));
+  if (version < 2) {
+    const n = stops.length;
+    stops = stops.map((s, i) => {
+      if (i === 0) return { ...s, type: 'start' as const };
+      if (i === n - 1) return { ...s, type: 'destination' as const };
+      return { ...s, type: 'waypoint' as const };
+    });
+  }
+  if (version < 3) {
+    stops = stops.map((s) =>
+      s.type === 'waypoint' && s.category === 'fuel' ? { ...s, type: 'fuel' as const } : s,
+    );
+  }
+  return stops;
 }
 
 function reassignTypes(stops: Stop[]): Stop[] {
   const n = stops.length;
-  return stops.map((s, i) => ({
-    ...s,
-    // Index 0 → start, last → destination, otherwise preserve only an
-    // EXPLICIT overnight; everything else (including stops that used
-    // to be 'destination' but are no longer last) becomes 'waypoint'.
-    // Waypoints don't force a day boundary in applyDays, so adding a
-    // new stop after an existing one keeps the existing stop on the
-    // same day instead of silently rolling it to a new day.
-    type: i === 0 ? 'start' : i === n - 1 ? 'destination' : (s.type === 'overnight' ? 'overnight' : 'waypoint'),
-  }));
+  return stops.map((s, i) => {
+    if (i === 0) return { ...s, type: 'start' as const };
+    if (i === n - 1) return { ...s, type: 'destination' as const };
+    // Preserve EXPLICIT overnights and fuel stops in the middle; everything
+    // else (including stale 'destination'/'start' types from a stop that
+    // was reordered) collapses to 'waypoint' so it doesn't force a day
+    // boundary or get re-rendered as something it isn't.
+    if (s.type === 'overnight') return { ...s, type: 'overnight' as const };
+    if (s.type === 'fuel') return { ...s, type: 'fuel' as const };
+    return { ...s, type: 'waypoint' as const };
+  });
 }
 
 function fitBounds(map: google.maps.Map, stops: Stop[]) {
@@ -335,7 +342,7 @@ export function Builder() {
       label: result.name,
       lat: result.lat,
       lng: result.lng,
-      type: 'waypoint',
+      type: 'fuel',
       category: 'fuel',
       highlights: [],
       kmFromPrevious: 0,
@@ -502,7 +509,7 @@ export function Builder() {
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
-        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber), stop.category === 'fuel'),
+        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber), stop.type === 'fuel' || stop.category === 'fuel'),
         title: stop.label || stop.name,
       });
       const showInfo = () => {
@@ -741,7 +748,7 @@ export function Builder() {
         fuelPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
         fuelCurrency: state.fuelCurrency || 'EUR',
         fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
-        dataVersion: 2,
+        dataVersion: 3,
         stops: stops.map((s) => ({
           id: s.id, name: s.name, label: s.label,
           lat: s.lat, lng: s.lng,

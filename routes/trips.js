@@ -321,6 +321,12 @@ function sanitizeFilename(s) {
   return trimmed.replace(/[^A-Za-z0-9\-_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'road-trip';
 }
 
+// Mirrors isFuelStop() in client/src/lib/compute.ts. Legacy fuel stops were
+// saved as type='waypoint' + category='fuel' (pre-issue #52).
+function isFuelStop(s) {
+  return s.type === 'fuel' || (s.type === 'waypoint' && s.category === 'fuel');
+}
+
 function buildGpx(trip, pins) {
   const stops = Array.isArray(trip.stops) ? trip.stops : [];
   const wptLines = [];
@@ -344,8 +350,11 @@ function buildGpx(trip, pins) {
       `  </wpt>`,
     );
   }
+  // Fuel stops are emitted as standalone <wpt> above (POI alongside the
+  // route) but excluded from the <rtept> route block — they're pit-stop
+  // suggestions, not turn points.
   const rtepts = stops
-    .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
+    .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number' && !isFuelStop(s))
     .map(
       (s) =>
         `    <rtept lat="${s.lat}" lon="${s.lng}"><name>${escapeXml(s.label || s.name || '')}</name></rtept>`,

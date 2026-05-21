@@ -50,14 +50,13 @@ export function findBestInsertIndex(
  */
 export function reassignStopTypes(stops: readonly Stop[]): Stop[] {
   const n = stops.length;
-  return stops.map((s, i) => ({
-    ...s,
-    type: i === 0
-      ? 'start'
-      : i === n - 1
-        ? 'destination'
-        : (s.type === 'overnight' ? 'overnight' : 'waypoint'),
-  }));
+  return stops.map((s, i) => {
+    if (i === 0) return { ...s, type: 'start' };
+    if (i === n - 1) return { ...s, type: 'destination' };
+    if (s.type === 'overnight') return { ...s, type: 'overnight' };
+    if (s.type === 'fuel') return { ...s, type: 'fuel' };
+    return { ...s, type: 'waypoint' };
+  });
 }
 
 /**

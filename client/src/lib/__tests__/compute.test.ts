@@ -10,6 +10,7 @@ import {
   formatDuration,
   fuelBreakdownForLegs,
   groupByDay,
+  isFuelStop,
   tripTotals,
 } from '../compute';
 import type { Stop } from '../types';
@@ -108,6 +109,35 @@ describe('applyDays', () => {
     const original = JSON.parse(JSON.stringify(stops));
     applyDays(stops, 600);
     expect(stops).toEqual(original);
+  });
+  it("fuel stops don't trigger a day boundary, even when they cross maxKm", () => {
+    // Without the fuel-exemption, gas at 350 km would tip dayKm past 300 and
+    // push the fuel stop to day 2. Fuel stops are pit-stops: they must stay
+    // on the current day so the day boundary lands at the next regular stop.
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'gas', type: 'fuel', kmFromPrevious: 350 }),
+      stop({ id: 'b', kmFromPrevious: 150 }),
+    ];
+    const out = applyDays(stops, 300);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 2]);
+  });
+});
+
+describe('isFuelStop', () => {
+  it('returns true for first-class type=fuel', () => {
+    expect(isFuelStop(stop({ id: 'a', type: 'fuel' }))).toBe(true);
+  });
+  it('returns true for legacy waypoint + category=fuel', () => {
+    expect(isFuelStop(stop({ id: 'a', type: 'waypoint', category: 'fuel' }))).toBe(true);
+  });
+  it('returns false for a plain waypoint', () => {
+    expect(isFuelStop(stop({ id: 'a', type: 'waypoint' }))).toBe(false);
+  });
+  it('returns false when the destination happens to carry category=fuel', () => {
+    // Defensive: a destination shouldn't be treated as a fuel pit-stop even
+    // if some stale category field says 'fuel'. Only middle waypoints qualify.
+    expect(isFuelStop(stop({ id: 'a', type: 'destination', category: 'fuel' }))).toBe(false);
   });
 });
 

@@ -1,8 +1,9 @@
 import { Fragment } from 'react';
-import { groupByDay } from '../../lib/compute';
+import { groupByDay, isFuelStop } from '../../lib/compute';
 import type { Stop, StopRouteMode } from '../../lib/types';
 import { DayHeader } from './DayHeader';
 import { StopRow } from './StopRow';
+import { FuelStopChip } from '../FuelStopChip';
 
 type Props = {
   stops: Stop[];
@@ -46,7 +47,7 @@ export function StopList(p: Props) {
         <Fragment key={g.day}>
           <DayHeader
             day={g.day}
-            stopCount={g.stops.length}
+            stopCount={g.stops.filter((x) => !isFuelStop(x.stop)).length}
             km={g.km}
             durationSeconds={g.durationSeconds}
             startDate={p.startDate}
@@ -70,24 +71,28 @@ export function StopList(p: Props) {
               {p.onInsertAt && (gi > 0 || rowIdxInDay > 0) && (
                 <InsertHere active={p.insertIndex === index} onClick={() => p.onInsertAt!(index)} />
               )}
-              <StopRow
-                stop={stop}
-                index={index}
-                isFirst={index === 0}
-                onChangeType={p.onChangeType}
-                onChangeRouteMode={p.onChangeRouteMode}
-                onRemove={p.onRemove}
-                onSetForceDayStart={p.onSetForceDayStart}
-                onAddHighlight={p.onAddHighlight}
-                onRemoveHighlight={p.onRemoveHighlight}
-                onDemote={p.onDemote}
-                demotingStopId={p.demotingStopId}
-                onDragStart={p.onDragStart}
-                onDragEnd={p.onDragEnd}
-                onDragOver={p.onDragOver}
-                onDragLeave={p.onDragLeave}
-                onDrop={p.onDrop}
-              />
+              {isFuelStop(stop) ? (
+                <FuelStopChip stop={stop} onRemove={() => p.onRemove(stop.id)} />
+              ) : (
+                <StopRow
+                  stop={stop}
+                  index={index}
+                  isFirst={index === 0}
+                  onChangeType={p.onChangeType}
+                  onChangeRouteMode={p.onChangeRouteMode}
+                  onRemove={p.onRemove}
+                  onSetForceDayStart={p.onSetForceDayStart}
+                  onAddHighlight={p.onAddHighlight}
+                  onRemoveHighlight={p.onRemoveHighlight}
+                  onDemote={p.onDemote}
+                  demotingStopId={p.demotingStopId}
+                  onDragStart={p.onDragStart}
+                  onDragEnd={p.onDragEnd}
+                  onDragOver={p.onDragOver}
+                  onDragLeave={p.onDragLeave}
+                  onDrop={p.onDrop}
+                />
+              )}
             </Fragment>
           ))}
         </Fragment>

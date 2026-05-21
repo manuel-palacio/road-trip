@@ -33,7 +33,7 @@ export type Stop = {
   lat: number;
   lng: number;
   countryCode?: string;
-  type: 'start' | 'overnight' | 'waypoint' | 'destination';
+  type: 'start' | 'overnight' | 'waypoint' | 'destination' | 'fuel';
   dayNumber?: number;
   forceDayStart?: boolean;
   highlights?: string[];
@@ -111,11 +111,10 @@ export type Trip = {
   templateTags?: string[];
   cloneCount?: number;
   publishedAt?: unknown;
-  // Schema-version stamp. Trips saved before aa4674d (the
-  // type='overnight' default fix) stored every added stop as
-  // 'overnight'; on load the Builder normalizes intermediate
-  // overnights to 'waypoint' and writes dataVersion=2 on next save
-  // so the migration runs at most once per trip.
+  // Schema-version stamp. v2 normalized stray 'overnight' types; v3
+  // promotes legacy fuel waypoints (type='waypoint' + category='fuel')
+  // to the first-class type='fuel'. Each migration runs at most once
+  // per trip — on first load, then the next save bumps the stamp.
   dataVersion?: number;
   createdAt?: unknown;
   updatedAt?: unknown;

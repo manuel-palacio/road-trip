@@ -62,6 +62,11 @@ describe('reassignStopTypes', () => {
     expect(reassignStopTypes(stops)[1].type).toBe('waypoint');
   });
 
+  it('preserves fuel type for middle stops', () => {
+    const stops = [stop('a', 49, 4), stop('b', 47, 4, 'fuel'), stop('c', 45, 5)];
+    expect(reassignStopTypes(stops)[1].type).toBe('fuel');
+  });
+
   it('handles a single stop (becomes start, even if alone)', () => {
     expect(reassignStopTypes([stop('only', 49, 4)])[0].type).toBe('start');
   });

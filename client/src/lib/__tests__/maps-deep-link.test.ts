@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { aaStatus, buildDayMapsUrl } from '../maps-deep-link';
+import { aaStatus, buildDayMapsUrl, routableStops } from '../maps-deep-link';
 import type { Stop } from '../types';
 
 function s(id: string, lat: number, lng: number): Stop {
   return { id, name: id, label: id, lat, lng, type: 'waypoint' };
+}
+
+function fuel(id: string, lat: number, lng: number): Stop {
+  return { id, name: id, label: id, lat, lng, type: 'fuel' };
+}
+
+function legacyFuel(id: string, lat: number, lng: number): Stop {
+  return { id, name: id, label: id, lat, lng, type: 'waypoint', category: 'fuel' };
 }
 
 describe('aaStatus', () => {
@@ -50,5 +58,36 @@ describe('buildDayMapsUrl', () => {
     expect(url).toContain('waypoints=');
     // Two waypoints (b and c) joined by | which gets URL-encoded
     expect(url).toContain('49%2C8%7C49.5%2C8.5');
+  });
+  it('excludes fuel stops from the directions URL', () => {
+    const stops = [s('a', 48.5, 7.7), fuel('gas', 48.7, 7.8), s('b', 49.0, 8.0)];
+    const url = buildDayMapsUrl(stops);
+    expect(url).toContain('origin=');
+    expect(url).toContain('destination=');
+    // Fuel stop is dropped — no waypoints in a 2-routable-stop URL.
+    expect(url).not.toContain('waypoints=');
+    expect(url).not.toContain('48.7');
+  });
+  it('also excludes legacy fuel waypoints (type=waypoint + category=fuel)', () => {
+    const stops = [s('a', 48.5, 7.7), legacyFuel('gas', 48.7, 7.8), s('b', 49.0, 8.0)];
+    const url = buildDayMapsUrl(stops);
+    expect(url).not.toContain('48.7');
+  });
+});
+
+describe('routableStops', () => {
+  it('drops first-class fuel stops', () => {
+    const stops = [s('a', 0, 0), fuel('f', 0, 0), s('b', 0, 0)];
+    expect(routableStops(stops).map((x) => x.id)).toEqual(['a', 'b']);
+  });
+  it('drops legacy fuel waypoints', () => {
+    const stops = [s('a', 0, 0), legacyFuel('f', 0, 0), s('b', 0, 0)];
+    expect(routableStops(stops).map((x) => x.id)).toEqual(['a', 'b']);
+  });
+  it('keeps non-fuel waypoints even with a different category', () => {
+    const stops: Stop[] = [
+      { id: 'a', name: 'a', label: 'a', lat: 0, lng: 0, type: 'waypoint', category: 'food' },
+    ];
+    expect(routableStops(stops).map((x) => x.id)).toEqual(['a']);
   });
 });
