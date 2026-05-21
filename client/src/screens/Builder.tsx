@@ -429,6 +429,7 @@ export function Builder() {
       styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
+      scaleControl: true,
       gestureHandling: 'greedy',
       backgroundColor: theme.resolved === 'light' ? '#efe8d4' : '#13151a',
       clickableIcons: false,

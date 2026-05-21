@@ -173,6 +173,7 @@ export function Viewer() {
       styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
+      scaleControl: true,
       gestureHandling: 'greedy',
       backgroundColor: '#13151a',
       clickableIcons: false,
