@@ -14,6 +14,7 @@ import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocatio
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { findFuelSearchTarget, type FuelSearchTarget } from '../lib/fuel-stops';
+import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
@@ -102,7 +103,10 @@ const empty = (): BuilderState => ({
   fuelConsumption: '',
   fuelUnit: 'L/100km',
   fuelPrice: '',
-  fuelCurrency: 'EUR',
+  // New trips seed the fuel currency from the browser locale (sv-SE → SEK,
+  // en-US → USD, etc.). Loaded trips keep their stored currency; trips
+  // without one still fall back to EUR at the load site.
+  fuelCurrency: defaultCurrencyForLocale(),
   fuelOverrides: [],
   tankRangeKm: 500,
 });
