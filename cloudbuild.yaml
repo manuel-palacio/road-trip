@@ -1,4 +1,13 @@
 steps:
+  # Gate deploys on the test suite. Uses node:20 (matches the Dockerfile
+  # runtime) so behaviour here matches production.
+  - name: 'node:20'
+    id: 'test'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'npm ci && npm test'
+
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'

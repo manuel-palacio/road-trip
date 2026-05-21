@@ -42,6 +42,19 @@ describe('findFuelSearchTarget', () => {
     expect(target).toBeNull();
   });
 
+  it('never targets the first stop (index 0) even if it claims kmFromPrevious', () => {
+    // Defensive: the very first stop in a trip has no inbound leg, so its
+    // kmFromPrevious is meaningless. Even if some upstream bug populates it
+    // with a huge value, the guard must skip it.
+    const a = stop({ id: 'a', kmFromPrevious: 9999 });
+    const target = findFuelSearchTarget(
+      group(1, [{ stop: a, index: 0 }]),
+      [a],
+      () => undefined,
+    );
+    expect(target).toBeNull();
+  });
+
   it('picks the longest leg in the day (above threshold)', () => {
     const a = stop({ id: 'a', lat: 60, lng: 18 });
     const b = stop({ id: 'b', lat: 59, lng: 18, kmFromPrevious: 100 });
