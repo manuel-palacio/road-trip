@@ -7,6 +7,7 @@ const { effectiveTripLimit } = require('../lib/limits');
 // shared/fuel.js is ESM (so Vite can tree-shake it for the client). This CJS
 // file loads it via dynamic import — the Promise resolves once and is cached.
 const fuelModulePromise = import('../shared/fuel.js');
+const fuelValidationPromise = import('../shared/fuel-validation.js');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -215,9 +216,15 @@ router.put('/api/trips/:id', async (req, res) => {
     if (!canWrite(snap.data(), req.uid)) return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
 
     const body = req.body || {};
+    const { validateFuelField } = await fuelValidationPromise;
     const update = {};
     for (const key of UPDATABLE_FIELDS) {
-      if (key in body) update[key] = body[key];
+      if (!(key in body)) continue;
+      const result = validateFuelField(key, body[key]);
+      if (result && result.error) {
+        return res.status(400).json({ error: result.error, code: 'INVALID' });
+      }
+      update[key] = result ? result.value : body[key];
     }
     update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await ref.update(update);
@@ -228,6 +235,7 @@ router.put('/api/trips/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
   }
 });
+
 
 router.delete('/api/trips/:id', async (req, res) => {
   try {
