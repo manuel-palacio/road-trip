@@ -10,7 +10,8 @@
     "dev": "concurrently -n server,client -c blue,magenta \"npm run dev:server\" \"npm run dev:client\"",
     "build": "vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20"
@@ -35,6 +36,7 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "firebase": "^11.1.0",
+    "husky": "^9.1.7",
     "jsdom": "^25.0.1",
     "nodemon": "^3.1.7",
     "postcss": "^8.4.49",
