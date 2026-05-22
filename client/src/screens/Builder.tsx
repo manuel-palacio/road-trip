@@ -15,6 +15,7 @@ import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptio
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
+import { spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -367,12 +368,14 @@ export function Builder() {
       highlights: [],
       kmFromPrevious: 0,
     };
-    setState((s) => {
-      const stops = [...s.stops];
-      const idx = Math.max(0, Math.min(insertAt, stops.length));
-      stops.splice(idx, 0, newStop);
-      return { ...s, stops: reassignTypes(stops) };
-    });
+    setState((s) => ({
+      ...s,
+      // spliceStopAt also wipes the successor's stale kmFromPrevious — its
+      // inbound leg just changed from (prev→next) to (newStop→next) and
+      // useRouteSegments will refetch. Without the wipe a save during the
+      // refetch window would persist the old A→B distance for the successor.
+      stops: reassignTypes(spliceStopAt(s.stops, insertAt, newStop)),
+    }));
   }
   // Fuel cost — multi-currency breakdown. Each leg is priced by its
   // destination's countryCode against fuelOverrides, falling back to the
