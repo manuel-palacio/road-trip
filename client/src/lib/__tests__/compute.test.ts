@@ -11,6 +11,7 @@ import {
   fuelBreakdownForLegs,
   groupByDay,
   isFuelStop,
+  legCost,
   tripTotals,
 } from '../compute';
 import type { Stop } from '../types';
@@ -286,6 +287,48 @@ describe('fuelBreakdownForLegs', () => {
     ];
     const b = fuelBreakdownForLegs(stops, 7, 'L/100km', 1.80, 'EUR', []);
     expect(b.get('EUR')).toBeCloseTo(7 * 1.80, 5);
+  });
+});
+
+describe('legCost', () => {
+  it('returns null for legs with 0 km', () => {
+    const s = stop({ id: 'a', kmFromPrevious: 0 });
+    expect(legCost(s, 7, 'L/100km', 1.80, 'EUR', [])).toBeNull();
+  });
+
+  it('returns null when consumption is not configured', () => {
+    const s = stop({ id: 'a', kmFromPrevious: 200 });
+    expect(legCost(s, undefined, 'L/100km', 1.80, 'EUR', [])).toBeNull();
+    expect(legCost(s, 0, 'L/100km', 1.80, 'EUR', [])).toBeNull();
+  });
+
+  it('returns null when price is not configured', () => {
+    const s = stop({ id: 'a', kmFromPrevious: 200 });
+    expect(legCost(s, 7, 'L/100km', undefined, 'EUR', [])).toBeNull();
+  });
+
+  it('returns amount + default currency when no override matches', () => {
+    const s = stop({ id: 'a', countryCode: 'FR', kmFromPrevious: 100 });
+    const result = legCost(s, 7, 'L/100km', 1.80, 'EUR', []);
+    expect(result?.currency).toBe('EUR');
+    expect(result?.amount).toBeCloseTo(12.6, 1); // 100km * 7L/100 = 7L * 1.80 = 12.60
+  });
+
+  it('routes leg to override price + currency when destination country matches', () => {
+    const s = stop({ id: 'a', countryCode: 'GB', kmFromPrevious: 100 });
+    const result = legCost(s, 7, 'L/100km', 1.80, 'EUR', [
+      { countryCode: 'GB', price: 1.50, currency: 'GBP' },
+    ]);
+    expect(result?.currency).toBe('GBP');
+    expect(result?.amount).toBeCloseTo(10.5, 1); // 100km * 7L/100 = 7L * 1.50 = 10.50
+  });
+
+  it('falls back to default when override has zero price', () => {
+    const s = stop({ id: 'a', countryCode: 'GB', kmFromPrevious: 100 });
+    const result = legCost(s, 7, 'L/100km', 1.80, 'EUR', [
+      { countryCode: 'GB', price: 0, currency: 'GBP' },
+    ]);
+    expect(result?.currency).toBe('EUR');
   });
 });
 

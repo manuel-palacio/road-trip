@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
+import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { longestLegOverRange } from '../lib/fuel-stops';
@@ -110,6 +111,14 @@ export function Share() {
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const pinMarkersRef = useRef<google.maps.Marker[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+
+  useLegCostMarkers(maps, map, dayedStops, {
+    consumption: trip?.fuelConsumption,
+    unit: trip?.fuelUnit,
+    defaultPrice: trip?.fuelPrice,
+    defaultCurrency: trip?.fuelCurrency,
+    overrides: trip?.fuelOverrides,
+  });
 
   useEffect(() => {
     if (!maps || !mapDiv || map) return;

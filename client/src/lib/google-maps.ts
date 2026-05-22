@@ -109,6 +109,30 @@ export function mapStyleForDropModeForTheme(theme: 'light' | 'dark'): google.map
   return theme === 'light' ? mapStyleForDropMode_light() : mapStyleForDropMode();
 }
 
+/** Small pill-shaped label rendered at a polyline midpoint to show the fuel
+ * cost of a leg ("€18", "£12", "158 kr"). Dynamically sized in width to fit
+ * the label text — Google Maps anchors at the centre so the chip floats
+ * over the route without obscuring stop markers. */
+export function makeCostChipIcon(text: string): google.maps.Icon {
+  // ~7.5px per char in 11px mono is a decent approximation. Floor on chars,
+  // pad horizontally for the rounded ends.
+  const charW = 7.5;
+  const padX = 8;
+  const w = Math.max(36, Math.round(text.length * charW + padX * 2));
+  const h = 22;
+  const cy = h / 2 + 4; // baseline tweak for the 11px text
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
+    `<rect x='0.5' y='0.5' width='${w - 1}' height='${h - 1}' rx='${h / 2}' fill='#f3ecde' stroke='#6b6358' stroke-width='1'/>` +
+    `<text x='${w / 2}' y='${cy}' text-anchor='middle' font-family='ui-monospace,Menlo,monospace' font-size='11' font-weight='600' fill='#0d0e11'>${text}</text>` +
+    `</svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    anchor: new google.maps.Point(w / 2, h / 2),
+    scaledSize: new google.maps.Size(w, h),
+  };
+}
+
 export function makeMarkerIcon(num: number, ringColor = '#f3ecde', isFuel = false): google.maps.Icon {
   // Cream center with day-color outer ring, dark number — keeps numbers
   // legible across all day color hues. Fuel stops swap the number for

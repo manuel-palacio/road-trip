@@ -20,31 +20,49 @@ export function estimateFuelCost(km, consumption, unit, pricePerUnit) {
   return litres * pricePerUnit;
 }
 
+/** Resolve the (price, currency) that should apply to a leg ending at `stop`.
+ * Returns the matching fuelOverride when one exists and is complete, otherwise
+ * the trip-level defaults. Shared by per-leg and per-trip cost calculations. */
+function resolveLegPrice(stop, defaultPrice, defaultCurrency, overrides) {
+  const cc = (stop.countryCode || '').toUpperCase();
+  const safeOverrides = Array.isArray(overrides) ? overrides : [];
+  const rawOv = cc
+    ? safeOverrides.find((o) => (o.countryCode || '').toUpperCase() === cc)
+    : null;
+  // Only honour an override when both price and currency are valid — otherwise
+  // we'd display the default price under the override's currency, which is
+  // semantically wrong.
+  const ov = rawOv && rawOv.price > 0 && rawOv.currency ? rawOv : null;
+  return {
+    price: ov ? ov.price : (defaultPrice != null ? defaultPrice : 0),
+    currency: (ov ? ov.currency : (defaultCurrency || 'EUR')).toUpperCase(),
+  };
+}
+
+/** Fuel cost for a single leg (defined by `stop.kmFromPrevious` and the
+ * override that matches `stop.countryCode`). Returns null when km is 0 or
+ * the consumption/price config isn't usable. Used by the map's per-leg
+ * cost chips and as the inner loop of fuelBreakdownForLegs. */
+export function legCost(stop, consumption, unit, defaultPrice, defaultCurrency, overrides) {
+  const km = stop.kmFromPrevious || 0;
+  if (km <= 0) return null;
+  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return null;
+  const { price, currency } = resolveLegPrice(stop, defaultPrice, defaultCurrency, overrides);
+  const amount = estimateFuelCost(km, consumption, unit, price);
+  if (amount == null || amount <= 0) return null;
+  return { amount, currency };
+}
+
 /** Compute a per-currency breakdown of fuel cost across a set of legs.
  * Each stop contributes a leg priced by its destination's countryCode:
  * if an override matches, use override's (price, currency); otherwise the
  * trip-level defaults. Returns a Map keyed by uppercase currency code. */
 export function fuelBreakdownForLegs(stops, consumption, unit, defaultPrice, defaultCurrency, overrides) {
   const out = new Map();
-  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return out;
-  const defCur = (defaultCurrency || 'EUR').toUpperCase();
-  const safeOverrides = Array.isArray(overrides) ? overrides : [];
   for (const stop of stops) {
-    const km = stop.kmFromPrevious || 0;
-    if (km <= 0) continue;
-    const cc = (stop.countryCode || '').toUpperCase();
-    const rawOv = cc
-      ? safeOverrides.find((o) => (o.countryCode || '').toUpperCase() === cc)
-      : null;
-    // Only honour an override when both price and currency are valid — otherwise
-    // we'd display the default price under the override's currency, which is
-    // semantically wrong.
-    const ov = rawOv && rawOv.price > 0 && rawOv.currency ? rawOv : null;
-    const price = ov ? ov.price : (defaultPrice != null ? defaultPrice : 0);
-    const currency = (ov ? ov.currency : defCur).toUpperCase();
-    const cost = estimateFuelCost(km, consumption, unit, price);
-    if (cost == null || cost <= 0) continue;
-    out.set(currency, (out.get(currency) || 0) + cost);
+    const cost = legCost(stop, consumption, unit, defaultPrice, defaultCurrency, overrides);
+    if (!cost) continue;
+    out.set(cost.currency, (out.get(cost.currency) || 0) + cost.amount);
   }
   return out;
 }

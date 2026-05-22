@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
+import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
@@ -396,6 +397,13 @@ export function Builder() {
     );
     return formatBreakdown(b);
   }, [dayedStops, fuelConsumptionNum, fuelPriceNum, state.fuelUnit, state.fuelCurrency, compiledOverrides]);
+  useLegCostMarkers(maps, map, dayedStops, {
+    consumption: Number.isFinite(fuelConsumptionNum) && fuelConsumptionNum > 0 ? fuelConsumptionNum : undefined,
+    unit: state.fuelUnit,
+    defaultPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
+    defaultCurrency: state.fuelCurrency,
+    overrides: compiledOverrides,
+  });
   function fuelCostForStops(stops: Stop[]): string | null {
     const b = fuelBreakdownForLegs(
       stops,

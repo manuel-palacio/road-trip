@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '../hooks/useConfig';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
+import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePromotePin } from '../hooks/usePromoteAction';
@@ -163,6 +164,14 @@ export function Viewer() {
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const stopInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const pinLayerRef = useRef<PinMapLayerHandle>(null);
+
+  useLegCostMarkers(maps, map, dayedStops, {
+    consumption: trip?.fuelConsumption,
+    unit: trip?.fuelUnit,
+    defaultPrice: trip?.fuelPrice,
+    defaultCurrency: trip?.fuelCurrency,
+    overrides: trip?.fuelOverrides,
+  });
 
   // Init map
   useEffect(() => {

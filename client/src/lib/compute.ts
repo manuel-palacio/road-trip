@@ -6,10 +6,11 @@ import type { Stop } from './types';
 export {
   estimateFuelCost,
   fuelBreakdownForLegs,
+  legCost,
   formatCurrency,
   formatBreakdown,
 } from '../../../shared/fuel';
-export type { FuelBreakdown } from '../../../shared/fuel';
+export type { FuelBreakdown, LegCost } from '../../../shared/fuel';
 
 /* Custom day color palette — muted inks matching the editorial cartography theme.
    Cycles past 10 days. */

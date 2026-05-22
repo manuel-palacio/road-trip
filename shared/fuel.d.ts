@@ -18,6 +18,17 @@ export function fuelBreakdownForLegs(
   overrides: FuelOverride[] | undefined,
 ): FuelBreakdown;
 
+export type LegCost = { amount: number; currency: string };
+
+export function legCost(
+  stop: Stop,
+  consumption: number | undefined | null,
+  unit: FuelUnit | undefined,
+  defaultPrice: number | undefined | null,
+  defaultCurrency: string | undefined,
+  overrides: FuelOverride[] | undefined,
+): LegCost | null;
+
 export function formatCurrency(
   amount: number,
   currency: string | undefined,
