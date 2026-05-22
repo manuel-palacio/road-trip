@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spliceStopAt } from '../stop-ops';
+import { removeStopById, spliceStopAt } from '../stop-ops';
 import type { Stop } from '../types';
 
 function s(id: string, overrides: Partial<Stop> = {}): Stop {
@@ -70,5 +70,72 @@ describe('spliceStopAt', () => {
     const stops = [s('a'), s('b')];
     expect(spliceStopAt(stops, -10, s('first')).map((x) => x.id)).toEqual(['first', 'a', 'b']);
     expect(spliceStopAt(stops, 999, s('last')).map((x) => x.id)).toEqual(['a', 'b', 'last']);
+  });
+
+  it('also wipes the successor stale routePath after insertion', () => {
+    const stops = [
+      s('a'),
+      s('b', {
+        kmFromPrevious: 400,
+        routePath: [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }],
+      }),
+    ];
+    const out = spliceStopAt(stops, 1, s('fuel'));
+    expect(out.find((x) => x.id === 'b')!.routePath).toBeUndefined();
+  });
+});
+
+describe('removeStopById', () => {
+  it('removes a stop by id', () => {
+    const stops = [s('a'), s('b'), s('c')];
+    expect(removeStopById(stops, 'b').map((x) => x.id)).toEqual(['a', 'c']);
+  });
+
+  it('does not mutate the input', () => {
+    const stops = [s('a'), s('b'), s('c')];
+    const copy = stops.map((x) => ({ ...x }));
+    removeStopById(stops, 'b');
+    expect(stops.map((x) => x.id)).toEqual(copy.map((x) => x.id));
+  });
+
+  it("clears the new-successor's stale km/duration/routePath after removing a middle stop", () => {
+    // [A, Fuel, B] → remove Fuel → B's predecessor becomes A, but B still
+    // carries Fuel→B km / path. Must be wiped.
+    const stops = [
+      s('a'),
+      s('fuel'),
+      s('b', {
+        kmFromPrevious: 200,
+        durationFromPrevious: '~2h',
+        durationSecondsFromPrevious: 7200,
+        routePath: [{ lat: 5, lng: 5 }, { lat: 6, lng: 6 }],
+      }),
+    ];
+    const out = removeStopById(stops, 'fuel');
+    const successor = out.find((x) => x.id === 'b')!;
+    expect(successor.kmFromPrevious).toBe(0);
+    expect(successor.durationFromPrevious).toBe('');
+    expect(successor.durationSecondsFromPrevious).toBe(0);
+    expect(successor.routePath).toBeUndefined();
+  });
+
+  it('removing the last stop does not touch any other stop', () => {
+    const stops = [s('a'), s('b', { kmFromPrevious: 300 })];
+    const out = removeStopById(stops, 'b');
+    expect(out.map((x) => x.id)).toEqual(['a']);
+  });
+
+  it('removing the first stop wipes the new-first stop inbound leg fields', () => {
+    // After removal, the previous index-1 stop is now at index 0 and has no
+    // inbound leg at all. Wiping is the right call.
+    const stops = [s('a'), s('b', { kmFromPrevious: 100 })];
+    const out = removeStopById(stops, 'a');
+    expect(out[0].id).toBe('b');
+    expect(out[0].kmFromPrevious).toBe(0);
+  });
+
+  it('no-op when id not found', () => {
+    const stops = [s('a'), s('b')];
+    expect(removeStopById(stops, 'missing').map((x) => x.id)).toEqual(['a', 'b']);
   });
 });

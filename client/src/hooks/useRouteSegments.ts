@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Stop, StopRouteMode } from '../lib/types';
 import { formatDuration } from '../lib/compute';
+import { pathMatchesEndpoints } from '../lib/route-path';
 
 type Segment = {
   km: number;
@@ -59,7 +60,43 @@ function loadRoutesLib(maps: typeof google.maps): Promise<RoutesLibrary> {
   return routesLibPromise;
 }
 
+/** Seed the module-scoped cache from any persisted routePath on the stops.
+ * Synchronous on purpose: lets the first paint of a freshly-loaded trip
+ * render polylines + distances without waiting for a Routes API call.
+ *
+ * Guard: the persisted path lives on `to.routePath` but only knows its
+ * endpoints geographically. If the user has inserted, removed, or
+ * reordered stops since save, `to`'s actual predecessor changed and the
+ * path is stale. pathMatchesEndpoints rejects that case so the fetch
+ * loop below can re-route the leg from scratch. */
+function seedCacheFromPersistedPaths(stops: readonly Stop[]): boolean {
+  let seeded = false;
+  for (let i = 1; i < stops.length; i++) {
+    const from = stops[i - 1];
+    const to = stops[i];
+    const key = pairKey(from.id, to.id, to.routeMode);
+    if (cache.has(key)) continue;
+    const path = to.routePath;
+    if (!path || path.length < 2) continue;
+    if (!pathMatchesEndpoints(path, { lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng })) {
+      continue;
+    }
+    cache.set(key, {
+      km: to.kmFromPrevious || 0,
+      durationSeconds: to.durationSecondsFromPrevious || 0,
+      path,
+    });
+    seeded = true;
+  }
+  return seeded;
+}
+
 export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null) {
+  // Synchronous cache seeding — runs every render but cache.set is cheap and
+  // idempotent. Mirrors the existing "cache is mutated freely from inside the
+  // hook" pattern of the fetch loop below.
+  seedCacheFromPersistedPaths(stops);
+
   const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(false);
   const [lastFailure, setLastFailure] = useState<string | null>(null);
@@ -142,11 +179,8 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
         kmFromPrevious: seg.km,
         durationSecondsFromPrevious: seg.durationSeconds,
         durationFromPrevious: formatDuration(seg.durationSeconds),
-        // path goes on a sibling field so it survives re-renders without persisting through save
-        // @ts-expect-error — added at runtime, not in Stop type
-        _path: seg.path,
-        // @ts-expect-error — added at runtime
-        _routingFailed: !!seg.failed,
+        routePath: seg.path,
+        routingFailed: !!seg.failed,
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,10 +189,11 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
   return { enriched, loading, lastFailure, clearFailure: () => setLastFailure(null) };
 }
 
-/** Path data attached to enriched stops, kept off-type for cleaner Stop shape. */
+/** Convenience accessors — the underlying fields are typed but consumers
+ * tend to ask "does this stop have a path / did routing fail" generically. */
 export function getStopPath(stop: Stop): { lat: number; lng: number }[] | undefined {
-  return (stop as unknown as { _path?: { lat: number; lng: number }[] })._path;
+  return stop.routePath;
 }
 export function getStopRoutingFailed(stop: Stop): boolean {
-  return !!(stop as unknown as { _routingFailed?: boolean })._routingFailed;
+  return !!stop.routingFailed;
 }

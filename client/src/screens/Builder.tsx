@@ -15,7 +15,8 @@ import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptio
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
-import { spliceStopAt } from '../lib/stop-ops';
+import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
+import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -604,7 +605,7 @@ export function Builder() {
     setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? { ...x, type } : x)) }));
   }
   function removeStop(id: string) {
-    setState((s) => ({ ...s, stops: reassignTypes(s.stops.filter((x) => x.id !== id)) }));
+    setState((s) => ({ ...s, stops: reassignTypes(removeStopById(s.stops, id)) }));
   }
   function setForceDayStart(id: string, value: boolean) {
     setState((s) => ({
@@ -781,22 +782,33 @@ export function Builder() {
         fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
         tankRangeKm: state.tankRangeKm > 0 ? state.tankRangeKm : undefined,
         dataVersion: 3,
-        stops: stops.map((s) => ({
-          id: s.id, name: s.name, label: s.label,
-          lat: s.lat, lng: s.lng,
-          countryCode: s.countryCode || '',
-          type: s.type,
-          dayNumber: s.dayNumber || 1,
-          highlights: s.highlights || [],
-          kmFromPrevious: s.kmFromPrevious || 0,
-          durationFromPrevious: s.durationFromPrevious || '',
-          durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
-          ...(s.routeMode ? { routeMode: s.routeMode } : {}),
-          ...(s.category ? { category: s.category } : {}),
-          ...(s.priority ? { priority: s.priority } : {}),
-          ...(s.notes ? { notes: s.notes } : {}),
-          ...(s.forceDayStart ? { forceDayStart: true } : {}),
-        })),
+        stops: stops.map((s) => {
+          // Persist the polyline path so viewer / share / next-builder-open
+          // can re-render the route without re-hitting the Routes API. The
+          // raw path can be 1000+ points for long legs; downsample to keep
+          // the Firestore document modest.
+          const path = s.routePath;
+          const persistablePath = path && path.length >= 2
+            ? downsamplePath(path, MAX_ROUTE_PATH_POINTS)
+            : null;
+          return {
+            id: s.id, name: s.name, label: s.label,
+            lat: s.lat, lng: s.lng,
+            countryCode: s.countryCode || '',
+            type: s.type,
+            dayNumber: s.dayNumber || 1,
+            highlights: s.highlights || [],
+            kmFromPrevious: s.kmFromPrevious || 0,
+            durationFromPrevious: s.durationFromPrevious || '',
+            durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
+            ...(s.routeMode ? { routeMode: s.routeMode } : {}),
+            ...(s.category ? { category: s.category } : {}),
+            ...(s.priority ? { priority: s.priority } : {}),
+            ...(s.notes ? { notes: s.notes } : {}),
+            ...(s.forceDayStart ? { forceDayStart: true } : {}),
+            ...(persistablePath ? { routePath: persistablePath } : {}),
+          };
+        }),
       };
       let saved: Trip;
       if (state.tripId) {

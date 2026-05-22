@@ -55,6 +55,14 @@ export type Stop = {
   category?: PinCategory;
   priority?: PinPriority;
   notes?: string;
+  /** Polyline path for the leg arriving at this stop, persisted on save so
+   * viewers don't re-call the Routes API just to re-draw the line. Hydrated
+   * back into the in-memory route cache by useRouteSegments at load time.
+   * First stop in a trip has no inbound leg and omits this. */
+  routePath?: { lat: number; lng: number }[];
+  /** True when the Routes API failed for this leg in the last fetch — used
+   * by the builder to flag the row visually. Not persisted across saves. */
+  routingFailed?: boolean;
 };
 
 export type PinCategory = 'food' | 'hotel' | 'scenic' | 'fuel' | 'landmark' | 'other';
