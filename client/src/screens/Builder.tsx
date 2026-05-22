@@ -10,10 +10,10 @@ import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
-import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
+import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
-import { findFuelSearchTarget, type FuelSearchTarget } from '../lib/fuel-stops';
+import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -334,19 +334,31 @@ export function Builder() {
   function fuelTargetForDay(day: number): FuelSearchTarget | null {
     const g = dayGroups.find((x) => x.day === day);
     if (!g) return null;
-    return findFuelSearchTarget(g, dayedStops, getStopPath, state.tankRangeKm);
+    // Manual "+ Fuel stop" button: target the day's longest leg unconditionally.
+    // tankRangeKm gates the WARNING chip (longestLegOverRange) but should not
+    // block the user from explicitly adding a fuel stop on a short-leg day.
+    return findLongestLegTarget(g, dayedStops, getStopPath);
   }
   function openFuelForDay(day: number) {
     const target = fuelTargetForDay(day);
     if (!target) return;
     setFuelTarget(target);
   }
-  function onFuelStopSelected(result: FuelStopResult) {
+  async function onFuelStopSelected(result: FuelStopResult) {
     if (!fuelTarget) return;
+    const insertAt = fuelTarget.insertAtFlatIndex;
+    setFuelTarget(null);
+    // Look up the locality so the chip reads "Grenoble" instead of
+    // "Circle K Grenoble Autoroute A48". The full station name stays on `name`
+    // for detail views + deep links. Falls back to "Fuel stop" when the
+    // Places Details call can't resolve a usable locality.
+    const locality = maps && map
+      ? await lookupLocalityForPlace(maps, map, result.placeId).catch(() => null)
+      : null;
     const newStop: Stop = {
       id: crypto.randomUUID(),
       name: result.name,
-      label: result.name,
+      label: locality ?? 'Fuel stop',
       lat: result.lat,
       lng: result.lng,
       type: 'fuel',
@@ -356,11 +368,10 @@ export function Builder() {
     };
     setState((s) => {
       const stops = [...s.stops];
-      const idx = Math.max(0, Math.min(fuelTarget.insertAtFlatIndex, stops.length));
+      const idx = Math.max(0, Math.min(insertAt, stops.length));
       stops.splice(idx, 0, newStop);
       return { ...s, stops: reassignTypes(stops) };
     });
-    setFuelTarget(null);
   }
   // Fuel cost — multi-currency breakdown. Each leg is priced by its
   // destination's countryCode against fuelOverrides, falling back to the

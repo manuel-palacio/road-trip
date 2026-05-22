@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findFuelSearchTarget, longestLegOverRange } from '../fuel-stops';
+import { findFuelSearchTarget, findLongestLegTarget, longestLegOverRange } from '../fuel-stops';
 import type { DayGroup } from '../compute';
 import type { Stop } from '../types';
 
@@ -177,6 +177,46 @@ describe('findFuelSearchTarget', () => {
     expect(target!.legStart.id).toBe('a');
     expect(target!.legEnd.id).toBe('b');
     expect(target!.insertAtFlatIndex).toBe(1);
+  });
+});
+
+describe('findLongestLegTarget (unconditional — drives the manual + Fuel stop button)', () => {
+  it('returns null for a single-stop day', () => {
+    const a = stop({ id: 'a' });
+    expect(
+      findLongestLegTarget(group(1, [{ stop: a, index: 0 }]), [a], () => undefined),
+    ).toBeNull();
+  });
+
+  it('returns null when every leg is 0 km', () => {
+    const a = stop({ id: 'a' });
+    const b = stop({ id: 'b', kmFromPrevious: 0 });
+    expect(
+      findLongestLegTarget(
+        group(1, [{ stop: a, index: 0 }, { stop: b, index: 1 }]),
+        [a, b],
+        () => undefined,
+      ),
+    ).toBeNull();
+  });
+
+  it('returns the longest leg even when below the conventional 500 km tank range', () => {
+    // Regression: before the fix, the + Fuel stop button hid on all-short-leg
+    // trips because findFuelSearchTarget gated on tankRangeKm. Manual entry
+    // must remain available regardless.
+    const a = stop({ id: 'a' });
+    const b = stop({ id: 'b', kmFromPrevious: 250 });
+    const c = stop({ id: 'c', kmFromPrevious: 180 });
+    const target = findLongestLegTarget(
+      group(1, [
+        { stop: a, index: 0 }, { stop: b, index: 1 }, { stop: c, index: 2 },
+      ]),
+      [a, b, c],
+      () => undefined,
+    );
+    expect(target).not.toBeNull();
+    expect(target!.legKm).toBe(250);
+    expect(target!.legEnd.id).toBe('b');
   });
 });
 

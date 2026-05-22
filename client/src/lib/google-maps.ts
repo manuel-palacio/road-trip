@@ -203,3 +203,47 @@ export function requestGeolocation(): Promise<{ lat: number; lng: number } | nul
     );
   });
 }
+
+/** Minimal shape of a Google Maps address component — enough to extract a
+ * locality without pulling in the global google namespace types. */
+export type AddressComponent = {
+  types: string[];
+  long_name?: string;
+  short_name?: string;
+};
+
+/** Pick the best locality-like label from a list of address components.
+ * Prefers 'locality' (most countries), falls back to 'postal_town' (UK), then
+ * the smaller administrative areas. Returns null when nothing usable is found
+ * so the caller can apply its own default (e.g. "Fuel stop"). */
+export function localityFromAddressComponents(
+  components: readonly AddressComponent[] | undefined,
+): string | null {
+  if (!components || components.length === 0) return null;
+  const pick = (...wanted: string[]) =>
+    components.find((c) => wanted.some((w) => c.types.includes(w)));
+  const candidate =
+    pick('locality') ||
+    pick('postal_town') ||
+    pick('administrative_area_level_3') ||
+    pick('administrative_area_level_2');
+  if (!candidate) return null;
+  return candidate.short_name || candidate.long_name || null;
+}
+
+/** Look up the locality (city) for a Google Places place_id via the legacy
+ * PlacesService. Resolves to null on any error so callers can fall back. */
+export function lookupLocalityForPlace(
+  maps: typeof google.maps,
+  map: google.maps.Map,
+  placeId: string,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!placeId) return resolve(null);
+    const service = new maps.places.PlacesService(map);
+    service.getDetails({ placeId, fields: ['address_components'] }, (place, status) => {
+      if (status !== maps.places.PlacesServiceStatus.OK || !place) return resolve(null);
+      resolve(localityFromAddressComponents(place.address_components as AddressComponent[] | undefined));
+    });
+  });
+}

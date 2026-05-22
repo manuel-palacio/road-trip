@@ -28,7 +28,14 @@ export type MeResponse = {
 
 export type Stop = {
   id: string;
+  /** Full place name from search/geocoding. Preserved for detail panels,
+   * info windows, and deep links (e.g. Google Maps). For fuel stops this is
+   * the Places API station name like "Circle K Grenoble Autoroute A48". */
   name: string;
+  /** Short display label shown in map markers, stop list, and chips. For
+   * fuel stops this is the locality (city) name when reverse geocoding
+   * resolves one, falling back to "Fuel stop". For user-added stops it
+   * defaults to the same value as `name` unless the user overrode it. */
   label: string;
   lat: number;
   lng: number;

@@ -20,15 +20,13 @@ export type FuelSearchTarget = {
   legKm: number;
 };
 
-/** Find the longest leg in a day that exceeds `tankRangeKm`, plus enough
- * metadata to insert a new stop at the right position. Returns null when
- * no leg crosses the threshold — i.e. the day has no real refuel pressure.
- * tankRangeKm defaults to 500 km when omitted. */
-export function findFuelSearchTarget(
+/** Find the longest leg in a day, unconditional on tank range. Used by the
+ * manual "+ Fuel stop" button — when the user explicitly asks for a fuel
+ * stop suggestion, we should always honour it regardless of refuel pressure. */
+export function findLongestLegTarget(
   group: DayGroup,
   allStops: readonly Stop[],
   getPath: (stop: Stop) => { lat: number; lng: number }[] | undefined,
-  tankRangeKm: number = DEFAULT_TANK_RANGE_KM,
 ): FuelSearchTarget | null {
   let maxKm = 0;
   let endIdx = -1;
@@ -36,14 +34,12 @@ export function findFuelSearchTarget(
     // The first stop in the trip has no inbound leg; skip it.
     if (index === 0) continue;
     const km = stop.kmFromPrevious || 0;
-    // Only target legs that genuinely exceed the tank range. A 200 km leg
-    // on a 500 km tank doesn't need a pit-stop suggestion.
-    if (km > tankRangeKm && km > maxKm) {
+    if (km > maxKm) {
       maxKm = km;
       endIdx = index;
     }
   }
-  if (endIdx < 0) return null;
+  if (endIdx < 0 || maxKm <= 0) return null;
   const legStart = allStops[endIdx - 1];
   const legEnd = allStops[endIdx];
   if (!legStart || !legEnd) return null;
@@ -57,6 +53,21 @@ export function findFuelSearchTarget(
         lng: (legStart.lng + legEnd.lng) / 2,
       };
   return { midpoint, insertAtFlatIndex: endIdx, legStart, legEnd, legKm: maxKm };
+}
+
+/** Find the longest leg in a day that exceeds `tankRangeKm`. Returns null
+ * when no leg crosses the threshold — i.e. the day has no real refuel
+ * pressure. Drives the auto-suggestion / warning paths. The manual button
+ * uses findLongestLegTarget instead so the user can always add a fuel stop. */
+export function findFuelSearchTarget(
+  group: DayGroup,
+  allStops: readonly Stop[],
+  getPath: (stop: Stop) => { lat: number; lng: number }[] | undefined,
+  tankRangeKm: number = DEFAULT_TANK_RANGE_KM,
+): FuelSearchTarget | null {
+  const target = findLongestLegTarget(group, allStops, getPath);
+  if (!target || target.legKm <= tankRangeKm) return null;
+  return target;
 }
 
 /** Returns the km of the longest single leg in a day that exceeds
