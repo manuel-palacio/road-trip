@@ -22,20 +22,40 @@ type Props = {
    * price). The visual de-emphasis (issue #57 AC3) matches save behavior —
    * what the user sees dimmed is what won't be sent. */
   matchesDefault: boolean;
-  /** Placeholder shown in the price input when the override is empty —
-   * the trip's global default price so the user sees what they'd be
-   * overriding. */
-  globalPriceHint: string;
+  /** Trip-level default price + currency. The row uses these to decide
+   * whether to show the global price as a placeholder hint — but ONLY
+   * when this row's currency matches the global one. Showing "20" (a
+   * SEK global) as a placeholder in an EUR row reads to users as
+   * "20 EUR" which is misleading. */
+  globalPrice: string;
+  globalCurrency: string;
   /** All currencies the user can pick from for this row. */
   currencies: ReadonlyArray<FuelCurrencyOption>;
   onChange: (patch: { price?: string; currency?: string }) => void;
 };
+
+/** Compute the placeholder shown in the price input for a row.
+ * Suppresses the global hint when this row's currency differs from
+ * the global one — see the prop comment for the reasoning. Pure.
+ * Exported so the behavior is directly unit-testable. */
+export function placeholderPriceFor(
+  rowCurrency: string,
+  globalPrice: string,
+  globalCurrency: string,
+): string {
+  if (!globalPrice) return '';
+  const rc = (rowCurrency || '').toUpperCase();
+  const gc = (globalCurrency || '').toUpperCase();
+  if (rc !== gc) return '';
+  return globalPrice;
+}
 
 /** A single per-country fuel-price override row. Auto-populated from the
  * trip's visited countries (issue #57): empty rows render dimmed and
  * aren't persisted; the user only needs to edit countries whose price
  * differs from the global default. */
 export function CountryOverrideRow(p: Props) {
+  const placeholder = placeholderPriceFor(p.currency, p.globalPrice, p.globalCurrency) || '—';
   return (
     <div
       data-testid="country-override-row"
@@ -54,7 +74,7 @@ export function CountryOverrideRow(p: Props) {
         min={0}
         step={0.01}
         inputMode="decimal"
-        placeholder={p.globalPriceHint || '—'}
+        placeholder={placeholder}
         value={p.price}
         onChange={(e) => p.onChange({ price: e.target.value })}
         className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted min-w-0"

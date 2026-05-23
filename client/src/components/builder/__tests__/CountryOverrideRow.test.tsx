@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CountryOverrideRow } from '../CountryOverrideRow';
+import { CountryOverrideRow, placeholderPriceFor } from '../CountryOverrideRow';
 
 // Issue #57 — component tests for the auto-populated per-country
 // override row. The data-layer side (tripCountriesFromStops + compiled
@@ -20,7 +20,8 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof CountryOverrid
     price: '',
     currency: 'SEK',
     matchesDefault: true,
-    globalPriceHint: '1.85',
+    globalPrice: '1.85',
+    globalCurrency: 'SEK',
     currencies: CURRENCIES,
     onChange: () => {},
     ...overrides,
@@ -34,10 +35,36 @@ describe('CountryOverrideRow (issue #57)', () => {
     const priceInput = screen.getByLabelText('Price for Sweden') as HTMLInputElement;
     // Empty value — pre-filled "default" semantics via empty input + placeholder
     expect(priceInput.value).toBe('');
-    // Placeholder shows the global price the user would be overriding
+    // Placeholder shows the global price because this row's currency
+    // matches the global currency (SEK === SEK).
     expect(priceInput.placeholder).toBe('1.85');
     const currencySelect = screen.getByLabelText('Currency for Sweden') as HTMLSelectElement;
     expect(currencySelect.value).toBe('SEK');
+  });
+  it('placeholder suppressed when row currency differs from global (DE row, SEK global)', () => {
+    // User-reported bug: setting SE=20 SEK then adding a DE stop made the
+    // DE row appear to "auto-populate to 20 EUR" because the placeholder
+    // shows the global NUMBER without currency, next to an EUR dropdown.
+    render(
+      <CountryOverrideRow
+        {...baseProps({
+          code: 'DE', name: 'Germany',
+          currency: 'EUR', defaultCurrency: 'EUR',
+          globalPrice: '20', globalCurrency: 'SEK',
+        })}
+      />,
+    );
+    const priceInput = screen.getByLabelText('Price for Germany') as HTMLInputElement;
+    expect(priceInput.placeholder).toBe('—');
+  });
+  it('placeholder is "—" when no global price configured', () => {
+    render(
+      <CountryOverrideRow
+        {...baseProps({ globalPrice: '', globalCurrency: 'EUR', currency: 'EUR' })}
+      />,
+    );
+    const priceInput = screen.getByLabelText(/Price for/i) as HTMLInputElement;
+    expect(priceInput.placeholder).toBe('—');
   });
   it('AC3: dims (opacity-60) when matchesDefault=true', () => {
     const { container } = render(<CountryOverrideRow {...baseProps({ matchesDefault: true })} />);
@@ -73,5 +100,28 @@ describe('CountryOverrideRow (issue #57)', () => {
     const { container } = render(<CountryOverrideRow {...baseProps({ code: 'DE', name: 'Germany' })} />);
     const row = container.querySelector('[data-testid="country-override-row"]') as HTMLElement;
     expect(row).toHaveAttribute('data-country', 'DE');
+  });
+});
+
+describe('placeholderPriceFor (pure)', () => {
+  it('returns global price when row currency matches global', () => {
+    expect(placeholderPriceFor('SEK', '20', 'SEK')).toBe('20');
+    expect(placeholderPriceFor('EUR', '1.85', 'EUR')).toBe('1.85');
+  });
+  it('returns empty string when currencies differ', () => {
+    expect(placeholderPriceFor('EUR', '20', 'SEK')).toBe('');
+    expect(placeholderPriceFor('DKK', '20', 'SEK')).toBe('');
+  });
+  it('returns empty string when global price is empty/missing', () => {
+    expect(placeholderPriceFor('SEK', '', 'SEK')).toBe('');
+    expect(placeholderPriceFor('EUR', '', 'EUR')).toBe('');
+  });
+  it('compares currencies case-insensitively', () => {
+    expect(placeholderPriceFor('eur', '1.85', 'EUR')).toBe('1.85');
+    expect(placeholderPriceFor('SEK', '20', 'sek')).toBe('20');
+  });
+  it('treats missing/empty currency strings as non-matching', () => {
+    expect(placeholderPriceFor('', '20', 'EUR')).toBe('');
+    expect(placeholderPriceFor('EUR', '20', '')).toBe('');
   });
 });

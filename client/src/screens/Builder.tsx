@@ -1141,7 +1141,8 @@ export function Builder() {
                     price={price}
                     currency={currency}
                     matchesDefault={matchesDefault}
-                    globalPriceHint={state.fuelPrice}
+                    globalPrice={state.fuelPrice}
+                    globalCurrency={state.fuelCurrency || 'EUR'}
                     currencies={FUEL_CURRENCIES}
                     onChange={(patch) => setCountryOverride(code, defaultCurrency, patch)}
                   />
