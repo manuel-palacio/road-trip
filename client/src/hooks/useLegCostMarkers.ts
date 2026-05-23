@@ -36,25 +36,34 @@ export function useLegCostMarkers(
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
-    // Acceptance: hidden when fuel isn't configured.
-    if (!fuel.consumption || !fuel.defaultPrice) return;
+    const fuelReady = !!fuel.consumption && !!fuel.defaultPrice;
 
     for (const stop of stops) {
-      const cost = legCost(
-        stop,
-        fuel.consumption,
-        fuel.unit,
-        fuel.defaultPrice,
-        fuel.defaultCurrency,
-        fuel.overrides,
-      );
-      if (!cost) continue; // also covers km<=0 and unrouted legs
+      const km = stop.kmFromPrevious || 0;
+      if (km <= 0) continue;
       const path = getStopPath(stop);
       // No polyline → no midpoint to anchor to. Geographic-midpoint fallback
       // would land off-route and look misleading on detours, so we just skip.
       if (!path || path.length < 2) continue;
       const mid = path[Math.floor(path.length / 2)];
-      const label = formatCurrency(Math.round(cost.amount), cost.currency);
+      const kmLabel = `${km} km`;
+      let label = kmLabel;
+      let title = `${km} km`;
+      if (fuelReady) {
+        const cost = legCost(
+          stop,
+          fuel.consumption,
+          fuel.unit,
+          fuel.defaultPrice,
+          fuel.defaultCurrency,
+          fuel.overrides,
+        );
+        if (cost) {
+          const costLabel = formatCurrency(Math.round(cost.amount), cost.currency);
+          label = `${kmLabel} · ${costLabel}`;
+          title = `${kmLabel} · est. fuel ${costLabel}`;
+        }
+      }
       const marker = new maps.Marker({
         position: mid,
         map,
@@ -63,7 +72,7 @@ export function useLegCostMarkers(
         // Below the stop markers (default 0) is the explicit requirement;
         // negative zIndex keeps them visually subordinate to route stops.
         zIndex: -1,
-        title: `Est. fuel: ${label}`,
+        title,
       });
       markersRef.current.push(marker);
     }

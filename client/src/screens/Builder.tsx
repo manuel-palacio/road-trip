@@ -385,15 +385,6 @@ export function Builder() {
   async function onFuelStopSelected(result: FuelStopResult) {
     if (!fuelTarget) return;
     const insertAt = fuelTarget.insertAtFlatIndex;
-    // When the targeted leg crosses a day boundary (legStart in day N,
-    // legEnd in day N+1), the user clicked "+ Fuel" on day N+1 expecting
-    // the new stop to join day N+1. Fuel stops are transparent to day
-    // grouping, though, so inserting before legEnd would normally drop
-    // the stop into day N. Set forceDayStart on the new fuel stop so it
-    // becomes day N+1's first stop and legEnd naturally falls into N+1
-    // (its inbound km is now small).
-    const crossesDayBoundary =
-      (fuelTarget.legStart.dayNumber || 1) !== (fuelTarget.legEnd.dayNumber || 1);
     setFuelTarget(null);
     // Look up the locality so the chip reads "Grenoble" instead of
     // "Circle K Grenoble Autoroute A48". The full station name stays on `name`
@@ -412,7 +403,6 @@ export function Builder() {
       category: 'fuel',
       highlights: [],
       kmFromPrevious: 0,
-      ...(crossesDayBoundary ? { forceDayStart: true } : {}),
     };
     setState((s) => ({
       ...s,
@@ -1387,6 +1377,7 @@ export function Builder() {
                   onDropAtDayStart={gi > 0 ? reorderToDayStart : undefined}
                   onFindFuel={fuelTargetForDay(g.day) !== null ? () => openFuelForDay(g.day) : undefined}
                   tankRangeKm={state.tankRangeKm}
+                  maxKmPerDay={state.maxKmPerDay}
                 />
               ))}
             </div>
@@ -1639,6 +1630,7 @@ export function Builder() {
               onFindFuelForDay={openFuelForDay}
               canFindFuelForDay={(day) => fuelTargetForDay(day) !== null}
               tankRangeKm={state.tankRangeKm}
+              maxKmPerDay={state.maxKmPerDay}
             />
           </div>
         </div>

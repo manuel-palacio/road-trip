@@ -21,6 +21,10 @@ type Props = {
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 means no leg crosses the threshold — chip is hidden. */
   longLegKm?: number;
+  /** Trip's max-km-per-day target. Drives the "Long day" warning chip
+   * when this day's total km exceeds it. Optional — defaults to 800
+   * for trips that haven't set one. */
+  maxKmPerDay?: number;
   // When set, the header becomes a drop target — a drop inserts the
   // dragged stop just before the first stop currently in this day.
   onDropAtStart?: () => void;
@@ -30,7 +34,8 @@ type Props = {
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, onDropAtStart, onFindFuel } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, onDropAtStart, onFindFuel } = p;
+  const dayMaxKm = maxKmPerDay && maxKmPerDay > 0 ? maxKmPerDay : 800;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
   let aaCls: string;
@@ -45,7 +50,7 @@ export function DayHeader(p: Props) {
     aaCls = 'bg-[rgba(122,154,114,0.16)] border border-[rgba(122,154,114,0.4)] text-[#9bbf91]';
     aaLabel = `Android Auto: Ready (${stopCount}/10 stops)`;
   }
-  const showKmWarning = km > 800;
+  const showKmWarning = km > dayMaxKm;
 
   return (
     <div
@@ -118,7 +123,7 @@ export function DayHeader(p: Props) {
         </span>
         {showKmWarning && (
           <span className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#ec8e74] px-2 py-[3px] rounded border border-dashed border-[rgba(214,90,63,0.5)]">
-            Over 800 km · long day
+            Long day · {km} km over {dayMaxKm} limit
           </span>
         )}
         {longLegKm > 0 && (

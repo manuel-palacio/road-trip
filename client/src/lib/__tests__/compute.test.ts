@@ -77,14 +77,17 @@ describe('applyDays', () => {
     const out = applyDays(stops, 600);
     expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 1]);
   });
-  it('auto-splits to a new day when cumulative km exceeds maxKm', () => {
+  it('does NOT auto-split by km — maxKm is a warning threshold, not a hard rule', () => {
+    // Day boundaries are user-driven now (overnight markers + forceDayStart).
+    // A 750 km trip with no overnight stays on a single day. The Builder
+    // shows a "Long day" warning chip but never moves stops around.
     const stops = [
       stop({ id: 'a' }),
       stop({ id: 'b', kmFromPrevious: 400 }),
-      stop({ id: 'c', kmFromPrevious: 350 }), // 750 > 600 → day 2
+      stop({ id: 'c', kmFromPrevious: 350 }),
     ];
     const out = applyDays(stops, 600);
-    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 2]);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 1]);
   });
   it('overnight on previous stop forces a new day at next', () => {
     const stops = [
@@ -118,61 +121,39 @@ describe('applyDays', () => {
     applyDays(stops, 600);
     expect(stops).toEqual(original);
   });
-  it("fuel stops don't trigger a day boundary, even when they cross maxKm", () => {
-    // Without the fuel-exemption, gas at 350 km would tip dayKm past 300 and
-    // push the fuel stop to day 2. Fuel stops are pit-stops: they must stay
-    // on the current day so the day boundary lands at the next regular stop.
+  it("fuel stops never trigger a day boundary themselves", () => {
+    // Fuel stops are pit-stops along a drive. They never cause a day
+    // boundary regardless of distance — only explicit overnight markers
+    // or forceDayStart on a regular stop do. Stays one day end-to-end.
     const stops = [
       stop({ id: 'a', type: 'start' }),
       stop({ id: 'gas', type: 'fuel', kmFromPrevious: 350 }),
       stop({ id: 'b', kmFromPrevious: 150 }),
     ];
     const out = applyDays(stops, 300);
-    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 2]);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 1]);
   });
-  it('fuel forceDayStart opens a new day AND the next non-fuel stop joins it, even past maxKm', () => {
-    // Real scenario: user clicks "+ Fuel" on Day 2 (only stop = Hamburg, with
-    // an 800km inbound leg from Day 1's Malmö). The fuel stop splits that leg
-    // as e.g. 400 + 400. Without softFuelDay, Hamburg would trigger another
-    // boundary at the second 400 (400 + 400 = 800 > maxKm of e.g. 600) and
-    // get pushed to day 3.
+  it('Stockholm + Copenhagen (660km, maxKm=600) stays one long day', () => {
+    // User-reported bug: under the old km-overflow rule, Stockholm ended up
+    // alone on Day 1 with no driving. With the new "no auto-split" rule,
+    // both stops stay on Day 1 — the Builder shows a "Long day" warning
+    // chip but doesn't shuffle the stops around.
     const stops = [
-      stop({ id: 'malmo' }),
-      stop({ id: 'newFuel', type: 'fuel', forceDayStart: true, kmFromPrevious: 400 }),
-      stop({ id: 'hamburg', kmFromPrevious: 400 }),
+      stop({ id: 'stockholm' }),
+      stop({ id: 'copenhagen', kmFromPrevious: 660 }),
     ];
-    const out = applyDays(stops, 600);
-    expect(out.map((s) => s.dayNumber)).toEqual([1, 2, 2]);
+    expect(applyDays(stops, 600).map((s) => s.dayNumber)).toEqual([1, 1]);
   });
-  it('chained fuel forceDayStart: multiple fuel stops in the same forced day still keep the destination together', () => {
-    // Edge: user adds two fuel stops back-to-back on a boundary leg. Both
-    // are fuel; the FIRST has forceDayStart=true (the boundary-leg insertion
-    // sets that), the SECOND is just an additional refuel. The next non-fuel
-    // stop should still land in the same day, not get pushed further.
+  it('inserting a fuel stop mid-leg keeps the whole trip on one day', () => {
+    // Same scenario as the user's bug: Stockholm → Fuel → Copenhagen.
+    // Fuel stops never trigger day boundaries; the trip stays on Day 1
+    // even though the total is 660 km > 600 maxKm.
     const stops = [
-      stop({ id: 'malmo' }),
-      stop({ id: 'fuel1', type: 'fuel', forceDayStart: true, kmFromPrevious: 300 }),
-      stop({ id: 'fuel2', type: 'fuel', kmFromPrevious: 200 }),
-      stop({ id: 'hamburg', kmFromPrevious: 400 }),
+      stop({ id: 'stockholm' }),
+      stop({ id: 'fuel', type: 'fuel', kmFromPrevious: 300 }),
+      stop({ id: 'copenhagen', kmFromPrevious: 360 }),
     ];
-    const out = applyDays(stops, 600);
-    // fuel1 opens day 2; fuel2 stays in day 2 (fuel is transparent); hamburg
-    // stays in day 2 because softFuelDay was still active when it was
-    // processed (it's the first non-fuel stop in the forced day).
-    expect(out.map((s) => s.dayNumber)).toEqual([1, 2, 2, 2]);
-  });
-  it('softFuelDay only suppresses the first non-fuel stop after the forced fuel boundary', () => {
-    // After softFuelDay consumes its one non-fuel stop, normal km accumulation
-    // resumes for subsequent stops. A second leg added later should still
-    // trigger a boundary if it pushes the day total past maxKm.
-    const stops = [
-      stop({ id: 'a' }),
-      stop({ id: 'newFuel', type: 'fuel', forceDayStart: true, kmFromPrevious: 400 }),
-      stop({ id: 'b', kmFromPrevious: 400 }), // softFuelDay absorbs this one
-      stop({ id: 'c', kmFromPrevious: 400 }), // now 400 + 400 = 800 > 600 → day 3
-    ];
-    const out = applyDays(stops, 600);
-    expect(out.map((s) => s.dayNumber)).toEqual([1, 2, 2, 3]);
+    expect(applyDays(stops, 600).map((s) => s.dayNumber)).toEqual([1, 1, 1]);
   });
   it('cross-day reorder: moving a stop into a different day re-computes dayNumber from flat order', () => {
     // Simulates the result of dragging "x" from end of day 1 to start of day 2.

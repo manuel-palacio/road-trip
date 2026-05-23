@@ -42,6 +42,9 @@ type Props = {
   onDropAtDayStart?: (day: number) => void;
   onFindFuel?: () => void;
   tankRangeKm?: number;
+  /** Trip's max-km-per-day target. Drives the "Long day" warning chip.
+   * Optional — defaults to 800 when unset. */
+  maxKmPerDay?: number;
 };
 
 export function DayColumn(p: Props) {
@@ -51,7 +54,8 @@ export function DayColumn(p: Props) {
   const date = formatDayDate(g.day, p.startDate);
   const aaCount = g.stops.filter((x) => !isFuelStop(x.stop)).length;
   const longLegKm = longestLegOverRange(g, p.tankRangeKm);
-  const showKmWarning = g.km > 800;
+  const dayMaxKm = p.maxKmPerDay && p.maxKmPerDay > 0 ? p.maxKmPerDay : 800;
+  const showKmWarning = g.km > dayMaxKm;
 
   let aaCls: string;
   let aaLabel: string;
@@ -152,7 +156,7 @@ export function DayColumn(p: Props) {
             </span>
             {showKmWarning && (
               <span
-                title="Over 800 km — long day"
+                title={`Long day — ${g.km} km over ${dayMaxKm} limit`}
                 className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#ec8e74] px-1.5 py-[2px] rounded border border-dashed border-[rgba(214,90,63,0.5)]"
               >
                 Long day

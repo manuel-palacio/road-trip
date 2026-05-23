@@ -87,6 +87,23 @@ describe('DayHeader fuel-config nudge (issue #59)', () => {
   });
 });
 
+describe('DayHeader long-day warning (auto-split removal follow-up)', () => {
+  it('shows "Long day" chip when km > maxKmPerDay', () => {
+    render(<DayHeader {...dayHeaderProps({ km: 660, maxKmPerDay: 600 })} />);
+    expect(screen.getByText(/Long day/i)).toBeInTheDocument();
+    expect(screen.getByText(/660 km over 600 limit/i)).toBeInTheDocument();
+  });
+  it('hides the chip when km <= maxKmPerDay', () => {
+    render(<DayHeader {...dayHeaderProps({ km: 500, maxKmPerDay: 600 })} />);
+    expect(screen.queryByText(/Long day/i)).not.toBeInTheDocument();
+  });
+  it('falls back to 800km threshold when maxKmPerDay is unset', () => {
+    render(<DayHeader {...dayHeaderProps({ km: 850, maxKmPerDay: undefined })} />);
+    expect(screen.getByText(/Long day/i)).toBeInTheDocument();
+    expect(screen.getByText(/850 km over 800 limit/i)).toBeInTheDocument();
+  });
+});
+
 describe('DayColumn fuel-config nudge (issue #59)', () => {
   it('AC4: no nudge when unconfigured', () => {
     render(<DayColumn {...dayColumnProps({ fuelCost: null, fuelConfigPartial: false })} />);

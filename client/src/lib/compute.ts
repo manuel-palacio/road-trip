@@ -51,57 +51,40 @@ export function formatDuration(seconds: number): string {
   return `~${hours.toFixed(1)}h`;
 }
 
-/** Computes dayNumber for each stop based on kmFromPrevious + max km/day + overnight markers
- * + per-stop forceDayStart flag. First stop is forced to Day 1. Fuel stops
- * are transparent to day planning: they never trigger a boundary themselves,
- * so a 600 km day with a refuel in the middle stays on one day.
+/** Computes dayNumber for each stop based on explicit user intent only:
+ *   - Stop's type === 'overnight'  → next stop starts a new day
+ *   - Stop's forceDayStart === true → this stop starts a new day
+ *   - First stop is always Day 1
  *
- * Special case for fuel-on-boundary-leg insertion: when a fuel stop
- * carries forceDayStart=true (set by onFuelStopSelected when the user
- * adds a fuel stop on a leg that spans a day boundary), the km-overflow
- * check is suppressed for the next non-fuel stop in that forced day.
- * Without this, a 780 km Hamburg→Reims leg split as NewFuel(400) +
- * Reims(380) would trip the maxKm check at Reims and push it into yet
- * another day — even though the original single leg sat in one day.
+ * No auto-split by km. `maxKmPerDay` is a *warning threshold* now (see
+ * dayExceedsMaxKm) — the user controls day boundaries explicitly via
+ * overnight markers and drag-and-drop. This avoids the jarring "stops
+ * jump around" behavior when reordering or adding mid-leg fuel stops.
+ *
+ * Migration for trips created under the old auto-split rule lives in
+ * stampImplicitDayBoundaries: it runs once at hydration and bakes the
+ * old km-overflow boundaries into forceDayStart so day numbers stay
+ * stable across the rule change.
  *
  * Pure: returns a new array, doesn't mutate input. */
-export function applyDays(stops: Stop[], maxKm: number): Stop[] {
+export function applyDays(stops: Stop[], _maxKm: number): Stop[] {
   if (stops.length === 0) return stops;
   const result: Stop[] = [];
   let day = 1;
-  let dayKm = 0;
-  // True while inside a day opened by a fuel stop's forceDayStart. The
-  // first non-fuel stop after that bypasses the km check (it's the
-  // continuation of one intended drive). Reset once consumed, OR when
-  // an explicit overnight / forceDayStart on a non-fuel stop opens a
-  // fresh day.
-  let softFuelDay = false;
   for (let i = 0; i < stops.length; i++) {
     const stop = stops[i];
     if (i === 0) {
-      dayKm = 0;
       result.push({ ...stop, dayNumber: 1 });
       continue;
     }
-    const seg = stop.kmFromPrevious || 0;
     const prevOvernight = stops[i - 1].type === 'overnight';
     const forced = stop.forceDayStart === true;
-    const isFuel = stop.type === 'fuel';
-    const kmOverflow = !softFuelDay && !isFuel && dayKm + seg > maxKm;
-    if (forced || prevOvernight || kmOverflow) {
-      day++;
-      dayKm = seg;
-      // Only fuel-forced day starts opt into the soft window.
-      // forceDayStart on a regular stop is a hard boundary that resets it.
-      softFuelDay = forced && isFuel;
-    } else {
-      dayKm += seg;
-      if (!isFuel) softFuelDay = false;
-    }
+    if (forced || prevOvernight) day++;
     result.push({ ...stop, dayNumber: day });
   }
   return result;
 }
+
 
 /** Format a day's calendar date relative to a trip's start date.
  * Returns "" if startDate is unset or invalid. */

@@ -38,6 +38,9 @@ type Props = {
   /** Tank range used to flag days with a long single leg. Defaults to 500
    * inside longestLegOverRange when undefined. */
   tankRangeKm?: number;
+  /** Trip's max-km-per-day target. Forwarded to each DayHeader for the
+   * "Long day" warning chip. Defaults to 800 in DayHeader if absent. */
+  maxKmPerDay?: number;
 };
 
 export function StopList(p: Props) {
@@ -65,6 +68,7 @@ export function StopList(p: Props) {
             fuelConfigPartial={p.fuelConfigPartial}
             onConfigureFuel={p.onConfigureFuel}
             longLegKm={longestLegOverRange(g, p.tankRangeKm)}
+            maxKmPerDay={p.maxKmPerDay}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
             onFindFuel={
               p.onFindFuelForDay && (!p.canFindFuelForDay || p.canFindFuelForDay(g.day))
