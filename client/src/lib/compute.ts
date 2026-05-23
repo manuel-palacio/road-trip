@@ -8,13 +8,14 @@ export {
   estimateFuelVolume,
   fuelBreakdownForLegs,
   fuelVolumeForLegs,
+  fuelConfigState,
   legCost,
   formatCurrency,
   formatBreakdown,
   formatVolume,
   formatFillUps,
 } from '../../../shared/fuel';
-export type { FuelBreakdown, LegCost } from '../../../shared/fuel';
+export type { FuelBreakdown, LegCost, FuelConfigState } from '../../../shared/fuel';
 
 /* Custom day color palette — muted inks matching the editorial cartography theme.
    Cycles past 10 days. */
@@ -146,4 +147,34 @@ export function tripTotals(stops: Stop[]): {
   const totalDays = stops.length === 0 ? 0 : Math.max(...stops.map((s) => s.dayNumber || 1));
   const totalDurationSeconds = stops.reduce((s, x) => s + (x.durationSecondsFromPrevious || 0), 0);
   return { totalKm, totalDays, totalDurationSeconds };
+}
+
+/** Distinct ISO country codes appearing in the trip's stops, in the order
+ * they're first visited. Powers the auto-populated per-country fuel
+ * override rows (issue #57). Stops without a countryCode are skipped.
+ * Pure: derives entirely from the input list, no side effects. */
+export function tripCountriesFromStops(stops: readonly Stop[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of stops) {
+    const cc = (s.countryCode || '').trim().toUpperCase();
+    if (!cc) continue;
+    if (seen.has(cc)) continue;
+    seen.add(cc);
+    out.push(cc);
+  }
+  return out;
+}
+
+/** Compile the Builder's free-form override drafts (string prices) into the
+ * numeric shape the server stores. Filters out rows that aren't ready to
+ * persist — issue #57 AC4: empty/zero/invalid rows are dropped, NOT sent.
+ * Pure. Mirrors what fuelBreakdownForLegs would skip at compute time, so
+ * what the UI doesn't dim is what the server doesn't see. */
+export function compileFuelOverrides(
+  drafts: ReadonlyArray<{ countryCode: string; price: string; currency: string }>,
+): { countryCode: string; price: number; currency: string }[] {
+  return drafts
+    .map((d) => ({ countryCode: d.countryCode, price: parseFloat(d.price), currency: d.currency }))
+    .filter((o) => !!o.countryCode && Number.isFinite(o.price) && o.price > 0 && !!o.currency);
 }

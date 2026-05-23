@@ -23,6 +23,26 @@ export function estimateFuelCost(km, consumption, unit, pricePerUnit) {
 /** US gallons per litre — used for MPG conversions. */
 const LITRES_PER_GALLON = 3.785411784;
 
+/** Classify the trip's fuel configuration as one of three states so the UI
+ * can distinguish "user hasn't set anything" (silent) from "user set one
+ * thing but forgot the other" (nudge them to finish). Returns:
+ *   { status: 'unconfigured' }                              — neither set
+ *   { status: 'partial', missing: ['consumption'|'price'] } — one missing
+ *   { status: 'ready' }                                     — both set
+ *
+ * Pure: takes the same numeric inputs estimateFuelCost would, no side
+ * effects, safe to call on every render. */
+export function fuelConfigState(consumption, price) {
+  const hasC = consumption != null && Number.isFinite(consumption) && consumption > 0;
+  const hasP = price != null && Number.isFinite(price) && price > 0;
+  if (!hasC && !hasP) return { status: 'unconfigured' };
+  if (hasC && hasP) return { status: 'ready' };
+  const missing = [];
+  if (!hasC) missing.push('consumption');
+  if (!hasP) missing.push('price');
+  return { status: 'partial', missing };
+}
+
 /** Estimate fuel volume consumed for a leg. Returns litres for L/100km
  * units, US gallons for MPG units. Null when km is 0 or consumption is
  * not configured. Mirrors estimateFuelCost without the price step. */

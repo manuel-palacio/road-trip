@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DAY_COLORS,
   applyDays,
+  compileFuelOverrides,
   dayColor,
   estimateFuelCost,
   estimateFuelVolume,
@@ -12,10 +13,12 @@ import {
   formatFillUps,
   formatVolume,
   fuelBreakdownForLegs,
+  fuelConfigState,
   fuelVolumeForLegs,
   groupByDay,
   isFuelStop,
   legCost,
+  tripCountriesFromStops,
   tripTotals,
 } from '../compute';
 import type { Stop } from '../types';
@@ -462,6 +465,140 @@ describe('formatFillUps', () => {
   it('MPG users: tankSizeLitres converts to gallons before the math', () => {
     // Tank 60 L ≈ 15.85 US gal. 30 gal of consumption → ceil(30/15.85) = 2 fill-ups.
     expect(formatFillUps(30, 60, 'MPG')).toBe('approx. 2 fill-ups');
+  });
+});
+
+describe('fuelConfigState', () => {
+  it("returns 'unconfigured' when neither consumption nor price is set", () => {
+    expect(fuelConfigState(undefined, undefined)).toEqual({ status: 'unconfigured' });
+    expect(fuelConfigState(null, null)).toEqual({ status: 'unconfigured' });
+    expect(fuelConfigState(0, 0)).toEqual({ status: 'unconfigured' });
+    expect(fuelConfigState(NaN, NaN)).toEqual({ status: 'unconfigured' });
+    expect(fuelConfigState(-1, -1)).toEqual({ status: 'unconfigured' });
+  });
+  it("returns 'ready' when both consumption and price are positive finite", () => {
+    expect(fuelConfigState(7, 1.85)).toEqual({ status: 'ready' });
+    expect(fuelConfigState(7.5, 2)).toEqual({ status: 'ready' });
+  });
+  it("returns 'partial' with missing=['price'] when only consumption is set", () => {
+    expect(fuelConfigState(7, undefined)).toEqual({ status: 'partial', missing: ['price'] });
+    expect(fuelConfigState(7, 0)).toEqual({ status: 'partial', missing: ['price'] });
+    expect(fuelConfigState(7, null)).toEqual({ status: 'partial', missing: ['price'] });
+  });
+  it("returns 'partial' with missing=['consumption'] when only price is set", () => {
+    expect(fuelConfigState(undefined, 1.85)).toEqual({ status: 'partial', missing: ['consumption'] });
+    expect(fuelConfigState(0, 1.85)).toEqual({ status: 'partial', missing: ['consumption'] });
+    expect(fuelConfigState(null, 1.85)).toEqual({ status: 'partial', missing: ['consumption'] });
+  });
+  it('rejects non-finite numbers (Infinity, NaN) as not set', () => {
+    expect(fuelConfigState(Infinity, 1.85)).toEqual({ status: 'partial', missing: ['consumption'] });
+    expect(fuelConfigState(7, Infinity)).toEqual({ status: 'partial', missing: ['price'] });
+  });
+});
+
+describe('tripCountriesFromStops', () => {
+  it('returns an empty list when no stops carry a countryCode', () => {
+    expect(tripCountriesFromStops([])).toEqual([]);
+    expect(tripCountriesFromStops([stop({ id: 'a' })])).toEqual([]);
+    expect(tripCountriesFromStops([stop({ id: 'a', countryCode: '' })])).toEqual([]);
+  });
+  it('returns each distinct country in visit order', () => {
+    const stops = [
+      stop({ id: 'a', countryCode: 'SE' }),
+      stop({ id: 'b', countryCode: 'DK' }),
+      stop({ id: 'c', countryCode: 'DE' }),
+    ];
+    expect(tripCountriesFromStops(stops)).toEqual(['SE', 'DK', 'DE']);
+  });
+  it('de-duplicates repeated countries (e.g. cross-border-back trips)', () => {
+    // Stockholm → Copenhagen → Malmö (SE again) → Hamburg. SE should only
+    // appear once even though it bookends a Danish stop.
+    const stops = [
+      stop({ id: 'a', countryCode: 'SE' }),
+      stop({ id: 'b', countryCode: 'DK' }),
+      stop({ id: 'c', countryCode: 'SE' }),
+      stop({ id: 'd', countryCode: 'DE' }),
+    ];
+    expect(tripCountriesFromStops(stops)).toEqual(['SE', 'DK', 'DE']);
+  });
+  it('normalises country codes to uppercase', () => {
+    const stops = [
+      stop({ id: 'a', countryCode: 'se' }),
+      stop({ id: 'b', countryCode: 'Dk' }),
+    ];
+    expect(tripCountriesFromStops(stops)).toEqual(['SE', 'DK']);
+  });
+  it('AC6: list changes when stops are added/removed (pure derivation)', () => {
+    // Issue #57 AC6: works when trip.countries[] changes after stops are
+    // added/removed. Since this fn derives from stops on every call, the
+    // output reflects the current list immediately.
+    const beforeAdd = [stop({ id: 'a', countryCode: 'SE' })];
+    expect(tripCountriesFromStops(beforeAdd)).toEqual(['SE']);
+    const afterAdd = [...beforeAdd, stop({ id: 'b', countryCode: 'DE' })];
+    expect(tripCountriesFromStops(afterAdd)).toEqual(['SE', 'DE']);
+    const afterRemove = afterAdd.filter((s) => s.id !== 'a');
+    expect(tripCountriesFromStops(afterRemove)).toEqual(['DE']);
+  });
+});
+
+describe('compileFuelOverrides (issue #57 AC4 — empty/zero rows not saved)', () => {
+  it('returns numeric-priced rows only', () => {
+    const out = compileFuelOverrides([
+      { countryCode: 'SE', price: '2.15', currency: 'SEK' },
+      { countryCode: 'DE', price: '1.72', currency: 'EUR' },
+    ]);
+    expect(out).toEqual([
+      { countryCode: 'SE', price: 2.15, currency: 'SEK' },
+      { countryCode: 'DE', price: 1.72, currency: 'EUR' },
+    ]);
+  });
+  it("drops empty-price rows (the 'matches default' state)", () => {
+    const out = compileFuelOverrides([
+      { countryCode: 'SE', price: '', currency: 'SEK' },
+      { countryCode: 'DE', price: '1.72', currency: 'EUR' },
+    ]);
+    expect(out).toEqual([{ countryCode: 'DE', price: 1.72, currency: 'EUR' }]);
+  });
+  it('drops zero-priced rows (redundant when matching default)', () => {
+    const out = compileFuelOverrides([
+      { countryCode: 'SE', price: '0', currency: 'SEK' },
+      { countryCode: 'DE', price: '0.00', currency: 'EUR' },
+    ]);
+    expect(out).toEqual([]);
+  });
+  it('drops negative or NaN prices', () => {
+    const out = compileFuelOverrides([
+      { countryCode: 'SE', price: '-1', currency: 'SEK' },
+      { countryCode: 'DE', price: 'abc', currency: 'EUR' },
+    ]);
+    expect(out).toEqual([]);
+  });
+  it('drops rows missing currency', () => {
+    const out = compileFuelOverrides([
+      { countryCode: 'SE', price: '2.15', currency: '' },
+    ]);
+    expect(out).toEqual([]);
+  });
+  it('drops rows missing countryCode', () => {
+    const out = compileFuelOverrides([
+      { countryCode: '', price: '2.15', currency: 'EUR' },
+    ]);
+    expect(out).toEqual([]);
+  });
+  it('mixed input: valid rows pass, invalid rows filtered, order preserved', () => {
+    const out = compileFuelOverrides([
+      { countryCode: 'SE', price: '2.15', currency: 'SEK' },  // keep
+      { countryCode: 'DK', price: '', currency: 'DKK' },        // drop (empty)
+      { countryCode: 'DE', price: '1.72', currency: 'EUR' },  // keep
+      { countryCode: '', price: '1', currency: 'EUR' },         // drop (no code)
+      { countryCode: 'AT', price: '0', currency: 'EUR' },       // drop (zero)
+      { countryCode: 'IT', price: '1.91', currency: 'EUR' },  // keep
+    ]);
+    expect(out).toEqual([
+      { countryCode: 'SE', price: 2.15, currency: 'SEK' },
+      { countryCode: 'DE', price: 1.72, currency: 'EUR' },
+      { countryCode: 'IT', price: 1.91, currency: 'EUR' },
+    ]);
   });
 });
 

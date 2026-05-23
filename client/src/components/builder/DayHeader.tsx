@@ -10,6 +10,14 @@ type Props = {
   isFirst: boolean;
   fuelCost?: string | null;
   fuelVolume?: string | null;
+  /** When true, the user has configured ONE of consumption/price but not the
+   * other. The header renders a tiny nudge chip in place of the cost so the
+   * user notices the half-set state and can finish it. Mutually exclusive
+   * with a non-null fuelCost in practice (ready state). */
+  fuelConfigPartial?: boolean;
+  /** Click handler for the nudge chip — typically opens the trip-details
+   * modal in Builder or navigates back to /builder in Viewer. */
+  onConfigureFuel?: () => void;
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 means no leg crosses the threshold — chip is hidden. */
   longLegKm?: number;
@@ -22,7 +30,7 @@ type Props = {
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, longLegKm = 0, onDropAtStart, onFindFuel } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, onDropAtStart, onFindFuel } = p;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
   let aaCls: string;
@@ -86,6 +94,20 @@ export function DayHeader(p: Props) {
           <>
             {' · '}
             <span className="text-paper-dim tracking-normal normal-case">{fuelVolume}</span>
+          </>
+        )}
+        {fuelConfigPartial && !fuelCost && (
+          <>
+            {' · '}
+            <button
+              type="button"
+              onClick={onConfigureFuel}
+              data-testid="fuel-config-nudge"
+              className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[11px] underline decoration-dotted underline-offset-2 transition-colors"
+            >
+              <span aria-hidden>⛽</span>
+              Set fuel price + consumption
+            </button>
           </>
         )}
       </div>

@@ -12,6 +12,11 @@ type Props = {
   startDate: string | null | undefined;
   fuelCost?: string | null;
   fuelVolume?: string | null;
+  /** Partial fuel-config state (one of price/consumption set, not both).
+   * When true the column header swaps the cost text for a nudge chip
+   * that opens the trip-details modal. See issue #59. */
+  fuelConfigPartial?: boolean;
+  onConfigureFuel?: () => void;
   /** Total stops count across the trip — needed so the trailing
    * "+ insert" affordance on the last day in the column targets the
    * correct global index (i.e. "append at end"). */
@@ -120,6 +125,20 @@ export function DayColumn(p: Props) {
               <>
                 {' · '}
                 <span className="text-paper-dim tracking-normal normal-case">{p.fuelVolume}</span>
+              </>
+            )}
+            {p.fuelConfigPartial && !p.fuelCost && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={p.onConfigureFuel}
+                  data-testid="fuel-config-nudge"
+                  className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[11px] underline decoration-dotted underline-offset-2 transition-colors"
+                >
+                  <span aria-hidden>⛽</span>
+                  Set fuel
+                </button>
               </>
             )}
           </div>

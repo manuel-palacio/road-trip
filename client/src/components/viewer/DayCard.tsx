@@ -24,13 +24,18 @@ type Props = {
   onToggleVisibility: () => void;
   fuelCost?: string | null;
   fuelVolume?: string | null;
+  /** Partial fuel-config state — see issue #59. When true, the card swaps
+   * the cost text for a nudge chip. In Viewer the chip navigates back to
+   * Builder; in Share it's typically not passed (read-only context). */
+  fuelConfigPartial?: boolean;
+  onConfigureFuel?: () => void;
   bookingAffiliateId?: string | null;
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 (or omitted) hides the chip. */
   longLegKm?: number;
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, bookingAffiliateId, longLegKm = 0 }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, longLegKm = 0 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -101,6 +106,20 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
             <>
               {' · '}
               <span className="text-paper-dim tracking-normal normal-case">{fuelVolume}</span>
+            </>
+          )}
+          {fuelConfigPartial && !fuelCost && onConfigureFuel && (
+            <>
+              {' · '}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onConfigureFuel(); }}
+                data-testid="fuel-config-nudge"
+                className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[11px] underline decoration-dotted underline-offset-2 transition-colors"
+              >
+                <span aria-hidden>⛽</span>
+                Set fuel
+              </button>
             </>
           )}
         </span>

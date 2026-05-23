@@ -13,12 +13,13 @@ import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
-import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
+import { CountryOverrideRow } from '../components/builder/CountryOverrideRow';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { DayColumn } from '../components/builder/DayColumn';
@@ -365,6 +366,9 @@ export function Builder() {
   // Per-day groupings — used by the StopList's render path AND by the
   // gas-station picker to find the longest leg of a given day.
   const dayGroups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  // Distinct ISO country codes in visit order. Drives the auto-populated
+  // per-country fuel-override rows in the trip-details modal (issue #57).
+  const tripCountries = useMemo(() => tripCountriesFromStops(dayedStops), [dayedStops]);
   function fuelTargetForDay(day: number): FuelSearchTarget | null {
     const g = dayGroups.find((x) => x.day === day);
     if (!g) return null;
@@ -425,10 +429,7 @@ export function Builder() {
   const fuelConsumptionNum = parseFloat(state.fuelConsumption);
   const fuelPriceNum = parseFloat(state.fuelPrice);
   const compiledOverrides = useMemo<FuelOverride[]>(
-    () =>
-      state.fuelOverrides
-        .map((o) => ({ countryCode: o.countryCode, price: parseFloat(o.price), currency: o.currency }))
-        .filter((o) => o.countryCode && Number.isFinite(o.price) && o.price > 0 && o.currency),
+    () => compileFuelOverrides(state.fuelOverrides),
     [state.fuelOverrides],
   );
   const totalFuelCostStr = useMemo(() => {
@@ -465,6 +466,9 @@ export function Builder() {
     defaultCurrency: state.fuelCurrency,
     overrides: compiledOverrides,
   });
+  // Issue #59: distinguish unconfigured (silent) from partial (nudge).
+  // Drives the small "Set fuel" chip in day headers + the summary bar.
+  const fuelPartial = fuelConfigState(fuelConsumptionNum, fuelPriceNum).status === 'partial';
   function fuelCostForStops(stops: Stop[]): string | null {
     const b = fuelBreakdownForLegs(
       stops,
@@ -485,27 +489,39 @@ export function Builder() {
     [dayedStops],
   );
 
-  function addFuelOverride() {
-    // Pre-select the first country that isn't already overridden, falling
-    // back to the first in the list. Currency follows the country default.
-    const used = new Set(state.fuelOverrides.map((o) => o.countryCode));
-    const pick = FUEL_COUNTRIES.find((c) => !used.has(c.code)) || FUEL_COUNTRIES[0];
-    setState((s) => ({
-      ...s,
-      fuelOverrides: [
-        ...s.fuelOverrides,
-        { id: crypto.randomUUID(), countryCode: pick.code, price: '', currency: pick.defaultCurrency },
-      ],
-    }));
-  }
-  function updateFuelOverride(id: string, patch: Partial<FuelOverrideDraft>) {
-    setState((s) => ({
-      ...s,
-      fuelOverrides: s.fuelOverrides.map((o) => (o.id === id ? { ...o, ...patch } : o)),
-    }));
-  }
   function removeFuelOverride(id: string) {
     setState((s) => ({ ...s, fuelOverrides: s.fuelOverrides.filter((o) => o.id !== id) }));
+  }
+  /** Upsert a per-country fuel override by countryCode (not by row id).
+   * Powers the auto-populated rows in the trip-details modal: each row
+   * may not have a corresponding override in state yet, in which case
+   * the first edit creates one. Existing rows update in place. */
+  function setCountryOverride(
+    countryCode: string,
+    defaultCurrency: string,
+    patch: { price?: string; currency?: string },
+  ) {
+    setState((s) => {
+      const idx = s.fuelOverrides.findIndex((o) => o.countryCode === countryCode);
+      if (idx === -1) {
+        return {
+          ...s,
+          fuelOverrides: [
+            ...s.fuelOverrides,
+            {
+              id: crypto.randomUUID(),
+              countryCode,
+              price: patch.price ?? '',
+              currency: patch.currency ?? defaultCurrency,
+            },
+          ],
+        };
+      }
+      return {
+        ...s,
+        fuelOverrides: s.fuelOverrides.map((o, i) => (i === idx ? { ...o, ...patch } : o)),
+      };
+    });
   }
 
   // Init map + autocomplete once SDK ready
@@ -1093,69 +1109,80 @@ export function Builder() {
               {state.fuelUnit === 'MPG' ? 'gal' : 'L'}
             </span>
           </label>
-          {state.fuelOverrides.length > 0 && (
-            <div className="flex flex-col gap-2">
+          {/* Per-country prices — auto-populated from the trip's visited
+              countries (issue #57). Pre-filled with the global defaults so
+              the user only sees what they need to edit. Empty rows aren't
+              saved (compiledOverrides filters them out before PUT). */}
+          {tripCountries.length > 0 && (
+            <div className="flex flex-col gap-2" data-testid="country-overrides">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
                 Per-country prices
               </span>
-              {state.fuelOverrides.map((o) => (
-                <div key={o.id} className="grid grid-cols-[1.2fr_1fr_1fr_auto] gap-2 items-center">
-                  <select
-                    value={o.countryCode}
-                    onChange={(e) => {
-                      const nextCc = e.target.value;
-                      const country = FUEL_COUNTRIES.find((c) => c.code === nextCc);
-                      const nextCur = !o.price && country ? country.defaultCurrency : o.currency;
-                      updateFuelOverride(o.id, { countryCode: nextCc, currency: nextCur });
-                    }}
-                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
-                    aria-label="Country"
-                  >
-                    {FUEL_COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.code} · {c.name}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    inputMode="decimal"
-                    placeholder="Price"
-                    value={o.price}
-                    onChange={(e) => updateFuelOverride(o.id, { price: e.target.value })}
-                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted min-w-0"
-                    aria-label="Price"
+              {tripCountries.map((code) => {
+                const country = FUEL_COUNTRIES.find((c) => c.code === code);
+                const name = country?.name || code;
+                const defaultCurrency = country?.defaultCurrency || state.fuelCurrency || 'EUR';
+                const override = state.fuelOverrides.find((o) => o.countryCode === code);
+                const price = override?.price ?? '';
+                const currency = override?.currency ?? defaultCurrency;
+                // A row is "same as default" when no override row exists OR
+                // its price is empty/zero. compiledOverrides won't ship it
+                // to the server in either case, so visual treatment matches
+                // persistence behavior.
+                const matchesDefault = !override
+                  || override.price === ''
+                  || parseFloat(override.price) <= 0;
+                return (
+                  <CountryOverrideRow
+                    key={code}
+                    code={code}
+                    name={name}
+                    defaultCurrency={defaultCurrency}
+                    price={price}
+                    currency={currency}
+                    matchesDefault={matchesDefault}
+                    globalPriceHint={state.fuelPrice}
+                    currencies={FUEL_CURRENCIES}
+                    onChange={(patch) => setCountryOverride(code, defaultCurrency, patch)}
                   />
-                  <select
-                    value={o.currency}
-                    onChange={(e) => updateFuelOverride(o.id, { currency: e.target.value })}
-                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
-                    aria-label="Currency"
-                  >
-                    {FUEL_CURRENCIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeFuelOverride(o.id)}
-                    aria-label="Remove override"
-                    title="Remove override"
-                    className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[14px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-          <button
-            type="button"
-            onClick={addFuelOverride}
-            className="self-start bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[10px] tracking-[0.16em] uppercase transition-colors hover:text-paper hover:border-paper-dim"
-          >
-            + Country override
-          </button>
+          {/* Orphan overrides — entries in state.fuelOverrides for countries
+              the user no longer visits (legacy data, or stops removed after
+              setting). Render below with a remove control so they're not
+              silently held in state. */}
+          {state.fuelOverrides.filter((o) => !tripCountries.includes(o.countryCode)).length > 0 && (
+            <div className="flex flex-col gap-2" data-testid="orphan-overrides">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
+                Other countries (not in this trip)
+              </span>
+              {state.fuelOverrides
+                .filter((o) => !tripCountries.includes(o.countryCode))
+                .map((o) => {
+                  const country = FUEL_COUNTRIES.find((c) => c.code === o.countryCode);
+                  const name = country?.name || o.countryCode;
+                  return (
+                    <div key={o.id} className="grid grid-cols-[auto_1.2fr_1fr_1fr_auto] gap-2 items-center opacity-70">
+                      <span className="text-[16px]" aria-hidden>{flagEmoji(o.countryCode)}</span>
+                      <span className="font-serif italic text-[13px] text-paper-dim truncate" title={name}>{name}</span>
+                      <span className="font-mono text-[12px] text-paper-dim">{o.price || '—'}</span>
+                      <span className="font-mono text-[12px] text-paper-dim">{o.currency}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFuelOverride(o.id)}
+                        aria-label={`Remove ${name} override`}
+                        title="Remove"
+                        className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[14px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1331,6 +1358,8 @@ export function Builder() {
                   startDate={state.startDate}
                   fuelCost={fuelCostForStops(g.stops.map((x) => x.stop))}
                   fuelVolume={fuelVolumeForStops(g.stops.map((x) => x.stop))}
+                  fuelConfigPartial={fuelPartial}
+                  onConfigureFuel={() => setDetailsOpen(true)}
                   totalStops={dayedStops.length}
                   isFirstDay={gi === 0}
                   insertIndex={insertIndex}
@@ -1382,6 +1411,17 @@ export function Builder() {
             <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
             </span>
+          )}
+          {fuelPartial && (
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              data-testid="fuel-config-nudge-summary"
+              className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[12px] underline decoration-dotted underline-offset-2 transition-colors whitespace-nowrap"
+            >
+              <span aria-hidden>⛽</span>
+              Add a fuel price to see cost estimates
+            </button>
           )}
           {totalFuelVolumeStr && (
             <span
@@ -1571,6 +1611,8 @@ export function Builder() {
               startDate={state.startDate}
               fuelCostFor={fuelCostForStops}
               fuelVolumeFor={fuelVolumeForStops}
+              fuelConfigPartial={fuelPartial}
+              onConfigureFuel={() => setDetailsOpen(true)}
               insertIndex={insertIndex}
               onInsertAt={startInsertAt}
               onChangeType={setStopType}
@@ -1619,6 +1661,17 @@ export function Builder() {
             <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
             </span>
+          )}
+          {fuelPartial && (
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              data-testid="fuel-config-nudge-summary"
+              className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[12px] underline decoration-dotted underline-offset-2 transition-colors whitespace-nowrap"
+            >
+              <span aria-hidden>⛽</span>
+              Add a fuel price to see cost estimates
+            </button>
           )}
           {totalFuelVolumeStr && (
             <span

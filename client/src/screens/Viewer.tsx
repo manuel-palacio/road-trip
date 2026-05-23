@@ -9,7 +9,7 @@ import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
-import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
@@ -127,6 +127,10 @@ export function Viewer() {
     );
     return formatBreakdown(b);
   }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit, trip?.fuelPrice, trip?.fuelCurrency, trip?.fuelOverrides]);
+  // Issue #59: nudge chip when fuel is partially configured. Viewer is
+  // read-only — click navigates the user to the Builder for this trip.
+  const fuelPartial = fuelConfigState(trip?.fuelConsumption, trip?.fuelPrice).status === 'partial';
+  const goToBuilder = () => trip && navigate(`/builder/${trip.id}`);
   function fuelCostFor(stopsForDay: Stop[]): string | null {
     const b = fuelBreakdownForLegs(
       stopsForDay,
@@ -374,6 +378,17 @@ export function Viewer() {
               <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
             </span>
           )}
+          {fuelPartial && (
+            <button
+              type="button"
+              onClick={goToBuilder}
+              data-testid="fuel-config-nudge-summary"
+              className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[12px] underline decoration-dotted underline-offset-2 transition-colors whitespace-nowrap"
+            >
+              <span aria-hidden>⛽</span>
+              Add a fuel price to see cost estimates
+            </button>
+          )}
           {totalFuelVolumeStr && (
             <span
               className="inline-flex items-baseline gap-1"
@@ -415,6 +430,8 @@ export function Viewer() {
                   onToggleVisibility={() => toggleDay(g.day)}
                   fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
                   fuelVolume={fuelVolumeFor(g.stops.map((x) => x.stop))}
+                  fuelConfigPartial={fuelPartial}
+                  onConfigureFuel={goToBuilder}
                   bookingAffiliateId={cfg.data?.bookingAffiliateId}
                   longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                 />

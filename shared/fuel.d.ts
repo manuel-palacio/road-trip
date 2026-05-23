@@ -2,6 +2,16 @@ import type { FuelOverride, FuelUnit, Stop } from '../client/src/lib/types';
 
 export type FuelBreakdown = Map<string, number>;
 
+export type FuelConfigState =
+  | { status: 'unconfigured' }
+  | { status: 'partial'; missing: ('consumption' | 'price')[] }
+  | { status: 'ready' };
+
+export function fuelConfigState(
+  consumption: number | undefined | null,
+  price: number | undefined | null,
+): FuelConfigState;
+
 export function estimateFuelCost(
   km: number,
   consumption: number | undefined | null,

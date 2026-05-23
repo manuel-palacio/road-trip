@@ -11,6 +11,9 @@ type Props = {
   startDate: string | null | undefined;
   fuelCostFor?: (stops: Stop[]) => string | null;
   fuelVolumeFor?: (stops: Stop[]) => string | null;
+  /** Forwards to each DayHeader's nudge chip. See issue #59. */
+  fuelConfigPartial?: boolean;
+  onConfigureFuel?: () => void;
   insertIndex?: number | null;
   onInsertAt?: (index: number) => void;
   onChangeType: (id: string, type: Stop['type']) => void;
@@ -59,6 +62,8 @@ export function StopList(p: Props) {
             isFirst={gi === 0}
             fuelCost={p.fuelCostFor ? p.fuelCostFor(g.stops.map((x) => x.stop)) : null}
             fuelVolume={p.fuelVolumeFor ? p.fuelVolumeFor(g.stops.map((x) => x.stop)) : null}
+            fuelConfigPartial={p.fuelConfigPartial}
+            onConfigureFuel={p.onConfigureFuel}
             longLegKm={longestLegOverRange(g, p.tankRangeKm)}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
             onFindFuel={
