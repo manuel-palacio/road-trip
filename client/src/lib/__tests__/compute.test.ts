@@ -127,6 +127,83 @@ describe('applyDays', () => {
     const out = applyDays(stops, 300);
     expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 2]);
   });
+  it('fuel forceDayStart opens a new day AND the next non-fuel stop joins it, even past maxKm', () => {
+    // Real scenario: user clicks "+ Fuel" on Day 2 (only stop = Hamburg, with
+    // an 800km inbound leg from Day 1's Malmö). The fuel stop splits that leg
+    // as e.g. 400 + 400. Without softFuelDay, Hamburg would trigger another
+    // boundary at the second 400 (400 + 400 = 800 > maxKm of e.g. 600) and
+    // get pushed to day 3.
+    const stops = [
+      stop({ id: 'malmo' }),
+      stop({ id: 'newFuel', type: 'fuel', forceDayStart: true, kmFromPrevious: 400 }),
+      stop({ id: 'hamburg', kmFromPrevious: 400 }),
+    ];
+    const out = applyDays(stops, 600);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 2, 2]);
+  });
+  it('chained fuel forceDayStart: multiple fuel stops in the same forced day still keep the destination together', () => {
+    // Edge: user adds two fuel stops back-to-back on a boundary leg. Both
+    // are fuel; the FIRST has forceDayStart=true (the boundary-leg insertion
+    // sets that), the SECOND is just an additional refuel. The next non-fuel
+    // stop should still land in the same day, not get pushed further.
+    const stops = [
+      stop({ id: 'malmo' }),
+      stop({ id: 'fuel1', type: 'fuel', forceDayStart: true, kmFromPrevious: 300 }),
+      stop({ id: 'fuel2', type: 'fuel', kmFromPrevious: 200 }),
+      stop({ id: 'hamburg', kmFromPrevious: 400 }),
+    ];
+    const out = applyDays(stops, 600);
+    // fuel1 opens day 2; fuel2 stays in day 2 (fuel is transparent); hamburg
+    // stays in day 2 because softFuelDay was still active when it was
+    // processed (it's the first non-fuel stop in the forced day).
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 2, 2, 2]);
+  });
+  it('softFuelDay only suppresses the first non-fuel stop after the forced fuel boundary', () => {
+    // After softFuelDay consumes its one non-fuel stop, normal km accumulation
+    // resumes for subsequent stops. A second leg added later should still
+    // trigger a boundary if it pushes the day total past maxKm.
+    const stops = [
+      stop({ id: 'a' }),
+      stop({ id: 'newFuel', type: 'fuel', forceDayStart: true, kmFromPrevious: 400 }),
+      stop({ id: 'b', kmFromPrevious: 400 }), // softFuelDay absorbs this one
+      stop({ id: 'c', kmFromPrevious: 400 }), // now 400 + 400 = 800 > 600 → day 3
+    ];
+    const out = applyDays(stops, 600);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 2, 2, 3]);
+  });
+  it('cross-day reorder: moving a stop into a different day re-computes dayNumber from flat order', () => {
+    // Simulates the result of dragging "x" from end of day 1 to start of day 2.
+    // Before the move:  [a, b, c (day2 starts), x (would be day2 end)]
+    // After the move:   [a, b, x, c]  — x is now in day 2's flat range.
+    // applyDays must reflect that purely from the new flat order; the
+    // reorder() function doesn't set dayNumber explicitly, it relies on
+    // applyDays to re-derive everything.
+    const before = applyDays(
+      [
+        stop({ id: 'a' }),
+        stop({ id: 'b', kmFromPrevious: 200 }),
+        // c is an overnight stop — its TYPE forces the boundary at the
+        // *next* stop, not at itself. The km has to stay under maxKm so
+        // c doesn't trigger the km-overflow rule independently.
+        stop({ id: 'c', kmFromPrevious: 100, type: 'overnight' }),
+        stop({ id: 'x', kmFromPrevious: 100 }),
+      ],
+      600,
+    );
+    expect(before.map((s) => s.dayNumber)).toEqual([1, 1, 1, 2]);
+    // Now move x to between b and c (still inside day 1). x's prevOvernight
+    // is now false (b is a waypoint), so it stays day 1.
+    const after = applyDays(
+      [
+        stop({ id: 'a' }),
+        stop({ id: 'b', kmFromPrevious: 200 }),
+        stop({ id: 'x', kmFromPrevious: 100 }),
+        stop({ id: 'c', kmFromPrevious: 100, type: 'overnight' }),
+      ],
+      600,
+    );
+    expect(after.map((s) => s.dayNumber)).toEqual([1, 1, 1, 1]);
+  });
 });
 
 describe('isFuelStop', () => {
