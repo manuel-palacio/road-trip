@@ -6,7 +6,7 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { getSharedTrip } from '../lib/api';
-import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
@@ -96,6 +96,18 @@ export function Share() {
     );
     return formatBreakdown(b);
   }
+  function fuelVolumeFor(stopsForDay: Stop[]): string | null {
+    const v = fuelVolumeForLegs(stopsForDay, trip?.fuelConsumption, trip?.fuelUnit);
+    return formatVolume(v, trip?.fuelUnit);
+  }
+  const totalFuelVolumeStr = useMemo(() => {
+    const v = fuelVolumeForLegs(dayedStops, trip?.fuelConsumption, trip?.fuelUnit);
+    return formatVolume(v, trip?.fuelUnit);
+  }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit]);
+  const totalFillUpsStr = useMemo(() => {
+    const v = fuelVolumeForLegs(dayedStops, trip?.fuelConsumption, trip?.fuelUnit);
+    return formatFillUps(v, trip?.tankSizeLitres, trip?.fuelUnit);
+  }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit, trip?.tankSizeLitres]);
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
     [dayedStops],
@@ -350,6 +362,17 @@ export function Share() {
                 <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
               </span>
             )}
+            {totalFuelVolumeStr && (
+              <span
+                className="inline-flex items-baseline gap-1"
+                title={totalFillUpsStr ? `${totalFuelVolumeStr} · ${totalFillUpsStr}` : undefined}
+              >
+                <span className="text-paper-dim text-[14px] font-medium tracking-normal normal-case">{totalFuelVolumeStr}</span>
+                {totalFillUpsStr && (
+                  <span className="text-paper-muted text-[12px] tracking-normal normal-case">· {totalFillUpsStr}</span>
+                )}
+              </span>
+            )}
             <span className="ml-auto font-sans text-[14px] tracking-[0.06em]">{flagSet.join(' ')}</span>
           </div>
 
@@ -375,6 +398,7 @@ export function Share() {
                     visible={!hiddenDays.has(g.day)}
                     onToggleVisibility={() => toggleDay(g.day)}
                     fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
+                    fuelVolume={fuelVolumeFor(g.stops.map((x) => x.stop))}
                     bookingAffiliateId={cfg.data?.bookingAffiliateId}
                     longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                   />

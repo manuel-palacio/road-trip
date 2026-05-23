@@ -9,6 +9,7 @@ type Props = {
   startDate: string | null | undefined;
   isFirst: boolean;
   fuelCost?: string | null;
+  fuelVolume?: string | null;
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 means no leg crosses the threshold — chip is hidden. */
   longLegKm?: number;
@@ -21,7 +22,7 @@ type Props = {
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, longLegKm = 0, onDropAtStart, onFindFuel } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, longLegKm = 0, onDropAtStart, onFindFuel } = p;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
   let aaCls: string;
@@ -71,17 +72,22 @@ export function DayHeader(p: Props) {
         {date && (
           <span className="font-serif italic text-[13px] text-paper-dim">{date}</span>
         )}
-        <span className="flex-1" />
-        <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-paper-dim">
-          <span className="text-paper font-medium">{km}</span> km
-          {durationSeconds > 0 && <> · {formatDuration(durationSeconds)}</>}
-          {fuelCost && (
-            <>
-              {' · '}
-              <span className="text-paper font-medium tracking-normal normal-case">{fuelCost}</span>
-            </>
-          )}
-        </span>
+      </div>
+      <div className="mt-1 font-mono text-[10px] tracking-[0.14em] uppercase text-paper-dim">
+        <span className="text-paper font-medium">{km}</span> km
+        {durationSeconds > 0 && <> · {formatDuration(durationSeconds)}</>}
+        {fuelCost && (
+          <>
+            {' · '}
+            <span className="text-paper font-medium tracking-normal normal-case">{fuelCost}</span>
+          </>
+        )}
+        {fuelVolume && (
+          <>
+            {' · '}
+            <span className="text-paper-dim tracking-normal normal-case">{fuelVolume}</span>
+          </>
+        )}
       </div>
       <div className="mt-2 flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.14em] uppercase font-medium ${aaCls}`}>

@@ -160,14 +160,17 @@ describe('findFuelSearchTarget', () => {
   });
 
   it('considers the inbound leg from the previous day', () => {
-    // Day 2's first stop is at flat index 2; its kmFromPrevious is the
-    // leg from Day 1's last stop. That counts as part of Day 2's drive.
+    // Day 2's first stop is at flat index 1; its kmFromPrevious is the
+    // leg from Day 1's last stop. That counts as part of Day 2's drive —
+    // the day-assignment of a fuel stop inserted there is handled at the
+    // insertion site (onFuelStopSelected sets forceDayStart so the new
+    // stop lands in the user's intended day).
     const day1Last = stop({ id: 'a', lat: 60, lng: 18 });
     const day2First = stop({ id: 'b', lat: 50, lng: 18, kmFromPrevious: 800 });
     const day2Next = stop({ id: 'c', lat: 49, lng: 18, kmFromPrevious: 100 });
     const target = findFuelSearchTarget(
       group(2, [
-        { stop: day2First, index: 1 }, // Day 1's stop is at index 0; Day 2 starts at 1
+        { stop: day2First, index: 1 },
         { stop: day2Next, index: 2 },
       ]),
       [day1Last, day2First, day2Next],

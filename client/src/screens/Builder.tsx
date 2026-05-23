@@ -13,7 +13,7 @@ import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
-import { applyDays, dayColor, formatBreakdown, formatDuration, fuelBreakdownForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
@@ -21,9 +21,12 @@ import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
+import { DayColumn } from '../components/builder/DayColumn';
+import { DayNav } from '../components/builder/DayNav';
 import { FuelStopFinder, type FuelStopResult } from '../components/builder/FuelStopFinder';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
+import { useLayoutMode } from '../hooks/useLayoutMode';
 
 // Override row uses string fields so blank inputs don't collapse to 0
 // before the user finishes typing. Converted to numbers only on save.
@@ -48,6 +51,7 @@ type BuilderState = {
   fuelCurrency: string;
   fuelOverrides: FuelOverrideDraft[];
   tankRangeKm: number;
+  tankSizeLitres: string;     // string for the same blank-vs-0 reason
 };
 
 // Curated currency dropdown — covers Europe + the usual road-trip suspects.
@@ -112,6 +116,7 @@ const empty = (): BuilderState => ({
   fuelCurrency: defaultCurrencyForLocale(),
   fuelOverrides: [],
   tankRangeKm: 500,
+  tankSizeLitres: '',
 });
 
 /** One-shot per-version migrations applied on read. v2 normalised legacy
@@ -163,7 +168,14 @@ function fitBounds(map: google.maps.Map, stops: Stop[]) {
   }
   const b = new google.maps.LatLngBounds();
   stops.forEach((s) => b.extend({ lat: s.lat, lng: s.lng }));
-  map.fitBounds(b, 80);
+  // Padding scales to container height — Plan mode renders the map as a
+  // 240px-tall strip, where padding=80 leaves only 80px of vertical fit
+  // area and forces Google Maps to clamp the zoom to "show the globe."
+  // 8% of the shorter dimension works for both the full-height Map mode
+  // viewport and the compact Plan mode strip.
+  const div = map.getDiv();
+  const padding = Math.max(16, Math.round(Math.min(div.clientWidth, div.clientHeight) * 0.08));
+  map.fitBounds(b, padding);
 }
 
 export function Builder() {
@@ -200,6 +212,11 @@ export function Builder() {
   function cycleSheetDown() {
     setSheetState((s) => (s === 'full' ? 'normal' : 'peek'));
   }
+  // Builder layout mode — `map` is the original sidebar + map grid;
+  // `plan` is the day-as-column kanban with the map shrunk to a strip.
+  // Persisted in localStorage by useLayoutMode; the default below only
+  // applies the first time a user lands here.
+  const layout = useLayoutMode('map');
   // When non-null, the next stop added via the search box splices at this
   // flat index instead of appending. Set by the inline "+ insert" button
   // between rows; cleared on add or by the user's × on the chip.
@@ -237,6 +254,9 @@ export function Builder() {
           }))
         : [],
       tankRangeKm: typeof t.tankRangeKm === 'number' && t.tankRangeKm > 0 ? t.tankRangeKm : 500,
+      tankSizeLitres: typeof t.tankSizeLitres === 'number' && t.tankSizeLitres > 0
+        ? String(t.tankSizeLitres)
+        : '',
     };
     setState(next);
     snapshotRef.current = serializeSnapshot(next);
@@ -350,6 +370,15 @@ export function Builder() {
   async function onFuelStopSelected(result: FuelStopResult) {
     if (!fuelTarget) return;
     const insertAt = fuelTarget.insertAtFlatIndex;
+    // When the targeted leg crosses a day boundary (legStart in day N,
+    // legEnd in day N+1), the user clicked "+ Fuel" on day N+1 expecting
+    // the new stop to join day N+1. Fuel stops are transparent to day
+    // grouping, though, so inserting before legEnd would normally drop
+    // the stop into day N. Set forceDayStart on the new fuel stop so it
+    // becomes day N+1's first stop and legEnd naturally falls into N+1
+    // (its inbound km is now small).
+    const crossesDayBoundary =
+      (fuelTarget.legStart.dayNumber || 1) !== (fuelTarget.legEnd.dayNumber || 1);
     setFuelTarget(null);
     // Look up the locality so the chip reads "Grenoble" instead of
     // "Circle K Grenoble Autoroute A48". The full station name stays on `name`
@@ -368,6 +397,7 @@ export function Builder() {
       category: 'fuel',
       highlights: [],
       kmFromPrevious: 0,
+      ...(crossesDayBoundary ? { forceDayStart: true } : {}),
     };
     setState((s) => ({
       ...s,
@@ -401,6 +431,22 @@ export function Builder() {
     );
     return formatBreakdown(b);
   }, [dayedStops, fuelConsumptionNum, fuelPriceNum, state.fuelUnit, state.fuelCurrency, compiledOverrides]);
+  const totalFuelVolumeStr = useMemo(() => {
+    const v = fuelVolumeForLegs(dayedStops, fuelConsumptionNum, state.fuelUnit);
+    return formatVolume(v, state.fuelUnit);
+  }, [dayedStops, fuelConsumptionNum, state.fuelUnit]);
+  const totalFillUpsStr = useMemo(() => {
+    const v = fuelVolumeForLegs(dayedStops, fuelConsumptionNum, state.fuelUnit);
+    const tank = parseFloat(state.tankSizeLitres);
+    return formatFillUps(v, Number.isFinite(tank) ? tank : null, state.fuelUnit);
+  }, [dayedStops, fuelConsumptionNum, state.fuelUnit, state.tankSizeLitres]);
+  // Compact "× N" form for the summary chip — the verbose
+  // "approx. N fill-ups" is preserved for the title (tooltip), the day
+  // headers, and the PDF where horizontal space isn't a constraint.
+  const totalFillUpsCompact = useMemo(() => {
+    const match = totalFillUpsStr?.match(/\d+/);
+    return match ? `× ${match[0]}` : null;
+  }, [totalFillUpsStr]);
   useLegCostMarkers(maps, map, dayedStops, {
     consumption: Number.isFinite(fuelConsumptionNum) && fuelConsumptionNum > 0 ? fuelConsumptionNum : undefined,
     unit: state.fuelUnit,
@@ -418,6 +464,10 @@ export function Builder() {
       compiledOverrides,
     );
     return formatBreakdown(b);
+  }
+  function fuelVolumeForStops(stops: Stop[]): string | null {
+    const v = fuelVolumeForLegs(stops, fuelConsumptionNum, state.fuelUnit);
+    return formatVolume(v, state.fuelUnit);
   }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
@@ -741,6 +791,7 @@ export function Builder() {
         currency: o.currency || '',
       })),
       tankRangeKm: s.tankRangeKm || 500,
+      tankSizeLitres: s.tankSizeLitres || '',
       stops: (s.stops || []).map((x) => ({
         id: x.id, name: x.name, label: x.label,
         lat: x.lat, lng: x.lng,
@@ -781,6 +832,13 @@ export function Builder() {
         fuelCurrency: state.fuelCurrency || 'EUR',
         fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
         tankRangeKm: state.tankRangeKm > 0 ? state.tankRangeKm : undefined,
+        tankSizeLitres: (() => {
+          // state.tankSizeLitres is the canonical litres value (string for
+          // blank-vs-0 reasons). The input form converts to/from gallons
+          // for MPG users at the boundary; here it's already in litres.
+          const litres = parseFloat(state.tankSizeLitres);
+          return Number.isFinite(litres) && litres > 0 ? litres : undefined;
+        })(),
         dataVersion: 3,
         stops: stops.map((s) => {
           // Persist the polyline path so viewer / share / next-builder-open
@@ -856,6 +914,504 @@ export function Builder() {
     );
   }
 
+  // Trip details modal — shared between Plan and Map modes. Both modes
+  // render this same JSX node and trigger it via setDetailsOpen(true).
+  // Closes on backdrop click, Escape, or the × button. The closure
+  // captures state + setState directly so we don't need to thread dozens
+  // of props through a separate component for a single-use surface.
+  const tripDetailsModal = detailsOpen ? (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) setDetailsOpen(false); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') setDetailsOpen(false); }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="trip-details-modal-title"
+    >
+      <div className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] overflow-y-auto bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
+        <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line sticky top-0 bg-surface z-10">
+          <span id="trip-details-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
+            Trip details
+          </span>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(false)}
+            aria-label="Close"
+            className="text-paper-muted hover:text-paper text-[18px] leading-none px-1"
+          >
+            ×
+          </button>
+        </header>
+        <div id="trip-details-panel" className="px-5 pt-4 pb-5 flex flex-col gap-4">
+          <div className="grid grid-cols-3 gap-[18px]">
+            <label className="block min-w-0">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Start date</span>
+              <input
+                type="date"
+                value={state.startDate}
+                onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [color-scheme:dark]"
+              />
+            </label>
+            <label className="block min-w-0 relative">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Max / day</span>
+              <input
+                type="number"
+                min={100}
+                max={2000}
+                step={50}
+                inputMode="numeric"
+                value={state.maxKmPerDay}
+                onChange={(e) => setState((s) => ({ ...s, maxKmPerDay: parseInt(e.target.value, 10) || 600 }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
+            </label>
+            <label className="block min-w-0 relative">
+              <span
+                className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
+                title="Approximate distance the car covers on a full tank. Days with a single leg longer than this surface a refuel warning + the 'Find fuel stop' suggester."
+              >
+                Tank range
+              </span>
+              <input
+                type="number"
+                min={100}
+                max={1500}
+                step={50}
+                inputMode="numeric"
+                value={state.tankRangeKm}
+                onChange={(e) => setState((s) => ({ ...s, tankRangeKm: parseInt(e.target.value, 10) || 500 }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
+            </label>
+          </div>
+          <label className="block">
+            <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Description</span>
+            <textarea
+              rows={2}
+              value={state.description}
+              placeholder="A note for yourself…"
+              onChange={(e) => setState((s) => ({ ...s, description: e.target.value }))}
+              className="w-full bg-transparent border-0 border-b border-line text-paper-dim font-serif italic text-[14px] py-1 outline-none resize-none min-h-[38px] transition-colors focus:border-accent placeholder:text-paper-muted placeholder:italic"
+            />
+          </label>
+          <div className="grid grid-cols-[1fr_auto_1fr_1fr] gap-3 items-end">
+            <label className="block min-w-0 relative">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Fuel</span>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                inputMode="decimal"
+                placeholder="—"
+                value={state.fuelConsumption}
+                onChange={(e) => setState((s) => ({ ...s, fuelConsumption: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+              />
+            </label>
+            <label className="block">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5 invisible">.</span>
+              <select
+                value={state.fuelUnit}
+                onChange={(e) => setState((s) => ({ ...s, fuelUnit: e.target.value as FuelUnit }))}
+                className="bg-transparent border-0 border-b border-line text-paper text-[12px] py-1 pr-3 outline-none cursor-pointer transition-colors focus:border-accent"
+              >
+                <option value="L/100km">L/100km</option>
+                <option value="MPG">MPG</option>
+              </select>
+            </label>
+            <label className="block min-w-0 relative">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Price</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                inputMode="decimal"
+                placeholder="—"
+                value={state.fuelPrice}
+                onChange={(e) => setState((s) => ({ ...s, fuelPrice: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+              />
+            </label>
+            <label className="block min-w-0">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Cur.</span>
+              <select
+                value={state.fuelCurrency}
+                onChange={(e) => setState((s) => ({ ...s, fuelCurrency: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent"
+              >
+                {FUEL_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="block min-w-0 relative max-w-[180px]">
+            <span
+              className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
+              title="Tank capacity — used for the 'approx. N fill-ups' estimate. Optional."
+            >
+              Tank size
+            </span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="decimal"
+              placeholder="—"
+              value={(() => {
+                const litres = parseFloat(state.tankSizeLitres);
+                if (!Number.isFinite(litres) || litres <= 0) return '';
+                return state.fuelUnit === 'MPG'
+                  ? String(Math.round(litres / 3.785411784))
+                  : String(Math.round(litres));
+              })()}
+              onChange={(e) => {
+                const raw = parseFloat(e.target.value);
+                if (!Number.isFinite(raw) || raw <= 0) {
+                  setState((s) => ({ ...s, tankSizeLitres: '' }));
+                  return;
+                }
+                const litres = state.fuelUnit === 'MPG' ? raw * 3.785411784 : raw;
+                setState((s) => ({ ...s, tankSizeLitres: String(litres) }));
+              }}
+              className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-8 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+            />
+            <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">
+              {state.fuelUnit === 'MPG' ? 'gal' : 'L'}
+            </span>
+          </label>
+          {state.fuelOverrides.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
+                Per-country prices
+              </span>
+              {state.fuelOverrides.map((o) => (
+                <div key={o.id} className="grid grid-cols-[1.2fr_1fr_1fr_auto] gap-2 items-center">
+                  <select
+                    value={o.countryCode}
+                    onChange={(e) => {
+                      const nextCc = e.target.value;
+                      const country = FUEL_COUNTRIES.find((c) => c.code === nextCc);
+                      const nextCur = !o.price && country ? country.defaultCurrency : o.currency;
+                      updateFuelOverride(o.id, { countryCode: nextCc, currency: nextCur });
+                    }}
+                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
+                    aria-label="Country"
+                  >
+                    {FUEL_COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.code} · {c.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    inputMode="decimal"
+                    placeholder="Price"
+                    value={o.price}
+                    onChange={(e) => updateFuelOverride(o.id, { price: e.target.value })}
+                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted min-w-0"
+                    aria-label="Price"
+                  />
+                  <select
+                    value={o.currency}
+                    onChange={(e) => updateFuelOverride(o.id, { currency: e.target.value })}
+                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
+                    aria-label="Currency"
+                  >
+                    {FUEL_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeFuelOverride(o.id)}
+                    aria-label="Remove override"
+                    title="Remove override"
+                    className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[14px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={addFuelOverride}
+            className="self-start bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[10px] tracking-[0.16em] uppercase transition-colors hover:text-paper hover:border-paper-dim"
+          >
+            + Country override
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  if (layout.mode === 'plan') {
+    return (
+      <section className="relative h-screen overflow-hidden flex flex-col bg-surface">
+        {/* Compact top bar — Plan mode is the editing surface so the title
+            doesn't need the magazine-scale treatment Map mode has. Target
+            height ~48px, freeing ~30px of vertical space for the columns. */}
+        <div className="flex items-center gap-3 px-6 py-2.5 border-b border-line shrink-0">
+          <button
+            type="button"
+            aria-label="Back to dashboard"
+            onClick={onCancel}
+            className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[13px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim shrink-0"
+          >
+            ←
+          </button>
+          <EmojiPicker value={state.coverEmoji} onChange={(e) => setState((s) => ({ ...s, coverEmoji: e }))} />
+          <input
+            type="text"
+            value={state.name}
+            placeholder="Untitled trip"
+            maxLength={80}
+            onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
+            className="flex-1 bg-transparent border-0 text-paper font-serif italic text-[18px] leading-[1.2] tracking-tight py-1 outline-none min-w-0 placeholder:text-paper-muted placeholder:italic"
+          />
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            data-testid="open-trip-details"
+            title="Edit trip details (fuel, dates, tank…)"
+            className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors shrink-0"
+          >
+            Trip details
+          </button>
+          <div className="hidden md:inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-7" role="group" aria-label="Layout mode">
+            <button
+              type="button"
+              onClick={() => layout.setMode('plan')}
+              aria-pressed={true}
+              data-testid="layout-mode-plan"
+              className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase bg-accent text-canvas"
+            >
+              Plan
+            </button>
+            <button
+              type="button"
+              onClick={() => layout.setMode('map')}
+              aria-pressed={false}
+              data-testid="layout-mode-map"
+              className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase border-l border-line bg-transparent text-paper-dim hover:text-paper transition-colors"
+            >
+              Map
+            </button>
+          </div>
+        </div>
+
+        {/* Map strip — fixed-height band that keeps the geography in
+            view while the user edits stops below. Width = full viewport. */}
+        <div className="relative w-full h-[240px] shrink-0 bg-[#13151a] border-b border-line">
+          {routes.loading && (
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+              <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
+            </div>
+          )}
+          <div ref={setMapDiv} className="w-full h-full" />
+          {state.tripId && (
+            <PinMapLayer
+              map={map}
+              maps={maps}
+              pins={builderPins}
+              onRequestCreate={pinModal.openCreate}
+              onRequestEdit={pinModal.openEdit}
+              onRequestDelete={pinModal.deletePin}
+            />
+          )}
+        </div>
+
+        {/* Day navigator — click a chip to scroll the columns row to
+            that day. Borrows dayColor from the polylines above so the
+            chip color matches the leg's tint on the map. */}
+        <DayNav
+          groups={dayGroups}
+          onJump={(day) => {
+            const el = document.getElementById(`day-col-${day}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+          }}
+        />
+
+        {/* Search row — sits directly above the day columns so the user's
+            intent ("add a stop") visually connects to where the stop will
+            land. Insert chip appears here when an inline "+ insert" target
+            is selected within a column below. */}
+        <div className="px-6 py-2.5 flex items-center gap-3 border-b border-line shrink-0 bg-canvas">
+          <span className="font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted shrink-0">
+            Stops <span className="text-paper font-medium ml-1">{state.stops.length}</span>
+          </span>
+          <div className="relative flex-1 max-w-[520px]">
+            <span className="absolute left-[12px] top-1/2 -translate-y-[7px] text-paper-muted text-[14px] pointer-events-none">⌕</span>
+            <input
+              ref={searchInputRef}
+              type="text"
+              autoComplete="off"
+              placeholder={insertIndex == null ? 'Search for a city or place…' : 'Search the place to insert…'}
+              className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[7px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
+            />
+          </div>
+          {insertIndex != null && (() => {
+            const before = insertIndex > 0 ? dayedStops[insertIndex - 1] : null;
+            const after = insertIndex < dayedStops.length ? dayedStops[insertIndex] : null;
+            let label: string;
+            if (before && after) label = `Insert between ${before.label || before.name} and ${after.label || after.name}`;
+            else if (before) label = `Insert after ${before.label || before.name}`;
+            else if (after) label = `Insert before ${after.label || after.name}`;
+            else label = 'Insert as first stop';
+            return (
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent-soft border border-accent text-accent font-mono text-[10px] tracking-[0.14em] uppercase max-w-full">
+                <span className="truncate normal-case tracking-normal font-sans text-[11.5px]">{label}</span>
+                <button
+                  type="button"
+                  onClick={() => setInsertIndex(null)}
+                  aria-label="Cancel insert"
+                  title="Cancel insert"
+                  className="text-accent hover:text-paper text-[13px] leading-none -mr-1 px-1"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })()}
+          {/* Save/Cancel live here in Plan mode (instead of a separate
+              footer row) so the editing surface keeps its tall card area.
+              ml-auto pushes them to the right; the buttons stay shrink-0
+              so they never collapse when the insert chip is wide. */}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onCancel}
+              data-testid="cancel-trip"
+              className="bg-transparent border border-line text-paper-dim px-3 py-[5px] rounded text-[12px] tracking-wide transition-colors hover:border-paper-dim hover:text-paper"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              data-testid="save-trip"
+              className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+            >
+              {saving ? 'Saving…' : 'Save trip'}
+            </button>
+          </div>
+        </div>
+
+        {/* Day-columns track — flex-1 fills remaining vertical space.
+            Horizontal scroll handles overflow when there are more days
+            than fit on the screen. */}
+        <div className="flex-1 overflow-x-auto overflow-y-hidden bg-canvas">
+          {dayGroups.length === 0 ? (
+            <p className="text-center font-serif italic text-paper-muted py-12 px-6 text-[14px]">
+              Search above to add your first stop.
+            </p>
+          ) : (
+            <div className="flex gap-3 px-6 py-4 h-full items-stretch">
+              {dayGroups.map((g, gi) => (
+                <DayColumn
+                  key={g.day}
+                  group={g}
+                  startDate={state.startDate}
+                  fuelCost={fuelCostForStops(g.stops.map((x) => x.stop))}
+                  fuelVolume={fuelVolumeForStops(g.stops.map((x) => x.stop))}
+                  totalStops={dayedStops.length}
+                  isFirstDay={gi === 0}
+                  insertIndex={insertIndex}
+                  onInsertAt={startInsertAt}
+                  onChangeType={setStopType}
+                  onChangeRouteMode={setStopRouteMode}
+                  onRemove={removeStop}
+                  onSetForceDayStart={setForceDayStart}
+                  onAddHighlight={addHighlight}
+                  onRemoveHighlight={removeHighlight}
+                  onDemote={state.tripId ? (s) => pinModal.openDemote(s) : undefined}
+                  demotingStopId={
+                    demoteStop.isPending && demoteStop.variables
+                      ? ('stop' in demoteStop.variables
+                          ? demoteStop.variables.stop.id
+                          : demoteStop.variables.id)
+                      : null
+                  }
+                  onDragStart={(id) => { draggedIdRef.current = id; }}
+                  onDragEnd={() => { draggedIdRef.current = null; }}
+                  onDragOver={() => { /* handled in StopRow */ }}
+                  onDragLeave={() => { /* handled in StopRow */ }}
+                  onDrop={(id, ev) => reorder(id, ev)}
+                  onDropAtDayStart={gi > 0 ? reorderToDayStart : undefined}
+                  onFindFuel={fuelTargetForDay(g.day) !== null ? () => openFuelForDay(g.day) : undefined}
+                  tankRangeKm={state.tankRangeKm}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Summary bar — identical to Map mode. */}
+        <div className="border-t border-line px-6 pt-3 pb-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim bg-surface shrink-0">
+          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+            <span className="text-paper text-[14px] font-medium">{totals.totalKm.toLocaleString('en-US')}</span>
+            <span>km</span>
+          </span>
+          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+            <span className="text-paper text-[14px] font-medium">{totals.totalDays}</span>
+            <span>{totals.totalDays === 1 ? 'day' : 'days'}</span>
+          </span>
+          {totals.totalDurationSeconds > 0 && (
+            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+              <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
+            </span>
+          )}
+          {totalFuelCostStr && (
+            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+              <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
+            </span>
+          )}
+          {totalFuelVolumeStr && (
+            <span
+              className="inline-flex items-baseline gap-1 whitespace-nowrap"
+              title={totalFillUpsStr ? `${totalFuelVolumeStr} · ${totalFillUpsStr}` : undefined}
+            >
+              <span className="text-paper-dim text-[14px] font-medium tracking-normal normal-case">{totalFuelVolumeStr}</span>
+              {totalFillUpsCompact && (
+                <span className="text-paper-muted text-[12px] tracking-normal normal-case">· {totalFillUpsCompact}</span>
+              )}
+            </span>
+          )}
+          <span className="ml-auto font-sans text-[14px] tracking-[0.06em] whitespace-nowrap">{flagSet.join(' ')}</span>
+        </div>
+
+        {pinModal.modalElement}
+
+        {tripDetailsModal}
+
+        {fuelTarget && maps && map && (
+          <FuelStopFinder
+            target={fuelTarget}
+            maps={maps}
+            map={map}
+            onSelect={onFuelStopSelected}
+            onClose={() => setFuelTarget(null)}
+          />
+        )}
+
+        {savedToast && (
+          <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
+        )}
+        <Toast
+          message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
+          onDismiss={routes.clearFailure}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="relative h-screen overflow-hidden md:grid md:grid-cols-[360px_1fr]">
       <aside
@@ -918,202 +1474,41 @@ export function Builder() {
             onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
             className="flex-1 bg-transparent border-0 text-paper font-serif italic text-[26px] leading-[1.15] tracking-tight py-1 outline-none min-w-0 placeholder:text-paper-muted placeholder:italic"
           />
+          {/* Mode toggle — this render path is Map mode (Plan mode early-returns
+              above), so the styles are hardcoded rather than driven off layout.mode. */}
+          <div className="hidden md:inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-8 mt-[6px]" role="group" aria-label="Layout mode">
+            <button
+              type="button"
+              onClick={() => layout.setMode('plan')}
+              aria-pressed={false}
+              title="Plan mode — days side-by-side as columns"
+              className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase transition-colors bg-transparent text-paper-dim hover:text-paper"
+            >
+              Plan
+            </button>
+            <button
+              type="button"
+              onClick={() => layout.setMode('map')}
+              aria-pressed={true}
+              title="Map mode — sidebar + full map"
+              className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase border-l border-line transition-colors bg-accent text-canvas"
+            >
+              Map
+            </button>
+          </div>
         </div>
 
         <div className="border-b border-line">
           <button
             type="button"
-            onClick={() => setDetailsOpen((o) => !o)}
-            aria-expanded={detailsOpen}
-            aria-controls="trip-details-panel"
+            onClick={() => setDetailsOpen(true)}
+            data-testid="open-trip-details"
             className="w-full flex items-center justify-between px-6 py-2.5 font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors"
           >
             <span>Trip details</span>
-            <span aria-hidden className="text-[12px]">{detailsOpen ? '▾' : '▸'}</span>
+            <span aria-hidden className="text-[12px]">↗</span>
           </button>
         </div>
-        {detailsOpen && (
-        <div id="trip-details-panel" className="px-6 pt-1 pb-3 border-b border-line flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-[18px]">
-            <label className="block min-w-0">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Start date</span>
-              <input
-                type="date"
-                value={state.startDate}
-                onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [color-scheme:dark]"
-              />
-            </label>
-            <label className="block min-w-0 relative">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Max / day</span>
-              <input
-                type="number"
-                min={100}
-                max={2000}
-                step={50}
-                inputMode="numeric"
-                value={state.maxKmPerDay}
-                onChange={(e) => setState((s) => ({ ...s, maxKmPerDay: parseInt(e.target.value, 10) || 600 }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
-            </label>
-            <label className="block min-w-0 relative">
-              <span
-                className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
-                title="Approximate distance the car covers on a full tank. Days with a single leg longer than this surface a refuel warning + the 'Find fuel stop' suggester."
-              >
-                Tank range
-              </span>
-              <input
-                type="number"
-                min={100}
-                max={1500}
-                step={50}
-                inputMode="numeric"
-                value={state.tankRangeKm}
-                onChange={(e) => setState((s) => ({ ...s, tankRangeKm: parseInt(e.target.value, 10) || 500 }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
-            </label>
-          </div>
-          <label className="block">
-            <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Description</span>
-            <textarea
-              rows={2}
-              value={state.description}
-              placeholder="A note for yourself…"
-              onChange={(e) => setState((s) => ({ ...s, description: e.target.value }))}
-              className="w-full bg-transparent border-0 border-b border-line text-paper-dim font-serif italic text-[14px] py-1 outline-none resize-none min-h-[38px] transition-colors focus:border-accent placeholder:text-paper-muted placeholder:italic"
-            />
-          </label>
-
-          {/* Fuel cost estimator — all four fields optional. The summary bar
-              and day headers only render a cost when consumption+price are set. */}
-          <div className="grid grid-cols-[1fr_auto_1fr_1fr] gap-3 items-end">
-            <label className="block min-w-0 relative">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Fuel</span>
-              <input
-                type="number"
-                min={0}
-                step={0.1}
-                inputMode="decimal"
-                placeholder="—"
-                value={state.fuelConsumption}
-                onChange={(e) => setState((s) => ({ ...s, fuelConsumption: e.target.value }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
-              />
-            </label>
-            <label className="block">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5 invisible">.</span>
-              <select
-                value={state.fuelUnit}
-                onChange={(e) => setState((s) => ({ ...s, fuelUnit: e.target.value as FuelUnit }))}
-                className="bg-transparent border-0 border-b border-line text-paper text-[12px] py-1 pr-3 outline-none cursor-pointer transition-colors focus:border-accent"
-              >
-                <option value="L/100km">L/100km</option>
-                <option value="MPG">MPG</option>
-              </select>
-            </label>
-            <label className="block min-w-0 relative">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Price</span>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                inputMode="decimal"
-                placeholder="—"
-                value={state.fuelPrice}
-                onChange={(e) => setState((s) => ({ ...s, fuelPrice: e.target.value }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
-              />
-            </label>
-            <label className="block min-w-0">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Cur.</span>
-              <select
-                value={state.fuelCurrency}
-                onChange={(e) => setState((s) => ({ ...s, fuelCurrency: e.target.value }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent"
-              >
-                {FUEL_CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {/* Per-country fuel overrides. When a leg's destination has a
-              matching countryCode, its (price, currency) replaces the trip
-              defaults. Used in the breakdown shown in summary + day rows. */}
-          {state.fuelOverrides.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted">
-                Per-country prices
-              </span>
-              {state.fuelOverrides.map((o) => (
-                <div key={o.id} className="grid grid-cols-[1.2fr_1fr_1fr_auto] gap-2 items-center">
-                  <select
-                    value={o.countryCode}
-                    onChange={(e) => {
-                      const nextCc = e.target.value;
-                      const country = FUEL_COUNTRIES.find((c) => c.code === nextCc);
-                      // Bump currency to the country's default when the user
-                      // switches country — but only if they haven't yet set
-                      // a price (less likely they intend the same currency).
-                      const nextCur = !o.price && country ? country.defaultCurrency : o.currency;
-                      updateFuelOverride(o.id, { countryCode: nextCc, currency: nextCur });
-                    }}
-                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
-                    aria-label="Country"
-                  >
-                    {FUEL_COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.code} · {c.name}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    inputMode="decimal"
-                    placeholder="Price"
-                    value={o.price}
-                    onChange={(e) => updateFuelOverride(o.id, { price: e.target.value })}
-                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted min-w-0"
-                    aria-label="Price"
-                  />
-                  <select
-                    value={o.currency}
-                    onChange={(e) => updateFuelOverride(o.id, { currency: e.target.value })}
-                    className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent min-w-0"
-                    aria-label="Currency"
-                  >
-                    {FUEL_CURRENCIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeFuelOverride(o.id)}
-                    aria-label="Remove override"
-                    title="Remove override"
-                    className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[14px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={addFuelOverride}
-            className="self-start bg-transparent border border-line text-paper-dim px-2.5 py-[5px] rounded font-mono text-[10px] tracking-[0.16em] uppercase transition-colors hover:text-paper hover:border-paper-dim"
-          >
-            + Country override
-          </button>
-        </div>
-        )}
 
         <div className="flex-1 flex flex-col overflow-hidden pt-[18px]">
           <div className="px-6 pb-3 font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted flex items-center gap-3">
@@ -1165,6 +1560,7 @@ export function Builder() {
               stops={dayedStops}
               startDate={state.startDate}
               fuelCostFor={fuelCostForStops}
+              fuelVolumeFor={fuelVolumeForStops}
               insertIndex={insertIndex}
               onInsertAt={startInsertAt}
               onChangeType={setStopType}
@@ -1195,26 +1591,37 @@ export function Builder() {
         </div>
 
         {/* Summary bar */}
-        <div className="border-t border-line px-6 pt-3 pb-2.5 flex items-center gap-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim bg-surface">
-          <span className="inline-flex items-baseline gap-1">
+        <div className="border-t border-line px-6 pt-3 pb-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim bg-surface">
+          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
             <span className="text-paper text-[14px] font-medium">{totals.totalKm.toLocaleString('en-US')}</span>
             <span>km</span>
           </span>
-          <span className="inline-flex items-baseline gap-1">
+          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
             <span className="text-paper text-[14px] font-medium">{totals.totalDays}</span>
             <span>{totals.totalDays === 1 ? 'day' : 'days'}</span>
           </span>
           {totals.totalDurationSeconds > 0 && (
-            <span className="inline-flex items-baseline gap-1">
+            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
             </span>
           )}
           {totalFuelCostStr && (
-            <span className="inline-flex items-baseline gap-1">
+            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
             </span>
           )}
-          <span className="ml-auto font-sans text-[14px] tracking-[0.06em]">{flagSet.join(' ')}</span>
+          {totalFuelVolumeStr && (
+            <span
+              className="inline-flex items-baseline gap-1 whitespace-nowrap"
+              title={totalFillUpsStr ? `${totalFuelVolumeStr} · ${totalFillUpsStr}` : undefined}
+            >
+              <span className="text-paper-dim text-[14px] font-medium tracking-normal normal-case">{totalFuelVolumeStr}</span>
+              {totalFillUpsCompact && (
+                <span className="text-paper-muted text-[12px] tracking-normal normal-case">· {totalFillUpsCompact}</span>
+              )}
+            </span>
+          )}
+          <span className="ml-auto font-sans text-[14px] tracking-[0.06em] whitespace-nowrap">{flagSet.join(' ')}</span>
         </div>
 
         <footer className="border-t border-line px-6 py-3.5 flex justify-between items-center gap-3 bg-surface">
@@ -1256,6 +1663,8 @@ export function Builder() {
       </div>
 
       {pinModal.modalElement}
+
+      {tripDetailsModal}
 
       {fuelTarget && maps && map && (
         <FuelStopFinder

@@ -29,6 +29,26 @@ export function legCost(
   overrides: FuelOverride[] | undefined,
 ): LegCost | null;
 
+export function estimateFuelVolume(
+  km: number,
+  consumption: number | undefined | null,
+  unit: FuelUnit | undefined,
+): number | null;
+
+export function fuelVolumeForLegs(
+  stops: Stop[],
+  consumption: number | undefined | null,
+  unit: FuelUnit | undefined,
+): number;
+
+export function formatVolume(volume: number | null | undefined, unit: FuelUnit | undefined): string | null;
+
+export function formatFillUps(
+  volume: number | null | undefined,
+  tankSizeLitres: number | null | undefined,
+  unit: FuelUnit | undefined,
+): string | null;
+
 export function formatCurrency(
   amount: number,
   currency: string | undefined,

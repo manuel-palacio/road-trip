@@ -4,11 +4,15 @@ import {
   applyDays,
   dayColor,
   estimateFuelCost,
+  estimateFuelVolume,
   formatBreakdown,
   formatCurrency,
   formatDayDate,
   formatDuration,
+  formatFillUps,
+  formatVolume,
   fuelBreakdownForLegs,
+  fuelVolumeForLegs,
   groupByDay,
   isFuelStop,
   legCost,
@@ -287,6 +291,100 @@ describe('fuelBreakdownForLegs', () => {
     ];
     const b = fuelBreakdownForLegs(stops, 7, 'L/100km', 1.80, 'EUR', []);
     expect(b.get('EUR')).toBeCloseTo(7 * 1.80, 5);
+  });
+});
+
+describe('estimateFuelVolume', () => {
+  it('returns null when consumption is missing', () => {
+    expect(estimateFuelVolume(500, undefined, 'L/100km')).toBeNull();
+    expect(estimateFuelVolume(500, 0, 'L/100km')).toBeNull();
+    expect(estimateFuelVolume(500, -1, 'L/100km')).toBeNull();
+  });
+
+  it('returns 0 for zero distance', () => {
+    expect(estimateFuelVolume(0, 7, 'L/100km')).toBe(0);
+  });
+
+  it('returns litres for L/100km units', () => {
+    // 500 km × 7 L/100km = 35 L
+    expect(estimateFuelVolume(500, 7, 'L/100km')).toBeCloseTo(35, 5);
+  });
+
+  it('returns US gallons for MPG units', () => {
+    // 500 km at 33.6 MPG ≈ 7 L/100km × 500 km / 100 = 35L → 35 / 3.785411784 ≈ 9.247 gal
+    expect(estimateFuelVolume(500, 33.6, 'MPG')).toBeCloseTo(35 / 3.785411784, 2);
+  });
+
+  it('scales linearly with distance', () => {
+    const small = estimateFuelVolume(100, 8, 'L/100km')!;
+    const big = estimateFuelVolume(1000, 8, 'L/100km')!;
+    expect(big / small).toBeCloseTo(10, 5);
+  });
+});
+
+describe('fuelVolumeForLegs', () => {
+  it('sums leg volumes', () => {
+    const stops = [
+      stop({ id: 'a' }),
+      stop({ id: 'b', kmFromPrevious: 200 }),
+      stop({ id: 'c', kmFromPrevious: 300 }),
+    ];
+    // 500 km × 7 L/100 = 35 L
+    expect(fuelVolumeForLegs(stops, 7, 'L/100km')).toBeCloseTo(35, 5);
+  });
+
+  it('returns 0 when consumption is not configured', () => {
+    const stops = [stop({ id: 'a' }), stop({ id: 'b', kmFromPrevious: 200 })];
+    expect(fuelVolumeForLegs(stops, undefined, 'L/100km')).toBe(0);
+    expect(fuelVolumeForLegs(stops, 0, 'L/100km')).toBe(0);
+  });
+});
+
+describe('formatVolume', () => {
+  it('formats litres for L/100km with no decimals', () => {
+    expect(formatVolume(35.4, 'L/100km')).toBe('35L');
+    expect(formatVolume(35.6, 'L/100km')).toBe('36L');
+  });
+
+  it('formats gallons for MPG', () => {
+    expect(formatVolume(9.2, 'MPG')).toBe('9 gal');
+    expect(formatVolume(15.8, 'MPG')).toBe('16 gal');
+  });
+
+  it('returns null for non-positive volumes', () => {
+    expect(formatVolume(0, 'L/100km')).toBeNull();
+    expect(formatVolume(-1, 'L/100km')).toBeNull();
+    expect(formatVolume(null, 'L/100km')).toBeNull();
+    expect(formatVolume(undefined, 'L/100km')).toBeNull();
+  });
+});
+
+describe('formatFillUps', () => {
+  it('returns null when tank size is not configured', () => {
+    expect(formatFillUps(100, undefined, 'L/100km')).toBeNull();
+    expect(formatFillUps(100, 0, 'L/100km')).toBeNull();
+    expect(formatFillUps(100, null, 'L/100km')).toBeNull();
+  });
+
+  it('returns null when volume is missing', () => {
+    expect(formatFillUps(null, 60, 'L/100km')).toBeNull();
+    expect(formatFillUps(0, 60, 'L/100km')).toBeNull();
+  });
+
+  it("rounds up — even 1 L over a tank counts as 2 fill-ups", () => {
+    expect(formatFillUps(61, 60, 'L/100km')).toBe('approx. 2 fill-ups');
+    expect(formatFillUps(60, 60, 'L/100km')).toBe('approx. 1 fill-up');
+    expect(formatFillUps(180, 60, 'L/100km')).toBe('approx. 3 fill-ups');
+  });
+
+  it('singular vs plural', () => {
+    expect(formatFillUps(30, 60, 'L/100km')).toBe('approx. 1 fill-up');
+    expect(formatFillUps(120, 60, 'L/100km')).toBe('approx. 2 fill-ups');
+  });
+
+  it('MPG users: tankSizeLitres converts to gallons before the math', () => {
+    // Tank 60 L ≈ 15.85 US gal. 30 gal of consumption → ceil(30/15.85) = 2 fill-ups.
+    expect(formatFillUps(30, 60, 'MPG')).toBe('approx. 2 fill-ups');
   });
 });
 

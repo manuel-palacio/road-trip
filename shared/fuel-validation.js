@@ -70,6 +70,7 @@ export function validateFuelField(key, raw) {
     case 'fuelConsumption': return validatePositiveNumber('fuelConsumption', raw);
     case 'fuelPrice':       return validatePositiveNumber('fuelPrice', raw);
     case 'tankRangeKm':     return validatePositiveNumber('tankRangeKm', raw);
+    case 'tankSizeLitres':  return validatePositiveNumber('tankSizeLitres', raw);
     case 'fuelUnit':        return validateFuelUnit(raw);
     case 'fuelCurrency':    return validateFuelCurrency(raw);
     default:                return null;

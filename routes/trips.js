@@ -30,6 +30,7 @@ const UPDATABLE_FIELDS = [
   'fuelCurrency',
   'fuelOverrides',
   'tankRangeKm',
+  'tankSizeLitres',
   'dataVersion',
 ];
 
@@ -456,6 +457,11 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
       stops, trip.fuelConsumption, trip.fuelUnit, trip.fuelPrice, trip.fuelCurrency, trip.fuelOverrides,
     );
     const breakdownToStr = (b) => fuel.formatBreakdown(b, 'en-US');
+    const volumeForStops = (stops) => fuel.fuelVolumeForLegs(stops, trip.fuelConsumption, trip.fuelUnit);
+    const volumeToStr = (stops) => fuel.formatVolume(volumeForStops(stops), trip.fuelUnit);
+    const fillUpsForStops = (stops) => fuel.formatFillUps(
+      volumeForStops(stops), trip.tankSizeLitres, trip.fuelUnit,
+    );
     const filename = `${sanitizeFilename(trip.name)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -480,6 +486,11 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
     const stopsForPricing = Array.isArray(trip.stops) ? trip.stops : [];
     const totalBreakdownStr = breakdownToStr(breakdownForTrip(stopsForPricing));
     if (totalBreakdownStr) totals.push(`Est. fuel ${totalBreakdownStr}`);
+    const totalVolumeStr = volumeToStr(stopsForPricing);
+    if (totalVolumeStr) {
+      const fillUpsStr = fillUpsForStops(stopsForPricing);
+      totals.push(fillUpsStr ? `${totalVolumeStr} · ${fillUpsStr}` : totalVolumeStr);
+    }
     doc
       .moveDown(0.8)
       .fillColor('#000')
@@ -494,12 +505,14 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
       const dayKm = dayStops.reduce((acc, s) => acc + (s.kmFromPrevious || 0), 0);
       const dayBreakdownStr = breakdownToStr(breakdownForTrip(dayStops));
       const dayCostStr = dayBreakdownStr ? `  ·  ${dayBreakdownStr}` : '';
+      const dayVolumeStr = volumeToStr(dayStops);
+      const dayVolStr = dayVolumeStr ? `  ·  ${dayVolumeStr}` : '';
       doc
         .moveDown(1.1)
         .font('Helvetica-Bold')
         .fontSize(11)
         .fillColor('#000')
-        .text(`Day ${day}${dayKm > 0 ? `  ·  ${dayKm} km${dayCostStr}` : ''}`, { continued: false });
+        .text(`Day ${day}${dayKm > 0 ? `  ·  ${dayKm} km${dayCostStr}${dayVolStr}` : ''}`, { continued: false });
       doc.moveDown(0.3);
       for (const stop of dayStops) {
         const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';

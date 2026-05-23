@@ -20,6 +20,56 @@ export function estimateFuelCost(km, consumption, unit, pricePerUnit) {
   return litres * pricePerUnit;
 }
 
+/** US gallons per litre — used for MPG conversions. */
+const LITRES_PER_GALLON = 3.785411784;
+
+/** Estimate fuel volume consumed for a leg. Returns litres for L/100km
+ * units, US gallons for MPG units. Null when km is 0 or consumption is
+ * not configured. Mirrors estimateFuelCost without the price step. */
+export function estimateFuelVolume(km, consumption, unit) {
+  if (!km || km < 0) return 0;
+  if (consumption == null || !Number.isFinite(consumption) || consumption <= 0) return null;
+  if (unit === 'MPG') {
+    const lPer100 = 235.2146 / consumption;
+    const litres = (km / 100) * lPer100;
+    return litres / LITRES_PER_GALLON;
+  }
+  return (km / 100) * consumption;
+}
+
+/** Sum of estimated fuel volume across all legs in `stops`. Unit-agnostic:
+ * returns litres for L/100km and US gallons for MPG. Returns 0 when
+ * consumption isn't configured. */
+export function fuelVolumeForLegs(stops, consumption, unit) {
+  let total = 0;
+  for (const stop of stops) {
+    const v = estimateFuelVolume(stop.kmFromPrevious || 0, consumption, unit);
+    if (v == null || v <= 0) continue;
+    total += v;
+  }
+  return total;
+}
+
+/** Format a volume amount for display. Litres render as `138L`, gallons as
+ * `36 gal`. Caller decides which unit context to pass. */
+export function formatVolume(volume, unit) {
+  if (volume == null || !Number.isFinite(volume) || volume <= 0) return null;
+  const rounded = Math.round(volume);
+  return unit === 'MPG' ? `${rounded} gal` : `${rounded}L`;
+}
+
+/** "approx. N fill-ups" string. `tankSizeLitres` is the canonical storage
+ * unit (litres) so we convert to gallons for MPG callers. Returns null
+ * when tank size isn't set or the math doesn't yield at least 1 fill-up. */
+export function formatFillUps(volume, tankSizeLitres, unit) {
+  if (!volume || volume <= 0) return null;
+  if (!tankSizeLitres || !Number.isFinite(tankSizeLitres) || tankSizeLitres <= 0) return null;
+  const tankInUnit = unit === 'MPG' ? tankSizeLitres / LITRES_PER_GALLON : tankSizeLitres;
+  const fillUps = Math.ceil(volume / tankInUnit);
+  if (fillUps < 1) return null;
+  return `approx. ${fillUps} fill-up${fillUps === 1 ? '' : 's'}`;
+}
+
 /** Resolve the (price, currency) that should apply to a leg ending at `stop`.
  * Returns the matching fuelOverride when one exists and is complete, otherwise
  * the trip-level defaults. Shared by per-leg and per-trip cost calculations. */

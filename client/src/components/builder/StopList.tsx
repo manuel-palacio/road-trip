@@ -10,6 +10,7 @@ type Props = {
   stops: Stop[];
   startDate: string | null | undefined;
   fuelCostFor?: (stops: Stop[]) => string | null;
+  fuelVolumeFor?: (stops: Stop[]) => string | null;
   insertIndex?: number | null;
   onInsertAt?: (index: number) => void;
   onChangeType: (id: string, type: Stop['type']) => void;
@@ -57,6 +58,7 @@ export function StopList(p: Props) {
             startDate={p.startDate}
             isFirst={gi === 0}
             fuelCost={p.fuelCostFor ? p.fuelCostFor(g.stops.map((x) => x.stop)) : null}
+            fuelVolume={p.fuelVolumeFor ? p.fuelVolumeFor(g.stops.map((x) => x.stop)) : null}
             longLegKm={longestLegOverRange(g, p.tankRangeKm)}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
             onFindFuel={

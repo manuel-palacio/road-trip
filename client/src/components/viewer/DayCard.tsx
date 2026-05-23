@@ -23,13 +23,14 @@ type Props = {
   visible: boolean;
   onToggleVisibility: () => void;
   fuelCost?: string | null;
+  fuelVolume?: string | null;
   bookingAffiliateId?: string | null;
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 (or omitted) hides the chip. */
   longLegKm?: number;
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, bookingAffiliateId, longLegKm = 0 }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, bookingAffiliateId, longLegKm = 0 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -94,6 +95,12 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
             <>
               {' · '}
               <span className="text-paper font-medium tracking-normal normal-case">{fuelCost}</span>
+            </>
+          )}
+          {fuelVolume && (
+            <>
+              {' · '}
+              <span className="text-paper-dim tracking-normal normal-case">{fuelVolume}</span>
             </>
           )}
         </span>

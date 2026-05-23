@@ -122,6 +122,11 @@ export type Trip = {
   // fuel-stop suggester (findFuelSearchTarget) and the per-day "long leg"
   // warning chip. Defaults to 500 km when unset.
   tankRangeKm?: number;
+  // Tank capacity in **litres** (canonical). MPG users see + edit this as
+  // gallons in the UI but it's converted to litres for storage. Drives the
+  // "approx. N fill-ups" trip-summary annotation. Optional; no fill-up
+  // estimate when unset.
+  tankSizeLitres?: number;
   // Community templates — when isTemplate=true the trip is visible at
   // /api/templates (public, no auth) and clonable by anyone. The owner
   // controls publishing; cloneCount is server-incremented on each clone.

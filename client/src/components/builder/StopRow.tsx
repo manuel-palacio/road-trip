@@ -66,6 +66,7 @@ export function StopRow(p: Props) {
   return (
     <div
       data-stop-id={stop.id}
+      data-testid="stop-card"
       draggable={false}
       onDragOver={(ev) => {
         if (!ev.dataTransfer.types.includes('text/plain')) return;

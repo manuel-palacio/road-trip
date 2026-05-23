@@ -5,10 +5,14 @@ import type { Stop } from './types';
 // import surface keeps working for every screen and test.
 export {
   estimateFuelCost,
+  estimateFuelVolume,
   fuelBreakdownForLegs,
+  fuelVolumeForLegs,
   legCost,
   formatCurrency,
   formatBreakdown,
+  formatVolume,
+  formatFillUps,
 } from '../../../shared/fuel';
 export type { FuelBreakdown, LegCost } from '../../../shared/fuel';
 
@@ -50,12 +54,27 @@ export function formatDuration(seconds: number): string {
  * + per-stop forceDayStart flag. First stop is forced to Day 1. Fuel stops
  * are transparent to day planning: they never trigger a boundary themselves,
  * so a 600 km day with a refuel in the middle stays on one day.
+ *
+ * Special case for fuel-on-boundary-leg insertion: when a fuel stop
+ * carries forceDayStart=true (set by onFuelStopSelected when the user
+ * adds a fuel stop on a leg that spans a day boundary), the km-overflow
+ * check is suppressed for the next non-fuel stop in that forced day.
+ * Without this, a 780 km Hamburg→Reims leg split as NewFuel(400) +
+ * Reims(380) would trip the maxKm check at Reims and push it into yet
+ * another day — even though the original single leg sat in one day.
+ *
  * Pure: returns a new array, doesn't mutate input. */
 export function applyDays(stops: Stop[], maxKm: number): Stop[] {
   if (stops.length === 0) return stops;
   const result: Stop[] = [];
   let day = 1;
   let dayKm = 0;
+  // True while inside a day opened by a fuel stop's forceDayStart. The
+  // first non-fuel stop after that bypasses the km check (it's the
+  // continuation of one intended drive). Reset once consumed, OR when
+  // an explicit overnight / forceDayStart on a non-fuel stop opens a
+  // fresh day.
+  let softFuelDay = false;
   for (let i = 0; i < stops.length; i++) {
     const stop = stops[i];
     if (i === 0) {
@@ -67,11 +86,16 @@ export function applyDays(stops: Stop[], maxKm: number): Stop[] {
     const prevOvernight = stops[i - 1].type === 'overnight';
     const forced = stop.forceDayStart === true;
     const isFuel = stop.type === 'fuel';
-    if (forced || prevOvernight || (!isFuel && dayKm + seg > maxKm)) {
+    const kmOverflow = !softFuelDay && !isFuel && dayKm + seg > maxKm;
+    if (forced || prevOvernight || kmOverflow) {
       day++;
       dayKm = seg;
+      // Only fuel-forced day starts opt into the soft window.
+      // forceDayStart on a regular stop is a hard boundary that resets it.
+      softFuelDay = forced && isFuel;
     } else {
       dayKm += seg;
+      if (!isFuel) softFuelDay = false;
     }
     result.push({ ...stop, dayNumber: day });
   }

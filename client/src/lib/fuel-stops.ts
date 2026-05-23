@@ -31,7 +31,11 @@ export function findLongestLegTarget(
   let maxKm = 0;
   let endIdx = -1;
   for (const { stop, index } of group.stops) {
-    // The first stop in the trip has no inbound leg; skip it.
+    // The first stop in the trip has no inbound leg; skip it. Boundary
+    // legs (a day's first stop, whose kmFromPrevious is the leg from the
+    // previous day) DO count — they're real driving distance and the
+    // caller (onFuelStopSelected) handles the day-assignment via
+    // forceDayStart so the new fuel stop lands in the user's intended day.
     if (index === 0) continue;
     const km = stop.kmFromPrevious || 0;
     if (km > maxKm) {

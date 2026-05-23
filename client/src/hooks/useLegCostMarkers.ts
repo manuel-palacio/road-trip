@@ -6,7 +6,7 @@ import type { FuelOverride, FuelUnit, Stop } from '../lib/types';
 
 /** Below this zoom level the country-scale map is too cluttered to host
  * per-leg chips — they collide with each other and with stop markers. */
-const MIN_ZOOM = 7;
+const MIN_ZOOM = 5;
 
 type FuelConfig = {
   consumption: number | undefined;
