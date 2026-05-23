@@ -201,6 +201,17 @@ export function Builder() {
   // first-time users see all the fields; collapsed by default when
   // editing an existing trip so the stop list gets more vertical room.
   const [detailsOpen, setDetailsOpen] = useState(!isEditing);
+  // Window-level Escape listener while the trip-details modal is open.
+  // onKeyDown on the modal's outer div doesn't fire because non-focusable
+  // elements don't receive key events; pattern mirrors PinModal.
+  useEffect(() => {
+    if (!detailsOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDetailsOpen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailsOpen]);
   // Mobile bottom-sheet snap state. Below md (768px) the sidebar lives
   // at the bottom of the screen with three heights: peek (only the
   // handle + summary visible), normal (~55dvh, both map and stops
@@ -923,7 +934,6 @@ export function Builder() {
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) setDetailsOpen(false); }}
-      onKeyDown={(e) => { if (e.key === 'Escape') setDetailsOpen(false); }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="trip-details-modal-title"
@@ -1180,11 +1190,11 @@ export function Builder() {
             onClick={() => setDetailsOpen(true)}
             data-testid="open-trip-details"
             title="Edit trip details (fuel, dates, tank…)"
-            className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors shrink-0"
+            className="hidden md:inline font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors shrink-0"
           >
             Trip details
           </button>
-          <div className="hidden md:inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-7" role="group" aria-label="Layout mode">
+          <div className="inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-7" role="group" aria-label="Layout mode">
             <button
               type="button"
               onClick={() => layout.setMode('plan')}
@@ -1476,7 +1486,7 @@ export function Builder() {
           />
           {/* Mode toggle — this render path is Map mode (Plan mode early-returns
               above), so the styles are hardcoded rather than driven off layout.mode. */}
-          <div className="hidden md:inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-8 mt-[6px]" role="group" aria-label="Layout mode">
+          <div className="inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-8 mt-[6px]" role="group" aria-label="Layout mode">
             <button
               type="button"
               onClick={() => layout.setMode('plan')}

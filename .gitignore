@@ -11,4 +11,10 @@ coverage
 # Playwright (used for visual verification, not part of the app)
 .playwright-mcp/
 slice*-*.png
+audit-*.png
+toolbar.png
+.tmp-screenshots/
 road-trip-service.json
+
+# Claude Code per-project state (scheduled tasks etc)
+.claude/
