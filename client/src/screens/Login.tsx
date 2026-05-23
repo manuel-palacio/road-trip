@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { signInWithGoogle } from '../lib/firebase';
+import { signInWithGoogle, signInAsDev } from '../lib/firebase';
 import { Brand } from '../components/Brand';
 
 const GoogleG = () => (
@@ -87,6 +87,26 @@ export function Login() {
           <GoogleG />
           Continue with Google
         </button>
+        {import.meta.env.DEV && (
+          <div className="mt-4 animate-rise [animation-delay:0.52s]">
+            <button
+              type="button"
+              onClick={async () => {
+                setError(null);
+                try {
+                  await signInAsDev();
+                } catch (err: unknown) {
+                  setError((err as { message?: string })?.message || 'Dev sign-in failed');
+                }
+              }}
+              title="Localhost-only impersonation. Requires DEV_IMPERSONATE_UID in server .env."
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-transparent border border-dashed border-line-strong text-paper-dim rounded-md font-mono text-[10px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
+            >
+              <span aria-hidden>🔧</span>
+              Dev sign-in (localhost)
+            </button>
+          </div>
+        )}
         {error && (
           <div className="mt-6 font-mono text-[11px] tracking-wide text-accent">{error}</div>
         )}

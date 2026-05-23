@@ -14,7 +14,11 @@ const templatesRouter = require('./routes/templates');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(express.json());
+// Trip payloads include per-stop persisted polyline paths (up to
+// MAX_ROUTE_PATH_POINTS points each). A multi-day trip with many legs
+// can exceed the Express 100kb default — bump generously, Cloud Run
+// has no trouble with multi-MB JSON.
+app.use(express.json({ limit: '5mb' }));
 
 app.get(['/health', '/actuator/health'], (req, res) => {
   res.json({ status: 'ok' });
@@ -41,6 +45,21 @@ app.use(meRouter);
 app.use(tripsRouter);
 app.use(shareRouter);
 app.use(templatesRouter);
+
+// Dev-only impersonation endpoint. Conditionally mounted — in any
+// hosted environment (Cloud Run, Heroku, Fly, Railway, NODE_ENV=production)
+// the router isn't loaded, so the endpoint doesn't exist. The router's
+// own internal guards (loopback check, env-var check) are belt-and-braces.
+const devAuth = require('./routes/dev-auth');
+if (devAuth.isDevAuthAvailable()) {
+  app.use(devAuth.router);
+  console.log(`[dev-auth] impersonation enabled for uid: ${process.env.DEV_IMPERSONATE_UID}`);
+} else if (process.env.DEV_IMPERSONATE_UID && devAuth.looksLikeProduction()) {
+  // Loud warning: someone set the dev env var in a production-like
+  // environment. The route is NOT mounted, but the env leak deserves
+  // attention so the operator can clear it.
+  console.warn('[dev-auth] DEV_IMPERSONATE_UID is set but environment looks production-like — endpoint NOT mounted.');
+}
 
 // Serve the React build
 const distPath = path.join(__dirname, 'dist');

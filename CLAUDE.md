@@ -57,6 +57,22 @@ Frontend tree (`client/src/`): `screens/` = page components, `components/` = sha
 
 **Deployment.** Cloud Build watches `main` and deploys to Cloud Run on push. There is no staging environment — local dev runs against the same Firebase project as production. Trip data created on `localhost` lives in the same Firestore.
 
+## Dev sign-in (headless / MCP browsers)
+
+For Chrome DevTools MCP, Playwright, or any browser session that can't use the Google popup flow, set `DEV_IMPERSONATE_UID=<your-firebase-uid>` in `.env`. This activates two things:
+
+1. **Server**: `POST /api/dev/auth/impersonate` mints a Firebase custom token for that UID.
+2. **Client**: the Login page shows a "Dev sign-in (localhost)" button (`import.meta.env.DEV` gated).
+
+The button calls the endpoint, then `signInWithCustomToken`. Everything downstream — JWT verification, allowlist, Firestore rules — runs unchanged.
+
+The endpoint is invisible in production: `routes/dev-auth.js` exports `isDevAuthAvailable()` which returns false if any hosted-env signal is present (`K_SERVICE`, `DYNO`, `FLY_APP_NAME`, `RAILWAY_ENVIRONMENT`, `NODE_ENV=production`). `server.js` only mounts the router when that check passes AND `DEV_IMPERSONATE_UID` is set. Internal route guards (loopback IP, env var re-check) are belt-and-braces.
+
+**Playwright MCP helpers** (`e2e/`):
+
+- `e2e/sign-in.js` — per-session snippet. Invoke via `browser_run_code_unsafe({ filename: "e2e/sign-in.js" })` at the start of any Playwright MCP session. Fresh sign-in each time, ~1-2s.
+- `e2e/playwright-auth.mjs` — one-time setup that saves storage state (cookies + localStorage + IndexedDB) to `e2e/.auth/state.json`. Requires `npm install -D playwright` once. Pass the file to `@playwright/mcp --storage-state e2e/.auth/state.json` so MCP sessions start already authenticated. The `.auth/` directory is gitignored.
+
 ## Conventions worth knowing
 
 - **Tailwind v3** (not v4). Class names use design tokens defined in the tailwind config (`bg-canvas`, `text-paper`, `border-line`, `bg-accent`, etc.) — don't hardcode hex values when a token exists.
