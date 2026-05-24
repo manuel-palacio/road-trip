@@ -20,6 +20,7 @@ import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
 import { CountryOverrideRow } from '../components/builder/CountryOverrideRow';
+import { DatePicker } from '../components/DatePicker';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { DayColumn } from '../components/builder/DayColumn';
@@ -944,8 +945,8 @@ export function Builder() {
       aria-modal="true"
       aria-labelledby="trip-details-modal-title"
     >
-      <div className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] overflow-y-auto bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
-        <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line sticky top-0 bg-surface z-10">
+      <div className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
+        <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line bg-surface shrink-0">
           <span id="trip-details-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
             Trip details
           </span>
@@ -958,17 +959,17 @@ export function Builder() {
             ×
           </button>
         </header>
-        <div id="trip-details-panel" className="px-5 pt-4 pb-5 flex flex-col gap-4">
+        <div id="trip-details-panel" className="px-5 pt-4 pb-5 flex flex-col gap-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-3 gap-[18px]">
-            <label className="block min-w-0">
+            <div className="block min-w-0">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Start date</span>
-              <input
-                type="date"
+              <DatePicker
                 value={state.startDate}
-                onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
-                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [color-scheme:dark]"
+                onChange={(next) => setState((s) => ({ ...s, startDate: next }))}
+                placeholder="Pick a date"
+                label="Trip start date"
               />
-            </label>
+            </div>
             <label className="block min-w-0 relative">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Max / day</span>
               <input
@@ -1175,6 +1176,24 @@ export function Builder() {
             </div>
           )}
         </div>
+        <footer className="flex justify-end items-center gap-2 px-5 py-3 border-t border-line bg-surface shrink-0">
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(false)}
+            className="bg-transparent border border-line text-paper-dim px-3 py-[5px] rounded text-[12px] tracking-wide transition-colors hover:border-paper-dim hover:text-paper"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            data-testid="modal-save-trip"
+            onClick={() => { void onSave(); setDetailsOpen(false); }}
+            disabled={saving}
+            className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </footer>
       </div>
     </div>
   ) : null;

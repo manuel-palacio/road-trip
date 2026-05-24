@@ -22,7 +22,8 @@
     "express": "^4.21.2",
     "firebase-admin": "^13.0.2",
     "pdfkit": "^0.18.0",
-    "qrcode.react": "^3.2.0"
+    "qrcode.react": "^3.2.0",
+    "react-day-picker": "^10.0.1"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.62.7",
