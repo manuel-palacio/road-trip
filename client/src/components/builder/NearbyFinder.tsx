@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FuelSearchTarget } from '../../lib/fuel-stops';
+import { PIN_CATEGORY_META } from '../../lib/pin-meta';
+import { placeTypeForCategory } from '../../lib/nearby-search';
+import type { PinCategory } from '../../lib/types';
 
-export type FuelStopResult = {
+export type NearbyResult = {
   placeId: string;
   name: string;
   vicinity: string;
@@ -11,11 +14,15 @@ export type FuelStopResult = {
 };
 
 type Props = {
+  /** Which kind of POI to look for. Determines the Google Places `type`
+   * filter, the modal heading + button labels, and the empty-state
+   * copy. The legacy fuel-stop flow passes 'fuel'. */
+  category: PinCategory;
   target: FuelSearchTarget;
   // Google Maps SDK + a map instance for the legacy PlacesService.
   maps: typeof google.maps;
   map: google.maps.Map;
-  onSelect: (r: FuelStopResult) => void;
+  onSelect: (r: NearbyResult) => void;
   onClose: () => void;
 };
 
@@ -32,13 +39,18 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
 }
 
 /** Modal that runs Google Places nearbySearch around the day's
- * longest-leg midpoint and lets the user pick a gas station to insert
- * as a new stop. Uses the legacy PlacesService API which is well-known
- * and stable; the newer Place.searchNearby() would also work. */
-export function FuelStopFinder({ target, maps, map, onSelect, onClose }: Props) {
-  const [results, setResults] = useState<FuelStopResult[] | null>(null);
+ * longest-leg midpoint and lets the user pick a place to insert as a
+ * new stop. Generalised from the original FuelStopFinder (issue #71):
+ * the `category` prop swaps the Google Place `type` filter and the
+ * surrounding UI copy so the same component handles fuel / food /
+ * hotel / scenic etc. Uses the legacy PlacesService API which is
+ * stable; Place.searchNearby() would also work. */
+export function NearbyFinder({ category, target, maps, map, onSelect, onClose }: Props) {
+  const [results, setResults] = useState<NearbyResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const meta = PIN_CATEGORY_META[category];
+  const placeType = placeTypeForCategory(category);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -52,51 +64,52 @@ export function FuelStopFinder({ target, maps, map, onSelect, onClose }: Props) 
     if (startedRef.current) return;
     startedRef.current = true;
     const service = new maps.places.PlacesService(map);
-    service.nearbySearch(
-      {
-        location: target.midpoint,
-        radius: SEARCH_RADIUS_M,
-        type: 'gas_station',
-      },
-      (raw, status) => {
-        if (status !== maps.places.PlacesServiceStatus.OK || !raw) {
-          setResults([]);
-          if (status !== maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-            setError(`Places search failed: ${status}`);
-          }
-          return;
+    const request: google.maps.places.PlaceSearchRequest = {
+      location: target.midpoint,
+      radius: SEARCH_RADIUS_M,
+      ...(placeType ? { type: placeType } : {}),
+    };
+    service.nearbySearch(request, (raw, status) => {
+      if (status !== maps.places.PlacesServiceStatus.OK || !raw) {
+        setResults([]);
+        if (status !== maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+          setError(`Places search failed: ${status}`);
         }
-        const items: FuelStopResult[] = raw
-          .filter((r) => r.geometry?.location)
-          .map((r) => ({
-            placeId: r.place_id || '',
-            name: r.name || 'Gas station',
-            vicinity: r.vicinity || '',
-            rating: typeof r.rating === 'number' ? r.rating : undefined,
-            lat: r.geometry!.location!.lat(),
-            lng: r.geometry!.location!.lng(),
-          }))
-          // Closest first.
-          .sort(
-            (a, b) =>
-              haversineKm(target.midpoint, { lat: a.lat, lng: a.lng })
-              - haversineKm(target.midpoint, { lat: b.lat, lng: b.lng }),
-          )
-          .slice(0, 10);
-        setResults(items);
-      },
-    );
-  }, [maps, map, target.midpoint]);
+        return;
+      }
+      const items: NearbyResult[] = raw
+        .filter((r) => r.geometry?.location)
+        .map((r) => ({
+          placeId: r.place_id || '',
+          name: r.name || meta.label,
+          vicinity: r.vicinity || '',
+          rating: typeof r.rating === 'number' ? r.rating : undefined,
+          lat: r.geometry!.location!.lat(),
+          lng: r.geometry!.location!.lng(),
+        }))
+        // Closest first.
+        .sort(
+          (a, b) =>
+            haversineKm(target.midpoint, { lat: a.lat, lng: a.lng })
+            - haversineKm(target.midpoint, { lat: b.lat, lng: b.lng }),
+        )
+        .slice(0, 10);
+      setResults(items);
+    });
+  }, [maps, map, target.midpoint, placeType, meta.label]);
 
   const startName = target.legStart.label || target.legStart.name || 'start';
   const endName = target.legEnd.label || target.legEnd.name || 'end';
+  const headingNoun = category === 'fuel' ? 'fuel stop' : meta.label.toLowerCase();
 
   return (
     <div
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Find a gas station along this leg"
+      aria-label={`Find a ${headingNoun} along this leg`}
+      data-testid="nearby-finder"
+      data-category={category}
       onClick={onClose}
     >
       <div
@@ -105,8 +118,8 @@ export function FuelStopFinder({ target, maps, map, onSelect, onClose }: Props) 
       >
         <header className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <h2 className="font-serif italic text-[20px] leading-tight text-paper">
-              Add a fuel stop
+            <h2 className="font-serif italic text-[20px] leading-tight text-paper" data-testid="nearby-finder-heading">
+              Add a {headingNoun}
             </h2>
             <p className="text-paper-dim text-[12px] mt-1 leading-snug truncate">
               Longest leg: <span className="text-paper">{startName}</span>
@@ -134,8 +147,8 @@ export function FuelStopFinder({ target, maps, map, onSelect, onClose }: Props) 
               {error}
             </p>
           ) : results.length === 0 ? (
-            <p className="text-center font-serif italic text-[14px] text-paper-dim py-8">
-              No gas stations within {SEARCH_RADIUS_M / 1000} km of the midpoint.
+            <p className="text-center font-serif italic text-[14px] text-paper-dim py-8" data-testid="nearby-finder-empty">
+              No {meta.label.toLowerCase()} found within {SEARCH_RADIUS_M / 1000} km of the midpoint.
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -148,7 +161,7 @@ export function FuelStopFinder({ target, maps, map, onSelect, onClose }: Props) 
                       onClick={() => onSelect(r)}
                       className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-md border border-line bg-canvas hover:border-accent hover:bg-accent-soft transition-colors"
                     >
-                      <span aria-hidden className="text-[18px] leading-none mt-0.5">⛽</span>
+                      <span aria-hidden className="text-[18px] leading-none mt-0.5">{meta.emoji}</span>
                       <span className="flex-1 min-w-0">
                         <span className="block text-paper text-[14px] truncate">{r.name}</span>
                         {r.vicinity && (

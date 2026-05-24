@@ -25,7 +25,7 @@ import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { DayColumn } from '../components/builder/DayColumn';
 import { DayNav } from '../components/builder/DayNav';
-import { FuelStopFinder, type FuelStopResult } from '../components/builder/FuelStopFinder';
+import { NearbyFinder, type NearbyResult } from '../components/builder/NearbyFinder';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
 import { useLayoutMode } from '../hooks/useLayoutMode';
@@ -271,7 +271,7 @@ export function Builder() {
     document.addEventListener('pointerup', onUp);
   }
   // Resolved gas-station search target (longest leg of a day) when the
-  // user opens the FuelStopFinder. Null = modal closed.
+  // user opens the NearbyFinder for the fuel category. Null = modal closed.
   const [fuelTarget, setFuelTarget] = useState<FuelSearchTarget | null>(null);
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
@@ -417,7 +417,7 @@ export function Builder() {
     if (!target) return;
     setFuelTarget(target);
   }
-  async function onFuelStopSelected(result: FuelStopResult) {
+  async function onFuelStopSelected(result: NearbyResult) {
     if (!fuelTarget) return;
     const insertAt = fuelTarget.insertAtFlatIndex;
     setFuelTarget(null);
@@ -1466,7 +1466,8 @@ export function Builder() {
         {tripDetailsModal}
 
         {fuelTarget && maps && map && (
-          <FuelStopFinder
+          <NearbyFinder
+            category="fuel"
             target={fuelTarget}
             maps={maps}
             map={map}
@@ -1730,7 +1731,8 @@ export function Builder() {
       {tripDetailsModal}
 
       {fuelTarget && maps && map && (
-        <FuelStopFinder
+        <NearbyFinder
+          category="fuel"
           target={fuelTarget}
           maps={maps}
           map={map}
