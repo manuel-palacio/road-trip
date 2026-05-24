@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { dayColor } from '../../lib/compute';
 import type { DayGroup } from '../../lib/compute';
 
@@ -8,14 +9,18 @@ type Props = {
    * (e.g. an unmounted columns track). */
   activeDay?: number;
   onJump: (day: number) => void;
+  /** Optional content rendered right-aligned in the same row. Used by
+   * Builder Plan mode to inline the trip summary stats next to the day
+   * chips (saves a whole row at the bottom of the page). */
+  rightSlot?: ReactNode;
 };
 
 /** Sticky chip-strip of all days, used as a breadcrumb / table-of-contents
  * for the horizontally-scrolling day columns. Click a chip to scroll its
  * column into view. The chip border picks up `dayColor` so the chip and
  * the matching map polyline carry the same tint. */
-export function DayNav({ groups, activeDay, onJump }: Props) {
-  if (groups.length === 0) return null;
+export function DayNav({ groups, activeDay, onJump, rightSlot }: Props) {
+  if (groups.length === 0 && !rightSlot) return null;
   return (
     <nav
       aria-label="Jump to day"
@@ -53,6 +58,11 @@ export function DayNav({ groups, activeDay, onJump }: Props) {
           </button>
         );
       })}
+      {rightSlot && (
+        <div className="ml-auto flex items-center gap-3 shrink-0 pl-2" data-testid="day-nav-right-slot">
+          {rightSlot}
+        </div>
+      )}
     </nav>
   );
 }

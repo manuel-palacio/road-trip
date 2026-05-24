@@ -1201,61 +1201,10 @@ export function Builder() {
   if (layout.mode === 'plan') {
     return (
       <section className="relative h-screen overflow-hidden flex flex-col bg-surface">
-        {/* Compact top bar — Plan mode is the editing surface so the title
-            doesn't need the magazine-scale treatment Map mode has. Target
-            height ~48px, freeing ~30px of vertical space for the columns. */}
-        <div className="flex items-center gap-3 px-6 py-2.5 border-b border-line shrink-0">
-          <button
-            type="button"
-            aria-label="Back to dashboard"
-            onClick={onCancel}
-            className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-[13px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim shrink-0"
-          >
-            ←
-          </button>
-          <EmojiPicker value={state.coverEmoji} onChange={(e) => setState((s) => ({ ...s, coverEmoji: e }))} />
-          <input
-            type="text"
-            value={state.name}
-            placeholder="Untitled trip"
-            maxLength={80}
-            onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
-            className="flex-1 bg-transparent border-0 text-paper font-serif italic text-[18px] leading-[1.2] tracking-tight py-1 outline-none min-w-0 placeholder:text-paper-muted placeholder:italic"
-          />
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(true)}
-            data-testid="open-trip-details"
-            title="Edit trip details (fuel, dates, tank…)"
-            className="hidden md:inline font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors shrink-0"
-          >
-            Trip details
-          </button>
-          <div className="inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-7" role="group" aria-label="Layout mode">
-            <button
-              type="button"
-              onClick={() => layout.setMode('plan')}
-              aria-pressed={true}
-              data-testid="layout-mode-plan"
-              className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase bg-accent text-canvas"
-            >
-              Plan
-            </button>
-            <button
-              type="button"
-              onClick={() => layout.setMode('map')}
-              aria-pressed={false}
-              data-testid="layout-mode-map"
-              className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase border-l border-line bg-transparent text-paper-dim hover:text-paper transition-colors"
-            >
-              Map
-            </button>
-          </div>
-        </div>
-
-        {/* Map strip — fixed-height band that keeps the geography in
-            view while the user edits stops below. Width = full viewport. */}
-        <div className="relative w-full h-[240px] shrink-0 bg-[#13151a] border-b border-line">
+        {/* Map strip with a floating header overlay. The previous separate
+            top nav bar took ~48px; folding it into the map (Google-Maps-
+            style chips) reclaims that for the editing surface below. */}
+        <div className="relative w-full h-[clamp(280px,32dvh,420px)] shrink-0 bg-[#13151a] border-b border-line">
           {routes.loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
               <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
@@ -1272,17 +1221,112 @@ export function Builder() {
               onRequestDelete={pinModal.deletePin}
             />
           )}
+          {/* Floating top-left chip: back + emoji + title */}
+          <div className="absolute top-3 left-3 z-[10] flex items-center gap-2 max-w-[60%] bg-canvas/90 backdrop-blur-sm border border-line-strong rounded-lg pl-2 pr-3 py-1.5 shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)]">
+            <button
+              type="button"
+              aria-label="Back to dashboard"
+              onClick={onCancel}
+              className="bg-transparent border border-line text-paper-dim w-6 h-6 rounded text-[12px] flex items-center justify-center transition-colors hover:text-paper hover:border-paper-dim shrink-0"
+            >
+              ←
+            </button>
+            <EmojiPicker value={state.coverEmoji} onChange={(e) => setState((s) => ({ ...s, coverEmoji: e }))} />
+            <input
+              type="text"
+              value={state.name}
+              placeholder="Untitled trip"
+              maxLength={80}
+              onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
+              className="flex-1 bg-transparent border-0 text-paper font-serif italic text-[16px] leading-[1.2] tracking-tight py-0 outline-none min-w-0 placeholder:text-paper-muted placeholder:italic"
+            />
+          </div>
+          {/* Floating top-right chip: trip details + mode toggle */}
+          <div className="absolute top-3 right-3 z-[10] flex items-center gap-2 bg-canvas/90 backdrop-blur-sm border border-line-strong rounded-lg px-2 py-1.5 shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)]">
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              data-testid="open-trip-details"
+              title="Edit trip details (fuel, dates, tank…)"
+              className="hidden md:inline font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted hover:text-paper transition-colors shrink-0 px-1"
+            >
+              Trip details
+            </button>
+            <div className="inline-flex items-stretch border border-line rounded overflow-hidden shrink-0 h-6" role="group" aria-label="Layout mode">
+              <button
+                type="button"
+                onClick={() => layout.setMode('plan')}
+                aria-pressed={true}
+                data-testid="layout-mode-plan"
+                className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase bg-accent text-canvas"
+              >
+                Plan
+              </button>
+              <button
+                type="button"
+                onClick={() => layout.setMode('map')}
+                aria-pressed={false}
+                data-testid="layout-mode-map"
+                className="px-2.5 font-mono text-[9.5px] tracking-[0.18em] uppercase border-l border-line bg-transparent text-paper-dim hover:text-paper transition-colors"
+              >
+                Map
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Day navigator — click a chip to scroll the columns row to
-            that day. Borrows dayColor from the polylines above so the
-            chip color matches the leg's tint on the map. */}
+        {/* Day navigator with trip totals inlined on the right. Folding
+            the totals here eliminates a dedicated summary row at the
+            bottom — same data, one fewer row of chrome. */}
         <DayNav
           groups={dayGroups}
           onJump={(day) => {
             const el = document.getElementById(`day-col-${day}`);
             if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
           }}
+          rightSlot={(
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim">
+              <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+                <span className="text-paper text-[12px] font-medium">{totals.totalKm.toLocaleString('en-US')}</span>
+                <span>km</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+                <span className="text-paper text-[12px] font-medium">{totals.totalDays}</span>
+                <span>{totals.totalDays === 1 ? 'day' : 'days'}</span>
+              </span>
+              {totals.totalDurationSeconds > 0 && (
+                <span className="text-paper text-[12px] font-medium whitespace-nowrap">{formatDuration(totals.totalDurationSeconds)}</span>
+              )}
+              {totalFuelCostStr && (
+                <span className="text-paper text-[12px] font-medium tracking-normal normal-case whitespace-nowrap">{totalFuelCostStr}</span>
+              )}
+              {fuelPartial && (
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(true)}
+                  data-testid="fuel-config-nudge-summary"
+                  className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[11px] underline decoration-dotted underline-offset-2 transition-colors whitespace-nowrap"
+                >
+                  <span aria-hidden>⛽</span>
+                  Add a fuel price
+                </button>
+              )}
+              {totalFuelVolumeStr && (
+                <span
+                  className="inline-flex items-baseline gap-1 whitespace-nowrap"
+                  title={totalFillUpsStr ? `${totalFuelVolumeStr} · ${totalFillUpsStr}` : undefined}
+                >
+                  <span className="text-paper-dim text-[12px] font-medium tracking-normal normal-case">{totalFuelVolumeStr}</span>
+                  {totalFillUpsCompact && (
+                    <span className="text-paper-muted text-[11px] tracking-normal normal-case">· {totalFillUpsCompact}</span>
+                  )}
+                </span>
+              )}
+              {flagSet.length > 0 && (
+                <span className="font-sans text-[13px] tracking-[0.06em] whitespace-nowrap">{flagSet.join(' ')}</span>
+              )}
+            </div>
+          )}
         />
 
         {/* Search row — sits directly above the day columns so the user's
@@ -1346,7 +1390,7 @@ export function Builder() {
               data-testid="save-trip"
               className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
             >
-              {saving ? 'Saving…' : 'Save trip'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
@@ -1401,51 +1445,6 @@ export function Builder() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Summary bar — identical to Map mode. */}
-        <div className="border-t border-line px-6 pt-3 pb-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-dim bg-surface shrink-0">
-          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
-            <span className="text-paper text-[14px] font-medium">{totals.totalKm.toLocaleString('en-US')}</span>
-            <span>km</span>
-          </span>
-          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
-            <span className="text-paper text-[14px] font-medium">{totals.totalDays}</span>
-            <span>{totals.totalDays === 1 ? 'day' : 'days'}</span>
-          </span>
-          {totals.totalDurationSeconds > 0 && (
-            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
-              <span className="text-paper text-[14px] font-medium">{formatDuration(totals.totalDurationSeconds)}</span>
-            </span>
-          )}
-          {totalFuelCostStr && (
-            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
-              <span className="text-paper text-[14px] font-medium tracking-normal normal-case">{totalFuelCostStr}</span>
-            </span>
-          )}
-          {fuelPartial && (
-            <button
-              type="button"
-              onClick={() => setDetailsOpen(true)}
-              data-testid="fuel-config-nudge-summary"
-              className="inline-flex items-baseline gap-1 text-accent hover:text-paper tracking-normal normal-case font-sans text-[12px] underline decoration-dotted underline-offset-2 transition-colors whitespace-nowrap"
-            >
-              <span aria-hidden>⛽</span>
-              Add a fuel price to see cost estimates
-            </button>
-          )}
-          {totalFuelVolumeStr && (
-            <span
-              className="inline-flex items-baseline gap-1 whitespace-nowrap"
-              title={totalFillUpsStr ? `${totalFuelVolumeStr} · ${totalFillUpsStr}` : undefined}
-            >
-              <span className="text-paper-dim text-[14px] font-medium tracking-normal normal-case">{totalFuelVolumeStr}</span>
-              {totalFillUpsCompact && (
-                <span className="text-paper-muted text-[12px] tracking-normal normal-case">· {totalFillUpsCompact}</span>
-              )}
-            </span>
-          )}
-          <span className="ml-auto font-sans text-[14px] tracking-[0.06em] whitespace-nowrap">{flagSet.join(' ')}</span>
         </div>
 
         {pinModal.modalElement}
@@ -1713,7 +1712,7 @@ export function Builder() {
             disabled={saving}
             className="bg-accent text-canvas border border-accent rounded px-3.5 py-[7px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
           >
-            {saving ? 'Saving…' : 'Save trip'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </footer>
       </aside>
