@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { isFuelStop } from '../../lib/compute';
 import { longestLegOverRange } from '../../lib/fuel-stops';
@@ -17,15 +17,6 @@ type Props = {
    * that opens the trip-details modal. See issue #59. */
   fuelConfigPartial?: boolean;
   onConfigureFuel?: () => void;
-  /** Total stops count across the trip — needed so the trailing
-   * "+ insert" affordance on the last day in the column targets the
-   * correct global index (i.e. "append at end"). */
-  totalStops: number;
-  /** True only for the first day in the trip — suppresses the leading
-   * "+ insert" affordance above the very first stop (the start). */
-  isFirstDay: boolean;
-  insertIndex?: number | null;
-  onInsertAt?: (index: number) => void;
   onChangeType: (id: string, type: Stop['type']) => void;
   onChangeRouteMode?: (id: string, mode: StopRouteMode) => void;
   onRemove: (id: string) => void;
@@ -190,76 +181,32 @@ export function DayColumn(p: Props) {
       {/* Stop list — flows vertically; the column's own overflow lets
           the sticky header above stay pinned while the body scrolls. */}
       <div className="flex-1 overflow-y-auto px-3 pt-2 pb-3 flex flex-col gap-2">
-        {g.stops.map(({ stop, index }, rowIdxInDay) => (
-          <Fragment key={stop.id}>
-            {p.onInsertAt && (!p.isFirstDay || rowIdxInDay > 0) && (
-              <InsertHere active={p.insertIndex === index} onClick={() => p.onInsertAt!(index)} />
-            )}
-            {isFuelStop(stop) ? (
-              <FuelStopChip stop={stop} onRemove={() => p.onRemove(stop.id)} />
-            ) : (
-              <StopRow
-                stop={stop}
-                index={index}
-                isFirst={index === 0}
-                onChangeType={p.onChangeType}
-                onChangeRouteMode={p.onChangeRouteMode}
-                onRemove={p.onRemove}
-                onSetForceDayStart={p.onSetForceDayStart}
-                onAddHighlight={p.onAddHighlight}
-                onRemoveHighlight={p.onRemoveHighlight}
-                onDemote={p.onDemote}
-                demotingStopId={p.demotingStopId}
-                onDragStart={p.onDragStart}
-                onDragEnd={p.onDragEnd}
-                onDragOver={p.onDragOver}
-                onDragLeave={p.onDragLeave}
-                onDrop={p.onDrop}
-              />
-            )}
-          </Fragment>
-        ))}
-        {/* The "+ insert at end of this day" affordance — global index is
-            (last stop's index + 1). When this is the trip's final day, it
-            doubles as "append at trip end" — same target index as a top-
-            level trailing insert in the flat list. */}
-        {p.onInsertAt && g.stops.length > 0 && (() => {
-          const lastIdx = g.stops[g.stops.length - 1].index + 1;
-          return (
-            <InsertHere
-              active={p.insertIndex === lastIdx}
-              onClick={() => p.onInsertAt!(lastIdx)}
+        {g.stops.map(({ stop, index }) => (
+          isFuelStop(stop) ? (
+            <FuelStopChip key={stop.id} stop={stop} onRemove={() => p.onRemove(stop.id)} />
+          ) : (
+            <StopRow
+              key={stop.id}
+              stop={stop}
+              index={index}
+              isFirst={index === 0}
+              onChangeType={p.onChangeType}
+              onChangeRouteMode={p.onChangeRouteMode}
+              onRemove={p.onRemove}
+              onSetForceDayStart={p.onSetForceDayStart}
+              onAddHighlight={p.onAddHighlight}
+              onRemoveHighlight={p.onRemoveHighlight}
+              onDemote={p.onDemote}
+              demotingStopId={p.demotingStopId}
+              onDragStart={p.onDragStart}
+              onDragEnd={p.onDragEnd}
+              onDragOver={p.onDragOver}
+              onDragLeave={p.onDragLeave}
+              onDrop={p.onDrop}
             />
-          );
-        })()}
+          )
+        ))}
       </div>
     </article>
-  );
-}
-
-function InsertHere({ active, onClick }: { active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Insert a stop here"
-      title="Insert a stop here"
-      className={`group relative h-3 -my-0.5 flex items-center justify-center transition-opacity ${
-        active ? 'opacity-100' : 'opacity-30 hover:opacity-100 focus-visible:opacity-100'
-      }`}
-    >
-      <span
-        className={`absolute inset-x-2 h-px transition-colors ${
-          active ? 'bg-accent' : 'bg-line group-hover:bg-paper-dim'
-        }`}
-      />
-      <span
-        className={`relative bg-canvas px-1.5 font-mono text-[10px] tracking-[0.16em] uppercase rounded transition-colors ${
-          active ? 'text-accent border border-accent' : 'text-paper-muted group-hover:text-accent'
-        }`}
-      >
-        + insert
-      </span>
-    </button>
   );
 }

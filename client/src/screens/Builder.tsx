@@ -13,7 +13,7 @@ import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
-import { applyDays, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
+import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
@@ -230,12 +230,46 @@ export function Builder() {
   // Persisted in localStorage by useLayoutMode; the default below only
   // applies the first time a user lands here.
   const layout = useLayoutMode('map');
-  // When non-null, the next stop added via the search box splices at this
-  // flat index instead of appending. Set by the inline "+ insert" button
-  // between rows; cleared on add or by the user's × on the chip.
-  const [insertIndex, setInsertIndex] = useState<number | null>(null);
-  const insertIndexRef = useRef<number | null>(null);
-  insertIndexRef.current = insertIndex;
+  // Resizable Plan-mode map strip — user drags the handle below the map
+  // to claim more or less vertical space. Persists via localStorage so
+  // their preference survives reloads. null = use the default clamp().
+  const [mapStripHeight, setMapStripHeight] = useState<number | null>(() => {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem('roadtrip:planMapHeight');
+    const n = raw ? parseFloat(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  });
+  const [resizingMap, setResizingMap] = useState(false);
+  const mapStripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mapStripHeight === null) return;
+    try { localStorage.setItem('roadtrip:planMapHeight', String(mapStripHeight)); } catch { /* quota */ }
+  }, [mapStripHeight]);
+  function startMapResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const startY = e.clientY;
+    // Snap to the current rendered height so the drag delta is meaningful
+    // even on first resize (when mapStripHeight is still null and the
+    // strip is sized via CSS clamp).
+    const startHeight = mapStripRef.current?.clientHeight
+      ?? mapStripHeight
+      ?? 320;
+    setResizingMap(true);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    function onMove(ev: PointerEvent) {
+      setMapStripHeight(clampMapStripHeight(startHeight + (ev.clientY - startY), window.innerHeight));
+    }
+    function onUp() {
+      setResizingMap(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
   // Resolved gas-station search target (longest leg of a day) when the
   // user opens the FuelStopFinder. Null = modal closed.
   const [fuelTarget, setFuelTarget] = useState<FuelSearchTarget | null>(null);
@@ -555,14 +589,7 @@ export function Builder() {
           highlights: [],
           kmFromPrevious: 0,
         };
-        const idx = insertIndexRef.current;
-        setState((s) => {
-          const stops = [...s.stops];
-          if (idx == null || idx >= stops.length) stops.push(newStop);
-          else stops.splice(Math.max(0, idx), 0, newStop);
-          return { ...s, stops: reassignTypes(stops) };
-        });
-        setInsertIndex(null);
+        setState((s) => ({ ...s, stops: reassignTypes([...s.stops, newStop]) }));
         if (searchInputRef.current) searchInputRef.current.value = '';
       });
     }
@@ -743,15 +770,6 @@ export function Builder() {
       stops.splice(targetIdx, 0, moved);
       return { ...s, stops: reassignTypes(stops) };
     });
-  }
-
-  function startInsertAt(index: number) {
-    setInsertIndex(index);
-    setSheetState('full');
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
   }
 
   // Auto-scroll the stop list while a drag is in progress. Triggered when
@@ -1203,8 +1221,14 @@ export function Builder() {
       <section className="relative h-screen overflow-hidden flex flex-col bg-surface">
         {/* Map strip with a floating header overlay. The previous separate
             top nav bar took ~48px; folding it into the map (Google-Maps-
-            style chips) reclaims that for the editing surface below. */}
-        <div className="relative w-full h-[clamp(280px,32dvh,420px)] shrink-0 bg-[#13151a] border-b border-line">
+            style chips) reclaims that for the editing surface below.
+            Height is resizable via the drag handle below — user's choice
+            (mapStripHeight) wins over the default clamp(). */}
+        <div
+          ref={mapStripRef}
+          style={mapStripHeight !== null ? { height: mapStripHeight } : undefined}
+          className={`relative w-full ${mapStripHeight === null ? 'h-[clamp(280px,32dvh,420px)]' : ''} shrink-0 bg-[#13151a] border-b border-line`}
+        >
           {routes.loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
               <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
@@ -1275,6 +1299,23 @@ export function Builder() {
           </div>
         </div>
 
+        {/* Drag handle — user resizes the map strip vertically. The
+            -mt-1.5 overlap lets the handle visually straddle the map's
+            bottom border so it reads as the separator itself. */}
+        <div
+          onPointerDown={startMapResize}
+          data-testid="map-resize-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize map height"
+          className={`group relative h-1.5 -mt-px cursor-ns-resize shrink-0 transition-colors ${resizingMap ? 'bg-accent' : 'bg-transparent hover:bg-accent/30'}`}
+        >
+          <span
+            aria-hidden
+            className={`absolute inset-x-0 top-1/2 -translate-y-1/2 mx-auto w-10 h-0.5 rounded-full transition-colors ${resizingMap ? 'bg-canvas' : 'bg-line-strong group-hover:bg-accent'}`}
+          />
+        </div>
+
         {/* Day navigator with trip totals inlined on the right. Folding
             the totals here eliminates a dedicated summary row at the
             bottom — same data, one fewer row of chrome. */}
@@ -1343,37 +1384,12 @@ export function Builder() {
               ref={searchInputRef}
               type="text"
               autoComplete="off"
-              placeholder={insertIndex == null ? 'Search for a city or place…' : 'Search the place to insert…'}
+              placeholder="Search for a city or place…"
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[7px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />
           </div>
-          {insertIndex != null && (() => {
-            const before = insertIndex > 0 ? dayedStops[insertIndex - 1] : null;
-            const after = insertIndex < dayedStops.length ? dayedStops[insertIndex] : null;
-            let label: string;
-            if (before && after) label = `Insert between ${before.label || before.name} and ${after.label || after.name}`;
-            else if (before) label = `Insert after ${before.label || before.name}`;
-            else if (after) label = `Insert before ${after.label || after.name}`;
-            else label = 'Insert as first stop';
-            return (
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent-soft border border-accent text-accent font-mono text-[10px] tracking-[0.14em] uppercase max-w-full">
-                <span className="truncate normal-case tracking-normal font-sans text-[11.5px]">{label}</span>
-                <button
-                  type="button"
-                  onClick={() => setInsertIndex(null)}
-                  aria-label="Cancel insert"
-                  title="Cancel insert"
-                  className="text-accent hover:text-paper text-[13px] leading-none -mr-1 px-1"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })()}
           {/* Save/Cancel live here in Plan mode (instead of a separate
-              footer row) so the editing surface keeps its tall card area.
-              ml-auto pushes them to the right; the buttons stay shrink-0
-              so they never collapse when the insert chip is wide. */}
+              footer row) so the editing surface keeps its tall card area. */}
           <div className="ml-auto flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -1416,8 +1432,6 @@ export function Builder() {
                   onConfigureFuel={() => setDetailsOpen(true)}
                   totalStops={dayedStops.length}
                   isFirstDay={gi === 0}
-                  insertIndex={insertIndex}
-                  onInsertAt={startInsertAt}
                   onChangeType={setStopType}
                   onChangeRouteMode={setStopRouteMode}
                   onRemove={removeStop}
@@ -1581,33 +1595,10 @@ export function Builder() {
               ref={searchInputRef}
               type="text"
               autoComplete="off"
-              placeholder={insertIndex == null ? 'Search for a city or place…' : 'Search the place to insert…'}
+              placeholder="Search for a city or place…"
               onFocus={() => setSheetState('full')}
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[11px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />
-            {insertIndex != null && (() => {
-              const before = insertIndex > 0 ? dayedStops[insertIndex - 1] : null;
-              const after = insertIndex < dayedStops.length ? dayedStops[insertIndex] : null;
-              let label: string;
-              if (before && after) label = `Insert between ${before.label || before.name} and ${after.label || after.name}`;
-              else if (before) label = `Insert after ${before.label || before.name}`;
-              else if (after) label = `Insert before ${after.label || after.name}`;
-              else label = 'Insert as first stop';
-              return (
-                <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent-soft border border-accent text-accent font-mono text-[10px] tracking-[0.14em] uppercase max-w-full">
-                  <span className="truncate normal-case tracking-normal font-sans text-[11.5px]">{label}</span>
-                  <button
-                    type="button"
-                    onClick={() => setInsertIndex(null)}
-                    aria-label="Cancel insert"
-                    title="Cancel insert"
-                    className="text-accent hover:text-paper text-[13px] leading-none -mr-1 px-1"
-                  >
-                    ×
-                  </button>
-                </div>
-              );
-            })()}
           </div>
           <div
             ref={stopScrollRef}
@@ -1623,8 +1614,6 @@ export function Builder() {
               fuelVolumeFor={fuelVolumeForStops}
               fuelConfigPartial={fuelPartial}
               onConfigureFuel={() => setDetailsOpen(true)}
-              insertIndex={insertIndex}
-              onInsertAt={startInsertAt}
               onChangeType={setStopType}
               onChangeRouteMode={setStopRouteMode}
               onRemove={removeStop}

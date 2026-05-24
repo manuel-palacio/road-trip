@@ -132,6 +132,21 @@ export function tripTotals(stops: Stop[]): {
   return { totalKm, totalDays, totalDurationSeconds };
 }
 
+/** Clamp the user-dragged map-strip height to (min, 70% of viewport).
+ * Pure helper so the resize bounds are testable independently of the
+ * pointer-event mechanics in Builder.tsx. */
+export function clampMapStripHeight(
+  desired: number,
+  viewportHeight: number,
+  options: { min?: number; maxRatio?: number } = {},
+): number {
+  const min = options.min ?? 200;
+  const maxRatio = options.maxRatio ?? 0.7;
+  const max = Math.max(min, Math.round(viewportHeight * maxRatio));
+  if (!Number.isFinite(desired)) return min;
+  return Math.max(min, Math.min(max, desired));
+}
+
 /** Distinct ISO country codes appearing in the trip's stops, in the order
  * they're first visited. Powers the auto-populated per-country fuel
  * override rows (issue #57). Stops without a countryCode are skipped.

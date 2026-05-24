@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DAY_COLORS,
   applyDays,
+  clampMapStripHeight,
   compileFuelOverrides,
   dayColor,
   estimateFuelCost,
@@ -474,6 +475,29 @@ describe('fuelConfigState', () => {
   it('rejects non-finite numbers (Infinity, NaN) as not set', () => {
     expect(fuelConfigState(Infinity, 1.85)).toEqual({ status: 'partial', missing: ['consumption'] });
     expect(fuelConfigState(7, Infinity)).toEqual({ status: 'partial', missing: ['price'] });
+  });
+});
+
+describe('clampMapStripHeight', () => {
+  it('clamps below the min', () => {
+    expect(clampMapStripHeight(50, 900)).toBe(200);
+    expect(clampMapStripHeight(0, 900)).toBe(200);
+  });
+  it('clamps above the max (70% of viewport)', () => {
+    // 70% of 900 = 630
+    expect(clampMapStripHeight(800, 900)).toBe(630);
+  });
+  it('respects custom min and maxRatio options', () => {
+    expect(clampMapStripHeight(100, 900, { min: 150 })).toBe(150);
+    // 50% of 900 = 450
+    expect(clampMapStripHeight(800, 900, { maxRatio: 0.5 })).toBe(450);
+  });
+  it('passes through values within the bounds', () => {
+    expect(clampMapStripHeight(400, 900)).toBe(400);
+  });
+  it('returns the min for non-finite inputs (defensive)', () => {
+    expect(clampMapStripHeight(NaN, 900)).toBe(200);
+    expect(clampMapStripHeight(Infinity, 900)).toBe(200);
   });
 });
 
