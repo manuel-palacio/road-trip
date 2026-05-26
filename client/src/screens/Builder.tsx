@@ -13,6 +13,7 @@ import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { stopCategory } from '../lib/pin-meta';
+import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-category';
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
@@ -578,15 +579,25 @@ export function Builder() {
     setMap(m);
     if (searchInputRef.current) {
       autocompleteRef.current = new maps.places.Autocomplete(searchInputRef.current, {
-        fields: ['name', 'formatted_address', 'geometry.location', 'address_components'],
+        fields: ['name', 'formatted_address', 'geometry.location', 'address_components', 'types'],
       });
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current?.getPlace();
         if (!place?.geometry?.location) return;
-        // Search input is a navigation gesture — always add as a route stop.
-        // POI metadata (category, priority, notes) lives on pins, which the
-        // user adds via the map FAB or by demoting a stop with the Pin
-        // button (which opens a modal for details).
+        // When the picked result is a concrete POI (hotel, restaurant, gas
+        // station, attraction…) carry its inferred category onto the stop
+        // so the identity badge reflects what the user picked. Cities and
+        // administrative areas don't get a category — they keep the city
+        // default. Category drives the default `type` so a picked hotel
+        // becomes an overnight and a picked gas station becomes a fuel stop,
+        // matching the NearbyFinder dispatch.
+        const category = isConcretePlace(place.types)
+          ? guessCategoryFromTypes(place.types)
+          : undefined;
+        const type: Stop['type'] =
+          category === 'fuel' ? 'fuel'
+          : category === 'hotel' ? 'overnight'
+          : 'waypoint';
         const newStop: Stop = {
           id: crypto.randomUUID(),
           name: place.formatted_address || place.name || '',
@@ -594,10 +605,8 @@ export function Builder() {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
           countryCode: extractCountryCode(place.address_components),
-          // 'waypoint' instead of 'overnight' — see the comment on the
-          // pin→stop conversion above. New stops land on the same day
-          // by default; users mark overnight ones explicitly.
-          type: 'waypoint',
+          type,
+          ...(category ? { category } : {}),
           highlights: [],
           kmFromPrevious: 0,
         };
