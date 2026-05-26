@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import * as Switch from '@radix-ui/react-switch';
-import { dayColor, formatDayDate, formatDuration, isFuelStop } from '../../lib/compute';
+import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
 import { phoneShare } from '../../lib/phone-share';
 import { accommodationLinks } from '../../lib/booking-links';
 import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
-import { FuelStopChip } from '../FuelStopChip';
+import { StopIdentityBadge } from '../StopIdentityBadge';
 import { QrModal } from '../QrModal';
 
 const ROUTE_MODE_GLYPH: Record<StopRouteMode, { glyph: string; label: string }> = {
@@ -41,9 +41,10 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
   const [shareLabel, setShareLabel] = useState<string | null>(null);
 
   const stopsOnly = group.stops.map((x) => x.stop);
-  // Fuel stops are pit-stop suggestions, not turn points — they don't count
-  // toward the Android Auto 10-stop limit and don't appear in the Maps URL.
-  const routableCount = stopsOnly.filter((s) => !isFuelStop(s)).length;
+  // Every stop on the day counts toward the AA badge — fuel stops are
+  // no longer treated as planner-side hints. The deep-link URL catches
+  // up in a follow-up (routableStops is the next thing to flip).
+  const routableCount = stopsOnly.length;
   const date = formatDayDate(group.day, startDate);
   const status = aaStatus(routableCount);
   const url = buildDayMapsUrl(stopsOnly);
@@ -159,15 +160,10 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
 
       {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-2.5">
-          {stopsOnly.map((stop, i) => isFuelStop(stop) ? (
-            <FuelStopChip key={stop.id} stop={stop} />
-          ) : (
+          {stopsOnly.map((stop, i) => (
             <div key={stop.id} className="flex items-start gap-2.5">
-              <div
-                className="w-[20px] h-[20px] font-mono text-[10px] font-semibold rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                style={{ backgroundColor: color, color: '#0d0e11' }}
-              >
-                {group.stops[i].index + 1}
+              <div className="mt-0.5">
+                <StopIdentityBadge stop={stop} index={group.stops[i].index} variant="compact" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
