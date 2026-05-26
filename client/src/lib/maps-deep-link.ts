@@ -1,4 +1,3 @@
-import { isFuelStop } from './compute';
 import type { Stop } from './types';
 
 /** Google Maps URL routing accepts 1 origin + ≤9 waypoints + 1 destination per URL.
@@ -13,10 +12,11 @@ export function aaStatus(stopCount: number): AaStatus {
   return 'ready';
 }
 
-/** Stops that count toward the Android Auto / Maps URL 10-stop limit. Fuel
- * stops are pit-stop suggestions, not turn points, so they're filtered out. */
+/** Stops that count toward the Android Auto / Maps URL 10-stop limit.
+ *  Every stop on the day counts — fuel stops are real AA waypoints,
+ *  not planner-side hints, so they go into the URL like any other stop. */
 export function routableStops(stops: readonly Stop[]): Stop[] {
-  return stops.filter((s) => !isFuelStop(s));
+  return [...stops];
 }
 
 /** Builds a Google Maps directions URL for a single day's stops.

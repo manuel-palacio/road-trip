@@ -59,30 +59,30 @@ describe('buildDayMapsUrl', () => {
     // Two waypoints (b and c) joined by | which gets URL-encoded
     expect(url).toContain('49%2C8%7C49.5%2C8.5');
   });
-  it('excludes fuel stops from the directions URL', () => {
+  it('includes fuel stops in the directions URL as waypoints', () => {
     const stops = [s('a', 48.5, 7.7), fuel('gas', 48.7, 7.8), s('b', 49.0, 8.0)];
     const url = buildDayMapsUrl(stops);
     expect(url).toContain('origin=');
     expect(url).toContain('destination=');
-    // Fuel stop is dropped — no waypoints in a 2-routable-stop URL.
-    expect(url).not.toContain('waypoints=');
-    expect(url).not.toContain('48.7');
+    expect(url).toContain('waypoints=');
+    // Fuel stop is now a real waypoint — its coordinates appear in the URL.
+    expect(url).toContain('48.7');
   });
-  it('also excludes legacy fuel waypoints (type=waypoint + category=fuel)', () => {
+  it('also includes legacy fuel waypoints (type=waypoint + category=fuel)', () => {
     const stops = [s('a', 48.5, 7.7), legacyFuel('gas', 48.7, 7.8), s('b', 49.0, 8.0)];
     const url = buildDayMapsUrl(stops);
-    expect(url).not.toContain('48.7');
+    expect(url).toContain('48.7');
   });
 });
 
 describe('routableStops', () => {
-  it('drops first-class fuel stops', () => {
+  it('keeps first-class fuel stops', () => {
     const stops = [s('a', 0, 0), fuel('f', 0, 0), s('b', 0, 0)];
-    expect(routableStops(stops).map((x) => x.id)).toEqual(['a', 'b']);
+    expect(routableStops(stops).map((x) => x.id)).toEqual(['a', 'f', 'b']);
   });
-  it('drops legacy fuel waypoints', () => {
+  it('keeps legacy fuel waypoints', () => {
     const stops = [s('a', 0, 0), legacyFuel('f', 0, 0), s('b', 0, 0)];
-    expect(routableStops(stops).map((x) => x.id)).toEqual(['a', 'b']);
+    expect(routableStops(stops).map((x) => x.id)).toEqual(['a', 'f', 'b']);
   });
   it('keeps non-fuel waypoints even with a different category', () => {
     const stops: Stop[] = [
