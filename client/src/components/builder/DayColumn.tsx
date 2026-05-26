@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
-import { isFuelStop } from '../../lib/compute';
 import { longestLegOverRange } from '../../lib/fuel-stops';
 import type { DayGroup } from '../../lib/compute';
 import type { PinCategory, Stop, StopRouteMode } from '../../lib/types';
 import { StopRow } from './StopRow';
-import { FuelStopChip } from '../FuelStopChip';
 import { CategoryMenuButton } from './CategoryMenuButton';
 
 type Props = {
@@ -51,7 +49,7 @@ export function DayColumn(p: Props) {
   const [over, setOver] = useState(false);
   const color = dayColor(g.day);
   const date = formatDayDate(g.day, p.startDate);
-  const aaCount = g.stops.filter((x) => !isFuelStop(x.stop)).length;
+  const aaCount = g.stops.length;
   const longLegKm = longestLegOverRange(g, p.tankRangeKm);
   const dayMaxKm = p.maxKmPerDay && p.maxKmPerDay > 0 ? p.maxKmPerDay : 800;
   const showKmWarning = g.km > dayMaxKm;
@@ -186,29 +184,25 @@ export function DayColumn(p: Props) {
           the sticky header above stay pinned while the body scrolls. */}
       <div className="flex-1 overflow-y-auto px-3 pt-2 pb-3 flex flex-col gap-2">
         {g.stops.map(({ stop, index }) => (
-          isFuelStop(stop) ? (
-            <FuelStopChip key={stop.id} stop={stop} onRemove={() => p.onRemove(stop.id)} />
-          ) : (
-            <StopRow
-              key={stop.id}
-              stop={stop}
-              index={index}
-              isFirst={index === 0}
-              onChangeType={p.onChangeType}
-              onChangeRouteMode={p.onChangeRouteMode}
-              onRemove={p.onRemove}
-              onSetForceDayStart={p.onSetForceDayStart}
-              onAddHighlight={p.onAddHighlight}
-              onRemoveHighlight={p.onRemoveHighlight}
-              onDemote={p.onDemote}
-              demotingStopId={p.demotingStopId}
-              onDragStart={p.onDragStart}
-              onDragEnd={p.onDragEnd}
-              onDragOver={p.onDragOver}
-              onDragLeave={p.onDragLeave}
-              onDrop={p.onDrop}
-            />
-          )
+          <StopRow
+            key={stop.id}
+            stop={stop}
+            index={index}
+            isFirst={index === 0}
+            onChangeType={p.onChangeType}
+            onChangeRouteMode={p.onChangeRouteMode}
+            onRemove={p.onRemove}
+            onSetForceDayStart={p.onSetForceDayStart}
+            onAddHighlight={p.onAddHighlight}
+            onRemoveHighlight={p.onRemoveHighlight}
+            onDemote={p.onDemote}
+            demotingStopId={p.demotingStopId}
+            onDragStart={p.onDragStart}
+            onDragEnd={p.onDragEnd}
+            onDragOver={p.onDragOver}
+            onDragLeave={p.onDragLeave}
+            onDrop={p.onDrop}
+          />
         ))}
       </div>
     </article>
