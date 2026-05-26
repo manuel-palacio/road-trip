@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { groupByDay, isFuelStop } from '../../lib/compute';
 import { longestLegOverRange } from '../../lib/fuel-stops';
-import type { Stop, StopRouteMode } from '../../lib/types';
+import type { PinCategory, Stop, StopRouteMode } from '../../lib/types';
 import { DayHeader } from './DayHeader';
 import { StopRow } from './StopRow';
 import { FuelStopChip } from '../FuelStopChip';
@@ -28,10 +28,13 @@ type Props = {
   onDragLeave: (ev: React.DragEvent) => void;
   onDrop: (id: string, ev: React.DragEvent) => void;
   onDropAtDayStart?: (day: number) => void;
-  // When set, each DayHeader gets a "+ Fuel stop" button. Predicate
-  // (canFindFuelForDay) hides the button on days with no targetable
-  // leg (single-stop days, unrouted legs, etc.).
-  onFindFuelForDay?: (day: number) => void;
+  // When set, each DayHeader gets a "+ Find ▾" menu. Builder receives
+  // the (day, category) pick and routes it to NearbyFinder with the
+  // right anchor. `canFindFuelForDay` continues to gate the Fuel entry
+  // — single-stop days have no within-day leg, so Fuel disables there
+  // but the other categories stay available (they anchor to the first
+  // stop, not to a leg).
+  onFindCategoryForDay?: (day: number, category: PinCategory) => void;
   canFindFuelForDay?: (day: number) => boolean;
   /** Tank range used to flag days with a long single leg. Defaults to 500
    * inside longestLegOverRange when undefined. */
@@ -68,11 +71,8 @@ export function StopList(p: Props) {
             longLegKm={longestLegOverRange(g, p.tankRangeKm)}
             maxKmPerDay={p.maxKmPerDay}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
-            onFindFuel={
-              p.onFindFuelForDay && (!p.canFindFuelForDay || p.canFindFuelForDay(g.day))
-                ? () => p.onFindFuelForDay!(g.day)
-                : undefined
-            }
+            onPickCategory={p.onFindCategoryForDay ? (cat) => p.onFindCategoryForDay!(g.day, cat) : undefined}
+            fuelDisabled={p.canFindFuelForDay ? !p.canFindFuelForDay(g.day) : false}
           />
           {g.stops.map(({ stop, index }) => (
             isFuelStop(stop) ? (

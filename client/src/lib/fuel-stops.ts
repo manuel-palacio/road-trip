@@ -59,6 +59,23 @@ export function findLongestLegTarget(
   return { midpoint, insertAtFlatIndex: endIdx, legStart, legEnd, legKm: maxKm };
 }
 
+/** Anchor for non-fuel NearbyFinder categories (food / hotel / scenic,
+ * issue #72). Uses the day's first stop as both the search midpoint and
+ * the bookend of a zero-length pseudo-leg — when legStart === legEnd
+ * the NearbyFinder modal can present a "Near X" subheading instead of
+ * "Longest leg." Returns null for empty days. Pure. */
+export function dayStartTarget(group: DayGroup): FuelSearchTarget | null {
+  if (group.stops.length === 0) return null;
+  const first = group.stops[0];
+  return {
+    midpoint: { lat: first.stop.lat, lng: first.stop.lng },
+    insertAtFlatIndex: first.index + 1,
+    legStart: first.stop,
+    legEnd: first.stop,
+    legKm: 0,
+  };
+}
+
 /** Find the longest leg in a day that exceeds `tankRangeKm`. Returns null
  * when no leg crosses the threshold — i.e. the day has no real refuel
  * pressure. Drives the auto-suggestion / warning paths. The manual button

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { formatDayDate, formatDuration } from '../../lib/compute';
+import type { PinCategory } from '../../lib/types';
+import { CategoryMenuButton } from './CategoryMenuButton';
 
 type Props = {
   day: number;
@@ -28,13 +30,16 @@ type Props = {
   // When set, the header becomes a drop target — a drop inserts the
   // dragged stop just before the first stop currently in this day.
   onDropAtStart?: () => void;
-  // When set, renders a "+ Fuel stop" button that opens the gas-station
-  // picker for this day. Set only by the Builder; viewer/handoff omit.
-  onFindFuel?: () => void;
+  // When set, renders the "+ Find ▾" menu that opens NearbyFinder for
+  // a chosen POI category. Set only by the Builder; viewer/handoff omit.
+  onPickCategory?: (category: PinCategory) => void;
+  /** True when the day has no within-day leg to anchor a fuel search to.
+   * Disables the Fuel entry in the menu without hiding the whole menu. */
+  fuelDisabled?: boolean;
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, onDropAtStart, onFindFuel } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, onDropAtStart, onPickCategory, fuelDisabled } = p;
   const dayMaxKm = maxKmPerDay && maxKmPerDay > 0 ? maxKmPerDay : 800;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
@@ -135,15 +140,13 @@ export function DayHeader(p: Props) {
             {longLegKm} km without refuel
           </span>
         )}
-        {onFindFuel && (
-          <button
-            type="button"
-            onClick={onFindFuel}
-            title="Find a gas station along this day's longest leg"
-            className="ml-auto inline-flex items-center gap-1 bg-transparent border border-line text-paper-dim px-2 py-[3px] rounded font-mono text-[9.5px] tracking-[0.14em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
-          >
-            <span aria-hidden>⛽</span> + Fuel stop
-          </button>
+        {onPickCategory && (
+          <div className="ml-auto">
+            <CategoryMenuButton
+              disabledCategories={fuelDisabled ? ['fuel'] : []}
+              onPick={onPickCategory}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -14,11 +14,11 @@ import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
-import { findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
+import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
-import type { FuelOverride, FuelUnit, Stop, Trip } from '../lib/types';
+import type { FuelOverride, FuelUnit, PinCategory, Stop, Trip } from '../lib/types';
 import { CountryOverrideRow } from '../components/builder/CountryOverrideRow';
 import { DatePicker } from '../components/DatePicker';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
@@ -270,9 +270,10 @@ export function Builder() {
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
   }
-  // Resolved gas-station search target (longest leg of a day) when the
-  // user opens the NearbyFinder for the fuel category. Null = modal closed.
-  const [fuelTarget, setFuelTarget] = useState<FuelSearchTarget | null>(null);
+  // Pending NearbyFinder open. category drives the Google Places type
+  // filter + the modal copy; target is the leg-midpoint (fuel) or the
+  // day's first stop (other categories) as the search anchor.
+  const [nearbyOpen, setNearbyOpen] = useState<{ category: PinCategory; target: FuelSearchTarget } | null>(null);
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
@@ -407,46 +408,56 @@ export function Builder() {
   function fuelTargetForDay(day: number): FuelSearchTarget | null {
     const g = dayGroups.find((x) => x.day === day);
     if (!g) return null;
-    // Manual "+ Fuel stop" button: target the day's longest leg unconditionally.
+    // Manual "+ Fuel" pick: target the day's longest leg unconditionally.
     // tankRangeKm gates the WARNING chip (longestLegOverRange) but should not
     // block the user from explicitly adding a fuel stop on a short-leg day.
     return findLongestLegTarget(g, dayedStops, getStopPath);
   }
-  function openFuelForDay(day: number) {
-    const target = fuelTargetForDay(day);
+  function openCategoryForDay(day: number, category: PinCategory) {
+    const g = dayGroups.find((x) => x.day === day);
+    if (!g) return;
+    const target = category === 'fuel'
+      ? findLongestLegTarget(g, dayedStops, getStopPath)
+      : dayStartTarget(g);
     if (!target) return;
-    setFuelTarget(target);
+    setNearbyOpen({ category, target });
   }
-  async function onFuelStopSelected(result: NearbyResult) {
-    if (!fuelTarget) return;
-    const insertAt = fuelTarget.insertAtFlatIndex;
-    setFuelTarget(null);
+  async function onNearbyResultSelected(result: NearbyResult) {
+    if (!nearbyOpen) return;
+    const { category, target } = nearbyOpen;
+    const insertAt = target.insertAtFlatIndex;
+    setNearbyOpen(null);
     // Look up the locality so the chip reads "Grenoble" instead of
-    // "Circle K Grenoble Autoroute A48". The full station name stays on `name`
-    // for detail views + deep links. Falls back to "Fuel stop" when the
-    // Places Details call can't resolve a usable locality.
+    // "Circle K Grenoble Autoroute A48". Falls back to the result name
+    // when the Places Details call can't resolve a usable locality.
     const locality = maps && map
       ? await lookupLocalityForPlace(maps, map, result.placeId).catch(() => null)
       : null;
+    // Every category inserts as a routed stop — that's the whole point
+    // of picking somewhere to go. Type varies by category so day-boundary
+    // semantics + the visual treatment match user intent:
+    //   fuel  → 'fuel'      (pit-stop chip, transparent to AA's 10-stop limit)
+    //   hotel → 'overnight' (triggers a day boundary at the next stop —
+    //                        "I'm sleeping here")
+    //   food  → 'waypoint'  (regular routing stop)
+    //   scenic→ 'waypoint'
+    const stopType: Stop['type'] =
+      category === 'fuel' ? 'fuel'
+      : category === 'hotel' ? 'overnight'
+      : 'waypoint';
+    const fallbackLabel = category === 'fuel' ? 'Fuel stop' : result.name;
     const newStop: Stop = {
       id: crypto.randomUUID(),
       name: result.name,
-      label: locality ?? 'Fuel stop',
+      label: locality ?? fallbackLabel,
       lat: result.lat,
       lng: result.lng,
-      type: 'fuel',
-      category: 'fuel',
+      type: stopType,
+      category,
       highlights: [],
       kmFromPrevious: 0,
     };
-    setState((s) => ({
-      ...s,
-      // spliceStopAt also wipes the successor's stale kmFromPrevious — its
-      // inbound leg just changed from (prev→next) to (newStop→next) and
-      // useRouteSegments will refetch. Without the wipe a save during the
-      // refetch window would persist the old A→B distance for the successor.
-      stops: reassignTypes(spliceStopAt(s.stops, insertAt, newStop)),
-    }));
+    setState((s) => ({ ...s, stops: reassignTypes(spliceStopAt(s.stops, insertAt, newStop)) }));
   }
   // Fuel cost — multi-currency breakdown. Each leg is priced by its
   // destination's countryCode against fuelOverrides, falling back to the
@@ -1452,7 +1463,8 @@ export function Builder() {
                   onDragLeave={() => { /* handled in StopRow */ }}
                   onDrop={(id, ev) => reorder(id, ev)}
                   onDropAtDayStart={gi > 0 ? reorderToDayStart : undefined}
-                  onFindFuel={fuelTargetForDay(g.day) !== null ? () => openFuelForDay(g.day) : undefined}
+                  onPickCategory={(cat) => openCategoryForDay(g.day, cat)}
+                  fuelDisabled={fuelTargetForDay(g.day) === null}
                   tankRangeKm={state.tankRangeKm}
                   maxKmPerDay={state.maxKmPerDay}
                 />
@@ -1465,14 +1477,14 @@ export function Builder() {
 
         {tripDetailsModal}
 
-        {fuelTarget && maps && map && (
+        {nearbyOpen && maps && map && (
           <NearbyFinder
-            category="fuel"
-            target={fuelTarget}
+            category={nearbyOpen.category}
+            target={nearbyOpen.target}
             maps={maps}
             map={map}
-            onSelect={onFuelStopSelected}
-            onClose={() => setFuelTarget(null)}
+            onSelect={onNearbyResultSelected}
+            onClose={() => setNearbyOpen(null)}
           />
         )}
 
@@ -1635,7 +1647,7 @@ export function Builder() {
               onDragLeave={() => { /* handled in StopRow */ }}
               onDrop={(id, ev) => reorder(id, ev)}
               onDropAtDayStart={reorderToDayStart}
-              onFindFuelForDay={openFuelForDay}
+              onFindCategoryForDay={openCategoryForDay}
               canFindFuelForDay={(day) => fuelTargetForDay(day) !== null}
               tankRangeKm={state.tankRangeKm}
               maxKmPerDay={state.maxKmPerDay}
@@ -1730,14 +1742,14 @@ export function Builder() {
 
       {tripDetailsModal}
 
-      {fuelTarget && maps && map && (
+      {nearbyOpen && maps && map && (
         <NearbyFinder
-          category="fuel"
-          target={fuelTarget}
+          category={nearbyOpen.category}
+          target={nearbyOpen.target}
           maps={maps}
           map={map}
-          onSelect={onFuelStopSelected}
-          onClose={() => setFuelTarget(null)}
+          onSelect={onNearbyResultSelected}
+          onClose={() => setNearbyOpen(null)}
         />
       )}
 

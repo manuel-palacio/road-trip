@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findFuelSearchTarget, findLongestLegTarget, longestLegOverRange } from '../fuel-stops';
+import { dayStartTarget, findFuelSearchTarget, findLongestLegTarget, longestLegOverRange } from '../fuel-stops';
 import type { DayGroup } from '../compute';
 import type { Stop } from '../types';
 
@@ -220,6 +220,48 @@ describe('findLongestLegTarget (unconditional — drives the manual + Fuel stop 
     expect(target).not.toBeNull();
     expect(target!.legKm).toBe(250);
     expect(target!.legEnd.id).toBe('b');
+  });
+});
+
+describe('dayStartTarget (issue #72 — anchor for non-fuel NearbyFinder)', () => {
+  it('returns null for an empty day group', () => {
+    expect(dayStartTarget({ day: 1, stops: [], km: 0, durationSeconds: 0 })).toBeNull();
+  });
+  it('uses the day\'s first stop as the search midpoint', () => {
+    const first = stop({ id: 'stockholm', lat: 59.33, lng: 18.06 });
+    const second = stop({ id: 'malmo', lat: 55.6, lng: 13 });
+    const target = dayStartTarget({
+      day: 1,
+      stops: [{ stop: first, index: 0 }, { stop: second, index: 1 }],
+      km: 600,
+      durationSeconds: 0,
+    });
+    expect(target).not.toBeNull();
+    expect(target!.midpoint).toEqual({ lat: 59.33, lng: 18.06 });
+  });
+  it('insertAtFlatIndex puts the new POI right AFTER the first stop', () => {
+    // For a day group whose first stop has flat index 3, a new POI
+    // inserts at flat index 4 — between Stockholm and the next stop.
+    const first = stop({ id: 'stockholm', lat: 59.33, lng: 18.06 });
+    const target = dayStartTarget({
+      day: 2,
+      stops: [{ stop: first, index: 3 }],
+      km: 0,
+      durationSeconds: 0,
+    });
+    expect(target!.insertAtFlatIndex).toBe(4);
+  });
+  it('legStart === legEnd and legKm = 0 (signals the "Near X" subheading mode)', () => {
+    const first = stop({ id: 'stockholm', lat: 59.33, lng: 18.06 });
+    const target = dayStartTarget({
+      day: 1,
+      stops: [{ stop: first, index: 0 }],
+      km: 0,
+      durationSeconds: 0,
+    });
+    expect(target!.legStart.id).toBe('stockholm');
+    expect(target!.legEnd.id).toBe('stockholm');
+    expect(target!.legKm).toBe(0);
   });
 });
 

@@ -3,9 +3,10 @@ import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { isFuelStop } from '../../lib/compute';
 import { longestLegOverRange } from '../../lib/fuel-stops';
 import type { DayGroup } from '../../lib/compute';
-import type { Stop, StopRouteMode } from '../../lib/types';
+import type { PinCategory, Stop, StopRouteMode } from '../../lib/types';
 import { StopRow } from './StopRow';
 import { FuelStopChip } from '../FuelStopChip';
+import { CategoryMenuButton } from './CategoryMenuButton';
 
 type Props = {
   group: DayGroup;
@@ -31,7 +32,14 @@ type Props = {
   onDragLeave: (ev: React.DragEvent) => void;
   onDrop: (id: string, ev: React.DragEvent) => void;
   onDropAtDayStart?: (day: number) => void;
-  onFindFuel?: () => void;
+  /** User picked a POI category from the per-day Find menu (issue #72).
+   * Builder routes to NearbyFinder with the right anchor for the category. */
+  onPickCategory?: (category: PinCategory) => void;
+  /** True when the day has no within-day leg to anchor a fuel search to
+   * (single-stop day). Disables the Fuel menu entry without hiding the
+   * whole Find menu — other categories anchor to the first stop and
+   * stay available. */
+  fuelDisabled?: boolean;
   tankRangeKm?: number;
   /** Trip's max-km-per-day target. Drives the "Long day" warning chip.
    * Optional — defaults to 800 when unset. */
@@ -162,17 +170,13 @@ export function DayColumn(p: Props) {
                 {longLegKm}km
               </span>
             )}
-            {p.onFindFuel && (
-              <button
-                type="button"
-                onClick={p.onFindFuel}
-                data-testid="add-fuel-button"
-                data-day={g.day}
-                title="Find a gas station along this day's longest leg"
-                className="ml-auto inline-flex items-center gap-1 bg-transparent border border-line text-paper-dim px-1.5 py-[2px] rounded font-mono text-[9px] tracking-[0.12em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
-              >
-                <span aria-hidden>⛽</span> + Fuel
-              </button>
+            {p.onPickCategory && (
+              <div className="ml-auto" data-day={g.day}>
+                <CategoryMenuButton
+                  disabledCategories={p.fuelDisabled ? ['fuel'] : []}
+                  onPick={p.onPickCategory}
+                />
+              </div>
             )}
           </div>
         </div>
