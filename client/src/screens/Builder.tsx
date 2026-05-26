@@ -12,6 +12,7 @@ import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
+import { stopCategory } from '../lib/pin-meta';
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
@@ -646,7 +647,7 @@ export function Builder() {
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
-        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber), stop.type === 'fuel' || stop.category === 'fuel'),
+        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber), stopCategory(stop)),
         title: stop.label || stop.name,
       });
       const showInfo = () => {

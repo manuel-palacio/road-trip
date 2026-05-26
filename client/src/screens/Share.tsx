@@ -11,7 +11,7 @@ import { longestLegOverRange } from '../lib/fuel-stops';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, makePinIcon, polylineOptionsFor } from '../lib/google-maps';
 import { useTheme } from '../hooks/useTheme';
-import { PIN_CATEGORY_META } from '../lib/pin-meta';
+import { PIN_CATEGORY_META, stopCategory } from '../lib/pin-meta';
 import type { Pin, Stop } from '../lib/types';
 import { Brand } from '../components/Brand';
 import { DayCard } from '../components/viewer/DayCard';
@@ -169,7 +169,7 @@ export function Share() {
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
-        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber), stop.type === 'fuel' || stop.category === 'fuel'),
+        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber), stopCategory(stop)),
         title: stop.label || stop.name,
       });
       marker.addListener('click', () => {

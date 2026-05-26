@@ -1,3 +1,6 @@
+import { DEFAULT_STOP_META, PIN_CATEGORY_META } from './pin-meta';
+import type { PinCategory } from './types';
+
 let loadPromise: Promise<typeof google.maps> | null = null;
 
 export function loadMapsSdk(apiKey: string): Promise<typeof google.maps> {
@@ -133,15 +136,23 @@ export function makeCostChipIcon(text: string): google.maps.Icon {
   };
 }
 
-export function makeMarkerIcon(num: number, ringColor = '#f3ecde', isFuel = false): google.maps.Icon {
-  // Cream center with day-color outer ring, dark number — keeps numbers
-  // legible across all day color hues. Fuel stops swap the number for
-  // a ⛽ glyph so they stand out visually from the rest of the route.
-  const center = isFuel
-    ? `<text x='22' y='27.5' text-anchor='middle' font-size='14'>⛽</text>`
-    : `<text x='22' y='26.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='600' fill='#0d0e11'>${num}</text>`;
-  const innerFill = isFuel ? '#fff5d6' : '#f3ecde';
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><circle cx='22' cy='22' r='15' fill='${ringColor}'/><circle cx='22' cy='22' r='11' fill='${innerFill}'/>${center}</svg>`;
+export function makeMarkerIcon(
+  num: number,
+  ringColor: string = '#f3ecde',
+  category?: PinCategory,
+): google.maps.Icon {
+  // Every marker is iconified: category-tinted inner disc + day-color ring
+  // + category emoji + small day-color corner pip with the sequence number.
+  // Card and map stay in lockstep via StopIdentityBadge.
+  const meta = category ? PIN_CATEGORY_META[category] : DEFAULT_STOP_META;
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'>` +
+      `<circle cx='22' cy='22' r='15' fill='${ringColor}'/>` +
+      `<circle cx='22' cy='22' r='12' fill='${meta.tint}'/>` +
+      `<text x='22' y='27' text-anchor='middle' font-size='15'>${meta.emoji}</text>` +
+      `<circle cx='34' cy='34' r='7.5' fill='${ringColor}' stroke='#f3ecde' stroke-width='1'/>` +
+      `<text x='34' y='37.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='9' font-weight='600' fill='#0d0e11'>${num}</text>` +
+    `</svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
     anchor: new google.maps.Point(22, 22),

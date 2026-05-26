@@ -13,6 +13,7 @@ import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, fo
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
+import { stopCategory } from '../lib/pin-meta';
 import { useTheme } from '../hooks/useTheme';
 import type { Stop } from '../lib/types';
 import { DayCard } from '../components/viewer/DayCard';
@@ -229,7 +230,7 @@ export function Viewer() {
       const marker = new maps.Marker({
         position: { lat: stop.lat, lng: stop.lng },
         map,
-        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber), stop.type === 'fuel' || stop.category === 'fuel'),
+        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber), stopCategory(stop)),
         title: stop.label || stop.name,
       });
       marker.addListener('click', () => {
