@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { flagEmoji } from '../../lib/flags';
 import { dayColor } from '../../lib/compute';
 import { getStopRoutingFailed } from '../../hooks/useRouteSegments';
+import { StopIdentityBadge } from '../StopIdentityBadge';
 import type { Stop, StopRouteMode } from '../../lib/types';
 
 type Props = {
@@ -123,24 +124,10 @@ export function StopRow(p: Props) {
         ⠿
       </span>
 
-      <div
-        className="w-[22px] h-[22px] font-mono text-[11px] font-semibold rounded-full flex items-center justify-center shrink-0"
-        style={{ backgroundColor: color, color: '#0d0e11' }}
-      >
-        {index + 1}
-      </div>
+      <StopIdentityBadge stop={stop} index={index} variant="card" />
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          {stop.category === 'fuel' && (
-            <span
-              aria-label="Fuel stop"
-              title="Fuel stop"
-              className="inline-flex items-center justify-center w-[20px] h-[20px] rounded bg-[rgba(244,211,94,0.18)] border border-[rgba(244,211,94,0.5)] text-[12px] leading-none shrink-0"
-            >
-              <span aria-hidden>⛽</span>
-            </span>
-          )}
           <span className="text-[14px] text-paper [overflow-wrap:anywhere]">{stop.label || stop.name}</span>
           {flag && <span className="text-[14px] leading-none">{flag}</span>}
         </div>
