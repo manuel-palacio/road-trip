@@ -9,6 +9,8 @@ import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
 import { StopIdentityBadge } from '../StopIdentityBadge';
 import { QrModal } from '../QrModal';
+import type { FuelTimeline } from '../../lib/fuel-timeline';
+import { FuelRemainingBadge } from '../FuelRemainingBadge';
 
 const ROUTE_MODE_GLYPH: Record<StopRouteMode, { glyph: string; label: string }> = {
   fastest: { glyph: '⚡', label: 'Fastest leg' },
@@ -33,9 +35,13 @@ type Props = {
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 (or omitted) hides the chip. */
   longLegKm?: number;
+  fuelTimeline?: FuelTimeline;
+  tankRangeKm?: number;
+  autoFuelWarningKm?: number;
+  onOpenManualPicker?: () => void;
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, longLegKm = 0 }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -155,6 +161,23 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
             <span aria-hidden>⛽</span>
             {longLegKm} km without refuel
           </span>
+        )}
+        {fuelTimeline && tankRangeKm && (
+          <FuelRemainingBadge
+            timeline={fuelTimeline}
+            lastStopIndex={group.stops[group.stops.length - 1].index}
+            tankRangeKm={tankRangeKm}
+          />
+        )}
+        {autoFuelWarningKm != null && (
+          <button
+            type="button"
+            onClick={onOpenManualPicker}
+            className="inline-flex items-center gap-1 px-2 py-[3px] rounded font-mono text-[9.5px] tracking-[0.16em] uppercase text-red-400 hover:text-paper hover:bg-accent-soft border border-red-400/30"
+            title="No fuel station found within 5 km of the route — click to widen the search."
+          >
+            ⚠ No station within 5 km — add manually
+          </button>
         )}
       </div>
 

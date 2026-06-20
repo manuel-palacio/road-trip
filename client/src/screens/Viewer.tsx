@@ -11,6 +11,7 @@ import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { longestLegOverRange } from '../lib/fuel-stops';
+import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { flagEmoji } from '../lib/flags';
 import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
 import { stopCategory } from '../lib/pin-meta';
@@ -116,6 +117,10 @@ export function Viewer() {
     [routes.enriched, trip?.maxKmPerDay],
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  const fuelTimeline = useMemo(
+    () => computeFuelTimeline(dayedStops, trip?.tankRangeKm || 0),
+    [dayedStops, trip?.tankRangeKm],
+  );
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
   const totalFuelCostStr = useMemo(() => {
     const b = fuelBreakdownForLegs(
@@ -435,6 +440,8 @@ export function Viewer() {
                   onConfigureFuel={goToBuilder}
                   bookingAffiliateId={cfg.data?.bookingAffiliateId}
                   longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
+                  fuelTimeline={fuelTimeline}
+                  tankRangeKm={trip.tankRangeKm}
                 />
               ))
             )

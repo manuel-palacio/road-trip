@@ -17,6 +17,7 @@ import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-categor
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
+import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
@@ -407,6 +408,10 @@ export function Builder() {
   // Per-day groupings — used by the StopList's render path AND by the
   // gas-station picker to find the longest leg of a given day.
   const dayGroups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  const fuelTimeline = useMemo(
+    () => computeFuelTimeline(dayedStops, state.tankRangeKm || 0),
+    [dayedStops, state.tankRangeKm],
+  );
   // Distinct ISO country codes in visit order. Drives the auto-populated
   // per-country fuel-override rows in the trip-details modal (issue #57).
   const tripCountries = useMemo(() => tripCountriesFromStops(dayedStops), [dayedStops]);
@@ -1508,6 +1513,7 @@ export function Builder() {
                   fuelDisabled={fuelTargetForDay(g.day) === null}
                   tankRangeKm={state.tankRangeKm}
                   maxKmPerDay={state.maxKmPerDay}
+                  fuelTimeline={fuelTimeline}
                 />
               ))}
             </div>

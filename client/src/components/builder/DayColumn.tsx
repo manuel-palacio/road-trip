@@ -3,6 +3,8 @@ import { dayColor, formatDayDate, formatDuration } from '../../lib/compute';
 import { longestLegOverRange } from '../../lib/fuel-stops';
 import type { DayGroup } from '../../lib/compute';
 import type { PinCategory, Stop, StopRouteMode } from '../../lib/types';
+import type { FuelTimeline } from '../../lib/fuel-timeline';
+import { FuelRemainingBadge } from '../FuelRemainingBadge';
 import { StopRow } from './StopRow';
 import { CategoryMenuButton } from './CategoryMenuButton';
 
@@ -42,6 +44,9 @@ type Props = {
   /** Trip's max-km-per-day target. Drives the "Long day" warning chip.
    * Optional — defaults to 800 when unset. */
   maxKmPerDay?: number;
+  fuelTimeline?: FuelTimeline;
+  autoFuelWarningKm?: number;
+  onOpenManualPicker?: () => void;
 };
 
 export function DayColumn(p: Props) {
@@ -167,6 +172,23 @@ export function DayColumn(p: Props) {
                 <span aria-hidden>⛽</span>
                 {longLegKm}km
               </span>
+            )}
+            {p.fuelTimeline && p.tankRangeKm && (
+              <FuelRemainingBadge
+                timeline={p.fuelTimeline}
+                lastStopIndex={g.stops[g.stops.length - 1].index}
+                tankRangeKm={p.tankRangeKm}
+              />
+            )}
+            {p.autoFuelWarningKm != null && (
+              <button
+                type="button"
+                onClick={p.onOpenManualPicker}
+                className="inline-flex items-center gap-1 px-2 py-[3px] rounded font-mono text-[9px] tracking-[0.12em] uppercase text-red-400 hover:text-paper hover:bg-accent-soft border border-red-400/30"
+                title="No fuel station found within 5 km of the route — click to widen the search."
+              >
+                ⚠ No station within 5 km — add manually
+              </button>
             )}
             {p.onPickCategory && (
               <div className="ml-auto" data-day={g.day}>
