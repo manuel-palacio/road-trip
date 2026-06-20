@@ -20,6 +20,22 @@ type Args = {
   onWarning: (warnings: Warning[]) => void;
 };
 
+/** An auto-inserted fuel stop without a routePath (or with an incomplete
+ * polyline) means useRouteSegments hasn't fetched directions for the new
+ * pair of legs yet. Running the engine in this window is harmful: the
+ * baseline reconstruction can't reconstitute the original leg km because
+ * the auto stop has km=0 and the successor was km-cleared by spliceStopAt,
+ * so the timeline sees no gap and the engine removes the stop it just
+ * added. Defer until routing catches up. */
+function hasPendingAutoRoutes(stops: readonly Stop[]): boolean {
+  for (const s of stops) {
+    if (isFuelStop(s) && s.addedByAuto === true) {
+      if (!s.routePath || s.routePath.length < 2) return true;
+    }
+  }
+  return false;
+}
+
 function hashStops(stops: readonly Stop[]): string {
   return stops
     .map(s => `${s.id}|${s.lat.toFixed(5)}|${s.lng.toFixed(5)}|${s.type}|${s.addedByAuto ? 1 : 0}`)
@@ -71,6 +87,7 @@ export function useAutoFuel(args: Args): { running: boolean } {
     if (!args.enabled || !args.placesSearch) return;
     if (args.enrichedStops.length < 2) return;
     if (!(args.tankRangeKm > 0)) return;
+    if (hasPendingAutoRoutes(args.enrichedStops)) return;
 
     const myReq = ++reqRef.current;
     let cancelled = false;

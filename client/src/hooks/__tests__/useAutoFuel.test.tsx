@@ -116,6 +116,25 @@ describe('useAutoFuel', () => {
     expect(onPropose).not.toHaveBeenCalled();
   });
 
+  it('defers when an auto stop is still awaiting its routePath (avoids insert/remove loop)', async () => {
+    const onPropose = vi.fn();
+    const onWarning = vi.fn();
+    // Stops include an auto-inserted fuel stop with NO routePath yet — simulates
+    // the window between spliceStopAt and useRouteSegments completing.
+    const inFlight: Stop[] = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'auto1', type: 'fuel', addedByAuto: true, kmFromPrevious: 0 }), // no routePath
+      stop({ id: 'b', type: 'destination', kmFromPrevious: 0 }),
+    ];
+    renderHook(() => useAutoFuel({
+      enabled: true, tripId: 't', stops: inFlight, enrichedStops: inFlight,
+      tankRangeKm: 500, placesSearch, onPropose, onWarning,
+    }));
+    await act(() => new Promise(r => setTimeout(r, 800)));
+    // Engine must NOT remove the auto stop while its routing is in flight.
+    expect(onPropose).not.toHaveBeenCalled();
+  });
+
   it('emits a warning when no station passes the detour cap', async () => {
     const onPropose = vi.fn();
     const onWarning = vi.fn();
