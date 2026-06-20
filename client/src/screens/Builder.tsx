@@ -8,6 +8,8 @@ import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { usePinModal } from '../hooks/usePinModal';
 import { usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
+import { useAutoFuel } from '../hooks/useAutoFuel';
+import type { PlacesSearchFn } from '../lib/auto-fuel-pick';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
@@ -166,6 +168,12 @@ function reassignTypes(stops: Stop[]): Stop[] {
   });
 }
 
+function markUserTouched(stop: Stop): Stop {
+  if (!stop.addedByAuto) return stop;
+  const { addedByAuto: _ignored, ...rest } = stop;
+  return rest as Stop;
+}
+
 function fitBounds(map: google.maps.Map, stops: Stop[]) {
   if (stops.length === 0) return;
   if (stops.length === 1) {
@@ -204,6 +212,9 @@ export function Builder() {
   const [hydrated, setHydrated] = useState(!isEditing);
   const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  const [autoFuelWarnings, setAutoFuelWarnings] = useState<Record<number, number>>({});
+  const [autoFuelToast, setAutoFuelToast] = useState<{ message: string } | null>(null);
+  const undoSnapshotRef = useRef<Stop[] | null>(null);
   // Trip-details disclosure. Expanded by default for brand-new trips so
   // first-time users see all the fields; collapsed by default when
   // editing an existing trip so the stop list gets more vertical room.
@@ -278,7 +289,10 @@ export function Builder() {
   // Pending NearbyFinder open. category drives the Google Places type
   // filter + the modal copy; target is the leg-midpoint (fuel) or the
   // day's first stop (other categories) as the search anchor.
-  const [nearbyOpen, setNearbyOpen] = useState<{ category: PinCategory; target: FuelSearchTarget } | null>(null);
+  const [nearbyOpen, setNearbyOpen] = useState<
+    | { category: PinCategory; target: FuelSearchTarget; widened?: boolean; legPolyline?: { lat: number; lng: number }[] }
+    | null
+  >(null);
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
@@ -415,6 +429,51 @@ export function Builder() {
   // Distinct ISO country codes in visit order. Drives the auto-populated
   // per-country fuel-override rows in the trip-details modal (issue #57).
   const tripCountries = useMemo(() => tripCountriesFromStops(dayedStops), [dayedStops]);
+
+  const placesSearch: PlacesSearchFn | null = useMemo(() => {
+    if (!maps || !map) return null;
+    return (location, radiusMeters) => new Promise<import('../components/builder/NearbyFinder').NearbyResult[]>((resolve) => {
+      const svc = new maps.places.PlacesService(map);
+      svc.nearbySearch(
+        { location, radius: radiusMeters, type: 'gas_station' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (raw: any, status: any) => {
+          if (status !== maps.places.PlacesServiceStatus.OK || !raw) return resolve([]);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          resolve(raw.filter((r: any) => r.geometry?.location).map((r: any) => ({
+            placeId: r.place_id || '',
+            name: r.name || 'Fuel stop',
+            vicinity: r.vicinity || '',
+            rating: typeof r.rating === 'number' ? r.rating : undefined,
+            lat: r.geometry!.location!.lat(),
+            lng: r.geometry!.location!.lng(),
+          })));
+        }
+      );
+    });
+  }, [maps, map]);
+
+  useAutoFuel({
+    enabled: state.autoFuel !== false,
+    tripId: state.tripId,
+    stops: state.stops,
+    enrichedStops: dayedStops,
+    tankRangeKm: state.tankRangeKm || 0,
+    placesSearch,
+    onPropose: (next, inserted, _removed) => {
+      if (!undoSnapshotRef.current) undoSnapshotRef.current = state.stops;
+      setState((s) => ({ ...s, stops: next }));
+      const msg = inserted.length === 1
+        ? `Added fuel stop near ${inserted[0].label} · Undo`
+        : `Added ${inserted.length} fuel stops · Undo`;
+      setAutoFuelToast({ message: msg });
+    },
+    onWarning: (warnings) => {
+      const warningMap: Record<number, number> = {};
+      for (const w of warnings) if (w.dayNumber) warningMap[w.dayNumber] = w.gapKm;
+      setAutoFuelWarnings(warningMap);
+    },
+  });
   function fuelTargetForDay(day: number): FuelSearchTarget | null {
     const g = dayGroups.find((x) => x.day === day);
     if (!g) return null;
@@ -734,10 +793,10 @@ export function Builder() {
   }, []);
 
   function setStopRouteMode(id: string, mode: import('../lib/types').StopRouteMode) {
-    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? { ...x, routeMode: mode } : x)) }));
+    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? markUserTouched({ ...x, routeMode: mode }) : x)) }));
   }
   function setStopType(id: string, type: Stop['type']) {
-    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? { ...x, type } : x)) }));
+    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? markUserTouched({ ...x, type }) : x)) }));
   }
   function removeStop(id: string) {
     setState((s) => ({ ...s, stops: reassignTypes(removeStopById(s.stops, id)) }));
@@ -745,7 +804,7 @@ export function Builder() {
   function setForceDayStart(id: string, value: boolean) {
     setState((s) => ({
       ...s,
-      stops: s.stops.map((x) => (x.id === id ? { ...x, forceDayStart: value } : x)),
+      stops: s.stops.map((x) => (x.id === id ? markUserTouched({ ...x, forceDayStart: value }) : x)),
     }));
   }
   function addHighlight(id: string, text: string) {
@@ -753,7 +812,7 @@ export function Builder() {
       ...s,
       stops: s.stops.map((x) =>
         x.id === id
-          ? { ...x, highlights: [...(x.highlights || []), text].filter((v, i, a) => a.indexOf(v) === i) }
+          ? markUserTouched({ ...x, highlights: [...(x.highlights || []), text].filter((v, i, a) => a.indexOf(v) === i) })
           : x,
       ),
     }));
@@ -762,7 +821,7 @@ export function Builder() {
     setState((s) => ({
       ...s,
       stops: s.stops.map((x) =>
-        x.id === id ? { ...x, highlights: (x.highlights || []).filter((h) => h !== text) } : x,
+        x.id === id ? markUserTouched({ ...x, highlights: (x.highlights || []).filter((h) => h !== text) }) : x,
       ),
     }));
   }
@@ -774,7 +833,8 @@ export function Builder() {
       const stops = [...s.stops];
       const fromIdx = stops.findIndex((x) => x.id === sourceId);
       if (fromIdx < 0) return s;
-      const [moved] = stops.splice(fromIdx, 1);
+      const [rawMoved] = stops.splice(fromIdx, 1);
+      const moved = markUserTouched(rawMoved);
       const targetIdx = stops.findIndex((x) => x.id === targetId);
       if (targetIdx < 0) {
         stops.splice(fromIdx, 0, moved);
@@ -1514,6 +1574,18 @@ export function Builder() {
                   tankRangeKm={state.tankRangeKm}
                   maxKmPerDay={state.maxKmPerDay}
                   fuelTimeline={fuelTimeline}
+                  autoFuelWarningKm={autoFuelWarnings[g.day]}
+                  onOpenManualPicker={() => {
+                    const gap = fuelTimeline.gaps.find(gp =>
+                      (dayedStops[gp.beforeStopIndex]?.dayNumber || 0) === g.day
+                    );
+                    setNearbyOpen({
+                      category: 'fuel',
+                      target: findLongestLegTarget(g, dayedStops, getStopPath)!,
+                      widened: true,
+                      legPolyline: gap?.legPolyline,
+                    });
+                  }}
                 />
               ))}
             </div>
@@ -1532,11 +1604,32 @@ export function Builder() {
             map={map}
             onSelect={onNearbyResultSelected}
             onClose={() => setNearbyOpen(null)}
+            detourCapKm={nearbyOpen.category === 'fuel' ? (nearbyOpen.widened ? 10 : 5) : undefined}
+            legPolyline={nearbyOpen.legPolyline}
           />
         )}
 
         {savedToast && (
           <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
+        )}
+        {autoFuelToast && (
+          <Toast
+            message={autoFuelToast.message.replace(' · Undo', '')}
+            variant="auto-fuel"
+            durationMs={8000}
+            actionLabel="Undo"
+            onAction={() => {
+              if (undoSnapshotRef.current) {
+                setState((s) => ({ ...s, stops: undoSnapshotRef.current! }));
+                undoSnapshotRef.current = null;
+              }
+              setAutoFuelToast(null);
+            }}
+            onDismiss={() => {
+              undoSnapshotRef.current = null;
+              setAutoFuelToast(null);
+            }}
+          />
         )}
         <Toast
           message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
@@ -1797,11 +1890,32 @@ export function Builder() {
           map={map}
           onSelect={onNearbyResultSelected}
           onClose={() => setNearbyOpen(null)}
+          detourCapKm={nearbyOpen.category === 'fuel' ? (nearbyOpen.widened ? 10 : 5) : undefined}
+          legPolyline={nearbyOpen.legPolyline}
         />
       )}
 
       {savedToast && (
         <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
+      )}
+      {autoFuelToast && (
+        <Toast
+          message={autoFuelToast.message.replace(' · Undo', '')}
+          variant="auto-fuel"
+          durationMs={8000}
+          actionLabel="Undo"
+          onAction={() => {
+            if (undoSnapshotRef.current) {
+              setState((s) => ({ ...s, stops: undoSnapshotRef.current! }));
+              undoSnapshotRef.current = null;
+            }
+            setAutoFuelToast(null);
+          }}
+          onDismiss={() => {
+            undoSnapshotRef.current = null;
+            setAutoFuelToast(null);
+          }}
+        />
       )}
       <Toast
         message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
