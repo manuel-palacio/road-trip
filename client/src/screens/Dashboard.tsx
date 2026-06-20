@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, publishTemplate, unpublishTemplate } from '../lib/api';
 import { signOutFirebase } from '../lib/firebase';
-import type { MeResponse, Trip } from '../lib/types';
+import type { AppConfig, MeResponse, Trip } from '../lib/types';
 import { Brand } from '../components/Brand';
 import { InstallAppButton } from '../components/InstallAppButton';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -23,7 +23,7 @@ function showUpgradeAlert() {
   alert('Upgrade to Pro is coming soon — Paddle integration ships in Slice 12.');
 }
 
-export function Dashboard({ me }: { me: MeResponse }) {
+export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const trips = useTrips(true);
@@ -103,6 +103,15 @@ export function Dashboard({ me }: { me: MeResponse }) {
           >
             Favorites
           </button>
+          {me.email.toLowerCase() === (config.adminEmail || '').toLowerCase() && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin')}
+              className="bg-transparent border border-accent text-accent px-3 md:px-[14px] py-[6px] md:py-[7px] rounded text-[11px] md:text-[12px] shrink-0 transition-colors duration-200 ease-out-soft hover:bg-accent hover:text-canvas"
+            >
+              Admin
+            </button>
+          )}
           <ThemeToggle />
           <InstallAppButton />
           <button

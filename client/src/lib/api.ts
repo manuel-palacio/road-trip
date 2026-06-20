@@ -201,6 +201,76 @@ export async function removeCollaborator(tripId: string, uid: string): Promise<v
   })));
 }
 
+export type AdminStats = {
+  trips: number;
+  users: number;
+  templates: number;
+  favorites: number;
+  proUsers: number;
+  freeUsers: number;
+};
+
+export type AdminUser = {
+  uid: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  plan: 'free' | 'pro';
+  tripLimit?: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+export type AdminTrip = {
+  id: string;
+  name: string;
+  ownerUid: string;
+  createdAt?: unknown;
+  stops?: unknown[];
+  isTemplate?: boolean;
+};
+
+export async function adminStats(): Promise<AdminStats> {
+  return handle<AdminStats>(await fetch('/api/admin/stats', await withToken()));
+}
+
+export async function adminListUsers(opts: { planFilter?: 'all' | 'free' | 'pro'; cursor?: string } = {}): Promise<{ users: AdminUser[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts.planFilter && opts.planFilter !== 'all') params.set('planFilter', opts.planFilter);
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  const qs = params.toString();
+  return handle<{ users: AdminUser[]; nextCursor: string | null }>(
+    await fetch(`/api/admin/users${qs ? `?${qs}` : ''}`, await withToken()),
+  );
+}
+
+export async function adminGetUser(uid: string): Promise<AdminUser> {
+  return handle<AdminUser>(await fetch(`/api/admin/users/${encodeURIComponent(uid)}`, await withToken()));
+}
+
+export async function adminSetPlan(uid: string, plan: 'free' | 'pro', tripLimit?: number): Promise<AdminUser> {
+  const body: { plan: string; tripLimit?: number } = { plan };
+  if (tripLimit != null) body.tripLimit = tripLimit;
+  return handle<AdminUser>(await fetch(`/api/admin/users/${encodeURIComponent(uid)}/plan`, await withToken({
+    method: 'PUT', body: JSON.stringify(body),
+  })));
+}
+
+export async function adminListTrips(opts: { cursor?: string } = {}): Promise<{ trips: AdminTrip[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  const qs = params.toString();
+  return handle<{ trips: AdminTrip[]; nextCursor: string | null }>(
+    await fetch(`/api/admin/trips${qs ? `?${qs}` : ''}`, await withToken()),
+  );
+}
+
+export async function adminDeleteTrip(id: string): Promise<{ ok: boolean }> {
+  return handle<{ ok: boolean }>(await fetch(`/api/admin/trips/${encodeURIComponent(id)}`, await withToken({
+    method: 'DELETE',
+  })));
+}
+
 export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {
   const res = await fetch(path, await withToken());
   if (!res.ok) {

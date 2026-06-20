@@ -14,8 +14,9 @@ import { Share } from './screens/Share';
 import { Handoff } from './screens/Handoff';
 import { Templates } from './screens/Templates';
 import { Favorites } from './screens/Favorites';
+import { Admin } from './screens/Admin';
 import { OfflineBadge } from './components/OfflineBadge';
-import type { MeResponse } from './lib/types';
+import type { AppConfig, MeResponse } from './lib/types';
 
 export default function App() {
   const cfg = useConfig();
@@ -44,6 +45,7 @@ export default function App() {
 }
 
 function AppAuthed() {
+  const cfg = useConfig();
   const auth = useAuth();
   const isSignedIn = auth.status === 'signed-in';
   const me = useMe(isSignedIn);
@@ -62,18 +64,19 @@ function AppAuthed() {
     return <Login />;
   }
 
-  return <AuthedRoutes me={me.data} />;
+  return <AuthedRoutes me={me.data} config={cfg.data!} />;
 }
 
-function AuthedRoutes({ me }: { me: MeResponse }) {
+function AuthedRoutes({ me, config }: { me: MeResponse; config: AppConfig }) {
   return (
     <Routes>
-      <Route path="/" element={<Dashboard me={me} />} />
+      <Route path="/" element={<Dashboard me={me} config={config} />} />
       <Route path="/builder" element={<Builder />} />
       <Route path="/builder/:tripId" element={<Builder />} />
       <Route path="/viewer/:tripId" element={<Viewer />} />
       <Route path="/handoff/:tripId" element={<Handoff />} />
       <Route path="/favorites" element={<Favorites />} />
+      <Route path="/admin" element={<Admin me={me} config={config} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
