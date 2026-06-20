@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { admin, getDb } = require('../lib/firebase');
 const { authRequired } = require('../middleware/auth');
+const limits = require('../middleware/rate-limit');
 
 const FAVORITES_PER_USER_LIMIT = 500;
 
@@ -53,7 +54,7 @@ router.get('/api/favorites', async (req, res) => {
   }
 });
 
-router.post('/api/favorites', async (req, res) => {
+router.post('/api/favorites', limits.favoriteCreate, async (req, res) => {
   try {
     const { error, value } = validateFavoritePayload(req.body || {});
     if (error) return res.status(400).json({ error, code: 'INVALID' });

@@ -1,10 +1,11 @@
 const express = require('express');
 const { admin, getDb } = require('../lib/firebase');
+const limits = require('../middleware/rate-limit');
 
 const router = express.Router();
 
 // Public — no auth middleware. Returns a sanitized trip view by share token.
-router.get('/api/share/:shareToken', async (req, res) => {
+router.get('/api/share/:shareToken', limits.publicShare, async (req, res) => {
   try {
     const db = getDb();
     const snap = await db

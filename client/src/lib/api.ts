@@ -31,7 +31,14 @@ async function handle<T>(res: Response): Promise<T> {
       const body = await res.json();
       msg = body.error || msg;
       code = body.code;
-    } catch { /* ignore non-JSON error bodies */ }
+      if (res.status === 429) {
+        const err = Object.assign(new ApiError(429, msg, code), { retryAfterSec: body?.retryAfterSec });
+        throw err;
+      }
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      /* ignore non-JSON error bodies */
+    }
     throw new ApiError(res.status, msg, code);
   }
   return res.json();

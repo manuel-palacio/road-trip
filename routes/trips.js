@@ -11,6 +11,7 @@ const fuelModulePromise = import('../shared/fuel.js');
 const fuelValidationPromise = import('../shared/fuel-validation.js');
 const pdfSummaryPromise = import('../shared/pdf-summary.js');
 const { authRequired } = require('../middleware/auth');
+const limits = require('../middleware/rate-limit');
 
 const router = express.Router();
 
@@ -160,7 +161,7 @@ function canDelete(data, uid) {
   return data.ownerUid === uid;
 }
 
-router.post('/api/trips', async (req, res) => {
+router.post('/api/trips', limits.tripCreate, async (req, res) => {
   try {
     const db = getDb();
 
@@ -251,7 +252,7 @@ router.get('/api/trips/:id', async (req, res) => {
   }
 });
 
-router.put('/api/trips/:id', async (req, res) => {
+router.put('/api/trips/:id', limits.tripUpdate, async (req, res) => {
   try {
     const db = getDb();
     const ref = db.collection('trips').doc(req.params.id);
@@ -314,7 +315,7 @@ router.get('/api/trips/:id/pins', async (req, res) => {
   }
 });
 
-router.post('/api/trips/:id/pins', async (req, res) => {
+router.post('/api/trips/:id/pins', limits.pinCreate, async (req, res) => {
   try {
     const ref = await loadTripForAccess(req, res, true);
     if (!ref) return;
@@ -856,7 +857,7 @@ function formatBranded(doc, trip, pins, fuelHelpers, brandedSummaryRows) {
 
 // ─── PDF export route ─────────────────────────────────────────────────────────
 
-router.get('/api/trips/:id/export/pdf', async (req, res) => {
+router.get('/api/trips/:id/export/pdf', limits.pdfExport, async (req, res) => {
   try {
     const db = getDb();
     const ref = await loadTripForAccess(req, res, false);
@@ -1062,7 +1063,7 @@ const COLLABORATOR_LIMIT_FREE = 1;
 // POST /api/trips/:id/collaborators — owner-only, adds a collaborator by email.
 // Resolves email → uid via the Admin SDK; 404 when not a known user. Free tier
 // capped at COLLABORATOR_LIMIT_FREE collaborator per trip.
-router.post('/api/trips/:id/collaborators', async (req, res) => {
+router.post('/api/trips/:id/collaborators', limits.collaboratorAdd, async (req, res) => {
   try {
     const db = getDb();
     const ref = db.collection('trips').doc(req.params.id);
@@ -1208,7 +1209,7 @@ router.get('/api/trips/:id/budget', async (req, res) => {
   }
 });
 
-router.post('/api/trips/:id/budget', async (req, res) => {
+router.post('/api/trips/:id/budget', limits.budgetCreate, async (req, res) => {
   try {
     const ref = await loadTripForAccess(req, res, true);
     if (!ref) return;

@@ -57,6 +57,8 @@ Frontend tree (`client/src/`): `screens/` = page components, `components/` = sha
 
 **Favorites.** Top-level Firestore collection `favorites/{favoriteId}` with `ownerUid` (not nested under `users/`). Dedup'd by `placeId` (when present) or a `name|lat.toFixed(4)|lng.toFixed(4)` signature via `favoriteKey` helper (`client/src/lib/favorite-key.ts`); the server's `sigKey` in `routes/favorites.js` produces the same string. POST returns the existing id on a dedup hit instead of creating a duplicate. `useFavorites` hook exposes `favoriteIdForStop(stop)`, add, remove + list; `FavoriteToggle` wires the star UI used in Builder `StopRow` and Viewer `DayCard`. Browseable at the `/favorites` route.
 
+**Rate limits.** `middleware/rate-limit.js` exports per-endpoint `express-rate-limit` instances keyed by `req.uid` (auth'd) or `req.ip` (public). `ADMIN_EMAIL` is exempt. Limits cover trip create/update, pin/budget/favorite/collaborator create, PDF export, template clone, and the public share endpoint. 429 `RATE_LIMITED` returned with a `Retry-After` header; `client/src/lib/api.ts` surfaces the message.
+
 **Plan limits.** `routes/trips.js` enforces `FREE_TRIP_LIMIT` / `PRO_TRIP_LIMIT` server-side on create; client gets a `402 TRIP_LIMIT_REACHED` and surfaces an upgrade prompt.
 
 **Deployment.** Cloud Build watches `main` and deploys to Cloud Run on push. There is no staging environment — local dev runs against the same Firebase project as production. Trip data created on `localhost` lives in the same Firestore.

@@ -2,6 +2,7 @@ const express = require('express');
 const { admin, getDb, getAuth } = require('../lib/firebase');
 const { effectiveTripLimit } = require('../lib/limits');
 const { authRequired } = require('../middleware/auth');
+const limits = require('../middleware/rate-limit');
 
 const router = express.Router();
 
@@ -108,7 +109,7 @@ router.get('/api/templates', async (req, res) => {
   }
 });
 
-router.post('/api/templates/:id/clone', authRequired, async (req, res) => {
+router.post('/api/templates/:id/clone', authRequired, limits.templateClone, async (req, res) => {
   try {
     const db = getDb();
     const sourceRef = db.collection('trips').doc(req.params.id);
