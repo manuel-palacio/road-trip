@@ -13,6 +13,8 @@ export type AppConfig = {
   mapsApiKey: string;
   adminEmail: string;
   bookingAffiliateId?: string;
+  getYourGuidePartnerId?: string;
+  viatorPartnerId?: string;
 };
 
 export type MeResponse = {

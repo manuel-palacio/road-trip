@@ -8,6 +8,9 @@ import { phoneShare } from '../lib/phone-share';
 import { getSharedTrip, getTrip } from '../lib/api';
 import type { Stop, Trip } from '../lib/types';
 import { QrModal } from '../components/QrModal';
+import { carRentalLink } from '../lib/affiliate-links';
+import { isoDatePlus } from '../lib/booking-links';
+import { useConfig } from '../hooks/useConfig';
 
 type ResolvedTrip = {
   name: string;
@@ -74,6 +77,7 @@ export function Handoff() {
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
 
+  const cfg = useConfig();
   const [qrFor, setQrFor] = useState<{ url: string; title: string; subtitle: string } | null>(null);
   const [shareToast, setShareToast] = useState<string | null>(null);
 
@@ -115,6 +119,31 @@ export function Handoff() {
           </div>
         </div>
       </header>
+
+      {(() => {
+        const startStop = resolved.stops[0];
+        const dropoffDate = resolved.startDate ? isoDatePlus(resolved.startDate, groups.length) : null;
+        if (!resolved.startDate || !startStop || !dropoffDate) return null;
+        const rental = carRentalLink(
+          { city: startStop.label || startStop.name, countryCode: startStop.countryCode, pickupDate: resolved.startDate, dropoffDate },
+          { bookingAffiliateId: cfg.data?.bookingAffiliateId },
+        );
+        return (
+          <div className="px-4 pt-4">
+            <a
+              href={rental.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Search car rentals in ${startStop.label || startStop.name} on Rentalcars.com`}
+              className="flex items-center gap-2 px-4 py-3 bg-surface border border-line rounded-xl text-[13px] text-paper-dim hover:text-paper hover:border-paper-dim transition-colors"
+            >
+              <span aria-hidden>🚙</span>
+              <span>Rent a car in <span className="text-paper font-medium">{startStop.label || startStop.name}</span></span>
+              <span className="ml-auto font-mono text-[10px] tracking-[0.14em] uppercase text-paper-muted">Rentalcars ↗</span>
+            </a>
+          </div>
+        );
+      })()}
 
       {groups.length === 0 ? (
         <p className="px-6 py-12 text-center font-serif italic text-paper-muted">

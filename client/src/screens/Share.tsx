@@ -405,6 +405,8 @@ export function Share() {
                     fuelCost={fuelCostFor(g.stops.map((x) => x.stop))}
                     fuelVolume={fuelVolumeFor(g.stops.map((x) => x.stop))}
                     bookingAffiliateId={cfg.data?.bookingAffiliateId}
+                    getYourGuidePartnerId={cfg.data?.getYourGuidePartnerId}
+                    viatorPartnerId={cfg.data?.viatorPartnerId}
                     longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                     fuelTimeline={fuelTimeline}
                     tankRangeKm={trip.tankRangeKm}

@@ -38,6 +38,10 @@ router.get('/config', (req, res) => {
     // as `aid=`. Empty string when unset; the frontend treats falsy
     // values as "no affiliate tag", so unconfigured deploys still work.
     bookingAffiliateId: process.env.BOOKING_AFFILIATE_ID || '',
+    // Experience affiliate partner ids for GetYourGuide and Viator.
+    // Links are functional without these; commission only kicks in once set.
+    getYourGuidePartnerId: process.env.GETYOURGUIDE_PARTNER_ID || '',
+    viatorPartnerId: process.env.VIATOR_PARTNER_ID || '',
   });
 });
 

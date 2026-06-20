@@ -9,7 +9,7 @@ export type AccommodationLinks = {
   hasDates: boolean;
 };
 
-function isoDatePlus(start: string, days: number): string | null {
+export function isoDatePlus(start: string, days: number): string | null {
   // Use UTC to avoid local-timezone day shifts when the user lives in
   // a non-zero offset (e.g. New York at 23:00 would otherwise see
   // tomorrow's date for today's stop).

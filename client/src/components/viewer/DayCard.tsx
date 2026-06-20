@@ -5,6 +5,7 @@ import { flagEmoji } from '../../lib/flags';
 import { aaStatus, buildDayMapsUrl } from '../../lib/maps-deep-link';
 import { phoneShare } from '../../lib/phone-share';
 import { accommodationLinks } from '../../lib/booking-links';
+import { experienceLinks } from '../../lib/affiliate-links';
 import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
 import { StopIdentityBadge } from '../StopIdentityBadge';
@@ -34,6 +35,8 @@ type Props = {
   fuelConfigPartial?: boolean;
   onConfigureFuel?: () => void;
   bookingAffiliateId?: string | null;
+  getYourGuidePartnerId?: string | null;
+  viatorPartnerId?: string | null;
   /** Longest single leg in the day that exceeds the trip's tank range, in km.
    * 0 (or omitted) hides the chip. */
   longLegKm?: number;
@@ -44,7 +47,7 @@ type Props = {
   trip?: { id?: string; name?: string };
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker, trip }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, getYourGuidePartnerId, viatorPartnerId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker, trip }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -250,6 +253,28 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                       >
                         <span aria-hidden>🔍</span> Google Hotels
                       </a>
+                    </div>
+                  );
+                })()}
+                {(stop.category === 'landmark' || stop.category === 'scenic') && (() => {
+                  const links = experienceLinks(
+                    { name: stop.label || stop.name },
+                    { getYourGuidePartnerId: getYourGuidePartnerId ?? undefined, viatorPartnerId: viatorPartnerId ?? undefined },
+                  );
+                  return (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {links.map((link) => (
+                        <a
+                          key={link.source}
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Search experiences on ${link.label}`}
+                          className="inline-flex items-center gap-1 px-2 py-[3px] bg-transparent border border-line rounded text-[11px] text-paper-dim hover:text-paper hover:border-paper-dim transition-colors"
+                        >
+                          <span aria-hidden>🎟</span> {link.label}
+                        </a>
+                      ))}
                     </div>
                   );
                 })()}
