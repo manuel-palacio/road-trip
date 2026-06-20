@@ -15,7 +15,11 @@ import { Handoff } from './screens/Handoff';
 import { Templates } from './screens/Templates';
 import { Favorites } from './screens/Favorites';
 import { Admin } from './screens/Admin';
+import { Privacy } from './screens/Privacy';
+import { Terms } from './screens/Terms';
 import { OfflineBadge } from './components/OfflineBadge';
+import { CookieBanner } from './components/CookieBanner';
+import { Footer } from './components/Footer';
 import type { AppConfig, MeResponse } from './lib/types';
 
 export default function App() {
@@ -28,19 +32,26 @@ export default function App() {
 
   initFirebase(cfg.data.firebaseConfig as any);
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <OfflineBadge />
-      <Routes>
-        {/* Public — no auth gate. Anyone with a valid share token can view. */}
-        <Route path="/share/:token" element={<Share />} />
-        {/* Public mobile-first hand-off page; the share token gates access. */}
-        <Route path="/handoff/share/:token" element={<Handoff />} />
-        {/* Public templates library — browsable without auth, clone needs sign-in. */}
-        <Route path="/templates" element={<Templates />} />
-        {/* Everything else funnels through the authed shell. */}
-        <Route path="*" element={<AppAuthed />} />
-      </Routes>
-    </>
+      <CookieBanner />
+      <main className="flex-1 flex flex-col">
+        <Routes>
+          {/* Public — no auth gate. Anyone with a valid share token can view. */}
+          <Route path="/share/:token" element={<Share />} />
+          {/* Public mobile-first hand-off page; the share token gates access. */}
+          <Route path="/handoff/share/:token" element={<Handoff />} />
+          {/* Public templates library — browsable without auth, clone needs sign-in. */}
+          <Route path="/templates" element={<Templates />} />
+          {/* Public legal pages — no auth required. */}
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          {/* Everything else funnels through the authed shell. */}
+          <Route path="*" element={<AppAuthed />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
   );
 }
 
