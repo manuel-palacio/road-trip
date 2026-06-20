@@ -177,12 +177,19 @@ function TemplateCardItem({
     <article className="relative flex flex-col gap-3 px-[26px] pt-[26px] pb-4 bg-surface border border-line rounded-lg min-h-[260px] transition-all duration-200 ease-out-soft hover:border-line-strong hover:-translate-y-px">
       <div className="flex items-start justify-between gap-3">
         <div className="text-[40px] leading-none">{item.coverEmoji || '🚗'}</div>
-        <span
-          title={`${item.cloneCount ?? 0} clones`}
-          className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-accent-soft border border-accent text-accent font-mono text-[9.5px] tracking-[0.14em] uppercase"
-        >
-          <span aria-hidden>★</span> {item.cloneCount ?? 0}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {item.sponsored && (
+            <span className="font-mono text-[9.5px] tracking-[0.18em] uppercase text-amber-400 px-1.5 py-[2px] border border-amber-400/40 rounded">
+              {item.sponsorLabel || 'Sponsored'}
+            </span>
+          )}
+          <span
+            title={`${item.cloneCount ?? 0} clones`}
+            className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-accent-soft border border-accent text-accent font-mono text-[9.5px] tracking-[0.14em] uppercase"
+          >
+            <span aria-hidden>★</span> {item.cloneCount ?? 0}
+          </span>
+        </div>
       </div>
       <h3 className="font-serif italic font-normal text-[22px] leading-[1.15] tracking-tight text-paper [overflow-wrap:anywhere]">
         {item.name}

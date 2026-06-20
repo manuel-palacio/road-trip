@@ -166,6 +166,10 @@ export type Trip = {
   templateVisibility?: 'public' | 'unlisted';
   cloneCount?: number;
   publishedAt?: unknown;
+  /** Admin-only: marks a template as sponsored (paid placement). Sorts to the
+   * top of the template gallery (max 2 per page) above organic results. */
+  sponsored?: boolean;
+  sponsorLabel?: string;
   // Schema-version stamp. v2 normalized stray 'overnight' types; v3
   // promotes legacy fuel waypoints (type='waypoint' + category='fuel')
   // to the first-class type='fuel'. Each migration runs at most once
@@ -188,6 +192,8 @@ export type TemplateCard = {
   totalDays?: number;
   countries?: string[];
   cloneCount?: number;
+  sponsored?: boolean;
+  sponsorLabel?: string;
   owner: { displayName: string; photoURL: string };
   publishedAt?: unknown;
 };

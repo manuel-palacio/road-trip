@@ -23,6 +23,8 @@ function templateCardFromTrip(id, trip, owner) {
     countries: Array.isArray(trip.countries) ? trip.countries : [],
     cloneCount: typeof trip.cloneCount === 'number' ? trip.cloneCount : 0,
     publishedAt: trip.publishedAt || null,
+    sponsored: !!trip.sponsored,
+    sponsorLabel: trip.sponsorLabel || null,
     owner,
   };
 }
@@ -76,7 +78,7 @@ router.get('/api/templates', async (req, res) => {
       (d) => (d.data().templateVisibility || 'public') !== 'unlisted',
     );
     const owners = await resolveOwners(db, visibleDocs.map((d) => d.data().ownerUid));
-    const items = visibleDocs
+    const sorted = visibleDocs
       .map((d) =>
         templateCardFromTrip(d.id, d.data(), owners.get(d.data().ownerUid) || {
           displayName: 'A road tripper',
@@ -92,9 +94,14 @@ router.get('/api/templates', async (req, res) => {
         const aT = a.publishedAt?.toMillis?.() || 0;
         const bT = b.publishedAt?.toMillis?.() || 0;
         return bT - aT;
-      })
-      .slice(0, limit);
-    res.json({ items });
+      });
+
+    // Sponsored templates float to the top (capped at 2 slots per page),
+    // followed by organic results sorted by cloneCount then publishedAt.
+    const sponsored = sorted.filter((t) => t.sponsored).slice(0, 2);
+    const organic = sorted.filter((t) => !t.sponsored);
+    const merged = [...sponsored, ...organic].slice(0, limit);
+    res.json({ items: merged });
   } catch (e) {
     console.error('GET /api/templates failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
@@ -204,6 +211,35 @@ router.post('/api/templates/:id/clone', authRequired, async (req, res) => {
     res.status(201).json({ id: cloneRef.id, ...out.data() });
   } catch (e) {
     console.error('POST /api/templates/:id/clone failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+// Admin-only: mark a template as sponsored or revoke sponsorship.
+router.post('/api/admin/templates/:id/sponsor', authRequired, async (req, res) => {
+  try {
+    const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
+    if (!adminEmail || (req.userEmail || '').toLowerCase() !== adminEmail) {
+      return res.status(403).json({ error: 'Admin only', code: 'FORBIDDEN' });
+    }
+    const db = getDb();
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Template not found', code: 'NOT_FOUND' });
+    if (!snap.data().isTemplate) {
+      return res.status(400).json({ error: 'Not a template', code: 'INVALID' });
+    }
+    const body = req.body || {};
+    const sponsored = !!body.sponsored;
+    const sponsorLabel = typeof body.sponsorLabel === 'string' ? body.sponsorLabel.slice(0, 40) : '';
+    await ref.update({
+      sponsored,
+      sponsorLabel: sponsored ? sponsorLabel : null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true, sponsored, sponsorLabel });
+  } catch (e) {
+    console.error('POST /api/admin/templates/:id/sponsor failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
   }
 });
