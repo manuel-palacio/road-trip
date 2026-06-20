@@ -91,6 +91,22 @@ export type Pin = {
   updatedAt?: unknown;
 };
 
+export type Favorite = {
+  id: string;
+  ownerUid: string;
+  placeId?: string;
+  name: string;
+  label: string;
+  lat: number;
+  lng: number;
+  countryCode?: string;
+  category?: PinCategory;
+  sourceTripId?: string;
+  sourceTripName?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
 export type FuelUnit = 'L/100km' | 'MPG';
 
 // Per-country fuel override. Consumption stays trip-wide (the car has one

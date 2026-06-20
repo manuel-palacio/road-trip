@@ -31,5 +31,16 @@ service cloud.firestore {
     // email allowlist) and let collaborators rewrite ownerUid/shareToken/
     // isTemplate — none of which the server permits. The catch-all deny
     // above covers trips/{tripId} and its pins subcollection.
+
+    // ─── Favorites: owner-only ───────────────────────────────────────────
+    // Same posture as the rest: server (Admin SDK) is the actual gate.
+    // The rules are defense-in-depth so a stolen web API key can't read
+    // someone else's favorites.
+    match /favorites/{favoriteId} {
+      allow read: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+      allow update: if false;
+    }
   }
 }
