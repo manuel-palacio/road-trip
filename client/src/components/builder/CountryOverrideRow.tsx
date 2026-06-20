@@ -1,4 +1,5 @@
 import { flagEmoji } from '../../lib/flags';
+import { FUEL_BOUNDS } from '../../lib/fuel-bounds';
 
 export type FuelCurrencyOption = { code: string; label: string };
 
@@ -32,6 +33,8 @@ type Props = {
   /** All currencies the user can pick from for this row. */
   currencies: ReadonlyArray<FuelCurrencyOption>;
   onChange: (patch: { price?: string; currency?: string }) => void;
+  /** Validation error for the price field, if any. */
+  priceError?: string | null;
 };
 
 /** Compute the placeholder shown in the price input for a row.
@@ -61,25 +64,29 @@ export function CountryOverrideRow(p: Props) {
       data-testid="country-override-row"
       data-country={p.code}
       data-matches-default={p.matchesDefault ? 'true' : 'false'}
-      className={`grid grid-cols-[auto_1.2fr_1fr_1fr] gap-2 items-center transition-opacity ${p.matchesDefault ? 'opacity-60' : 'opacity-100'}`}
+      className={`grid grid-cols-[auto_1.2fr_1fr_1fr] gap-2 items-start transition-opacity ${p.matchesDefault ? 'opacity-60' : 'opacity-100'}`}
     >
-      <span className="inline-flex items-center gap-2 min-w-0">
+      <span className="inline-flex items-center gap-2 min-w-0 pt-1">
         <span className="text-[16px]" aria-hidden>{flagEmoji(p.code)}</span>
         <span className="font-serif italic text-[13px] text-paper-dim truncate" title={p.name}>
           {p.name}
         </span>
       </span>
-      <input
-        type="number"
-        min={0}
-        step={0.01}
-        inputMode="decimal"
-        placeholder={placeholder}
-        value={p.price}
-        onChange={(e) => p.onChange({ price: e.target.value })}
-        className="bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted min-w-0"
-        aria-label={`Price for ${p.name}`}
-      />
+      <div className="min-w-0">
+        <input
+          type="number"
+          min={FUEL_BOUNDS.price.min}
+          max={FUEL_BOUNDS.price.max}
+          step={FUEL_BOUNDS.price.step}
+          inputMode="decimal"
+          placeholder={placeholder}
+          value={p.price}
+          onChange={(e) => p.onChange({ price: e.target.value })}
+          className="w-full bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+          aria-label={`Price for ${p.name}`}
+        />
+        {p.priceError && <p className="text-red-400 text-[11.5px] mt-0.5">{p.priceError}</p>}
+      </div>
       <select
         value={p.currency}
         onChange={(e) => p.onChange({ currency: e.target.value })}

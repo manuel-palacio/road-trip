@@ -26,6 +26,7 @@ import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, PinCategory, Stop, Trip } from '../lib/types';
 import { CountryOverrideRow } from '../components/builder/CountryOverrideRow';
+import { FUEL_BOUNDS, validateConsumption, validatePrice, validateTankRange, validateTankSize } from '../lib/fuel-bounds';
 import { DatePicker } from '../components/DatePicker';
 import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
@@ -1070,6 +1071,14 @@ export function Builder() {
     );
   }
 
+  // Fuel input validation — inline errors + save-button guard.
+  const consumptionErr = validateConsumption(parseFloat(state.fuelConsumption), state.fuelUnit);
+  const priceErr = validatePrice(parseFloat(state.fuelPrice));
+  const tankSizeErr = validateTankSize(parseFloat(state.tankSizeLitres));
+  const tankRangeErr = validateTankRange(state.tankRangeKm);
+  const overrideErrs = state.fuelOverrides.map((o) => validatePrice(parseFloat(o.price)));
+  const fuelHasErrors = !!(consumptionErr || priceErr || tankSizeErr || tankRangeErr || overrideErrs.some((e) => e));
+
   // Trip details modal — shared between Plan and Map modes. Both modes
   // render this same JSX node and trigger it via setDetailsOpen(true).
   // Closes on backdrop click, Escape, or the × button. The closure
@@ -1131,15 +1140,16 @@ export function Builder() {
               </span>
               <input
                 type="number"
-                min={100}
-                max={1500}
-                step={50}
+                min={FUEL_BOUNDS.tankRangeKm.min}
+                max={FUEL_BOUNDS.tankRangeKm.max}
+                step={FUEL_BOUNDS.tankRangeKm.step}
                 inputMode="numeric"
                 value={state.tankRangeKm}
                 onChange={(e) => setState((s) => ({ ...s, tankRangeKm: parseInt(e.target.value, 10) || 500 }))}
                 className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
+              {tankRangeErr && <p className="text-red-400 text-[11.5px] mt-0.5">{tankRangeErr}</p>}
             </label>
           </div>
           <label className={`flex items-start gap-2 -mt-1 ${state.tankRangeKm ? '' : 'opacity-50 cursor-not-allowed'}`}>
@@ -1174,14 +1184,16 @@ export function Builder() {
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Fuel</span>
               <input
                 type="number"
-                min={0}
-                step={0.1}
+                min={state.fuelUnit === 'MPG' ? FUEL_BOUNDS.consumptionMpg.min : FUEL_BOUNDS.consumptionL.min}
+                max={state.fuelUnit === 'MPG' ? FUEL_BOUNDS.consumptionMpg.max : FUEL_BOUNDS.consumptionL.max}
+                step={state.fuelUnit === 'MPG' ? FUEL_BOUNDS.consumptionMpg.step : FUEL_BOUNDS.consumptionL.step}
                 inputMode="decimal"
                 placeholder="—"
                 value={state.fuelConsumption}
                 onChange={(e) => setState((s) => ({ ...s, fuelConsumption: e.target.value }))}
                 className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
               />
+              {consumptionErr && <p className="text-red-400 text-[11.5px] mt-0.5">{consumptionErr}</p>}
             </label>
             <label className="block">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5 invisible">.</span>
@@ -1198,14 +1210,16 @@ export function Builder() {
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Price</span>
               <input
                 type="number"
-                min={0}
-                step={0.01}
+                min={FUEL_BOUNDS.price.min}
+                max={FUEL_BOUNDS.price.max}
+                step={FUEL_BOUNDS.price.step}
                 inputMode="decimal"
                 placeholder="—"
                 value={state.fuelPrice}
                 onChange={(e) => setState((s) => ({ ...s, fuelPrice: e.target.value }))}
                 className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
               />
+              {priceErr && <p className="text-red-400 text-[11.5px] mt-0.5">{priceErr}</p>}
             </label>
             <label className="block min-w-0">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Cur.</span>
@@ -1229,8 +1243,9 @@ export function Builder() {
             </span>
             <input
               type="number"
-              min={0}
-              step={1}
+              min={state.fuelUnit === 'MPG' ? Math.ceil(FUEL_BOUNDS.tankSizeLitres.min / 3.785411784) : FUEL_BOUNDS.tankSizeLitres.min}
+              max={state.fuelUnit === 'MPG' ? Math.floor(FUEL_BOUNDS.tankSizeLitres.max / 3.785411784) : FUEL_BOUNDS.tankSizeLitres.max}
+              step={FUEL_BOUNDS.tankSizeLitres.step}
               inputMode="decimal"
               placeholder="—"
               value={(() => {
@@ -1254,6 +1269,7 @@ export function Builder() {
             <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">
               {state.fuelUnit === 'MPG' ? 'gal' : 'L'}
             </span>
+            {tankSizeErr && <p className="text-red-400 text-[11.5px] mt-0.5">{tankSizeErr}</p>}
           </label>
           {/* Per-country prices — auto-populated from the trip's visited
               countries (issue #57). Pre-filled with the global defaults so
@@ -1291,6 +1307,7 @@ export function Builder() {
                     globalCurrency={state.fuelCurrency || 'EUR'}
                     currencies={FUEL_CURRENCIES}
                     onChange={(patch) => setCountryOverride(code, defaultCurrency, patch)}
+                    priceError={validatePrice(parseFloat(price))}
                   />
                 );
               })}
@@ -1343,7 +1360,7 @@ export function Builder() {
             type="button"
             data-testid="modal-save-trip"
             onClick={() => { void onSave(); setDetailsOpen(false); }}
-            disabled={saving}
+            disabled={saving || fuelHasErrors}
             className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
           >
             {saving ? 'Saving…' : 'Save'}
