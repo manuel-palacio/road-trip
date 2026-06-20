@@ -9,6 +9,7 @@ import { usePinModal } from '../hooks/usePinModal';
 import { usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { useAutoFuel } from '../hooks/useAutoFuel';
+import { useFavorites } from '../hooks/useFavorites';
 import type { PlacesSearchFn } from '../lib/auto-fuel-pick';
 import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
@@ -357,6 +358,23 @@ export function Builder() {
   const autoScrollVelRef = useRef<number>(0);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const favorites = useFavorites();
+
+  const handleFavoriteAdd = (stop: Stop) => {
+    favorites.add({
+      name: stop.name,
+      label: stop.label,
+      lat: stop.lat,
+      lng: stop.lng,
+      countryCode: stop.countryCode,
+      category: stop.category,
+      sourceTripId: state.tripId || undefined,
+      sourceTripName: state.name || undefined,
+    });
+  };
+
+  const handleFavoriteRemove = (id: string) => favorites.remove(id);
 
   const pinModal = usePinModal(state.tripId || '', {
     onSaveAsStop: (draft) => {
@@ -1613,6 +1631,8 @@ export function Builder() {
                           : demoteStop.variables.id)
                       : null
                   }
+                  onFavoriteAdd={handleFavoriteAdd}
+                  onFavoriteRemove={handleFavoriteRemove}
                   onDragStart={(id) => { draggedIdRef.current = id; }}
                   onDragEnd={() => { draggedIdRef.current = null; }}
                   onDragOver={() => { /* handled in StopRow */ }}
@@ -1789,6 +1809,8 @@ export function Builder() {
                       : demoteStop.variables.id)
                   : null
               }
+              onFavoriteAdd={handleFavoriteAdd}
+              onFavoriteRemove={handleFavoriteRemove}
               onDragStart={(id) => { draggedIdRef.current = id; }}
               onDragEnd={() => { draggedIdRef.current = null; stopAutoScroll(); }}
               onDragOver={() => { /* handled in StopRow */ }}

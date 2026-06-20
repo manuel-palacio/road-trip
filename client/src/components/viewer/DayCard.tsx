@@ -8,6 +8,8 @@ import { accommodationLinks } from '../../lib/booking-links';
 import type { DayGroup } from '../../lib/compute';
 import type { StopRouteMode } from '../../lib/types';
 import { StopIdentityBadge } from '../StopIdentityBadge';
+import { FavoriteToggle } from '../FavoriteToggle';
+import { useFavorites } from '../../hooks/useFavorites';
 import { QrModal } from '../QrModal';
 import type { FuelTimeline } from '../../lib/fuel-timeline';
 import { FuelRemainingBadge } from '../FuelRemainingBadge';
@@ -39,12 +41,14 @@ type Props = {
   tankRangeKm?: number;
   autoFuelWarningKm?: number;
   onOpenManualPicker?: () => void;
+  trip?: { id?: string; name?: string };
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker, trip }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
+  const favorites = useFavorites();
 
   const stopsOnly = group.stops.map((x) => x.stop);
   // Every stop on the day counts toward the AA badge — fuel stops are
@@ -250,6 +254,28 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                   );
                 })()}
               </div>
+              {trip && (
+                <div className="mt-0.5 shrink-0">
+                  <FavoriteToggle
+                    isFavorited={!!favorites.favoriteIdForStop(stop)}
+                    pending={favorites.addPending || favorites.removePending}
+                    onAdd={() => favorites.add({
+                      name: stop.name,
+                      label: stop.label,
+                      lat: stop.lat,
+                      lng: stop.lng,
+                      countryCode: stop.countryCode,
+                      category: stop.category,
+                      sourceTripId: trip.id,
+                      sourceTripName: trip.name,
+                    })}
+                    onRemove={() => {
+                      const id = favorites.favoriteIdForStop(stop);
+                      if (id) favorites.remove(id);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           ))}
 

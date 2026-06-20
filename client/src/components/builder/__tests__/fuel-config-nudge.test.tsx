@@ -1,8 +1,14 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DayHeader } from '../DayHeader';
 import { DayColumn } from '../DayColumn';
 import type { DayGroup } from '../../../lib/compute';
 import type { Stop } from '../../../lib/types';
+
+function withQueryClient(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
+}
 
 // Issue #59 component tests — verifies the UI side of the nudge-chip ACs.
 // The data-layer side (fuelConfigState classification) is covered by the
@@ -106,25 +112,27 @@ describe('DayHeader long-day warning (auto-split removal follow-up)', () => {
 
 describe('DayColumn fuel-config nudge (issue #59)', () => {
   it('AC4: no nudge when unconfigured', () => {
-    render(<DayColumn {...dayColumnProps({ fuelCost: null, fuelConfigPartial: false })} />);
+    render(withQueryClient(<DayColumn {...dayColumnProps({ fuelCost: null, fuelConfigPartial: false })} />));
     expect(screen.queryByTestId('fuel-config-nudge')).not.toBeInTheDocument();
   });
   it('AC2: nudge visible when partial + no cost', () => {
-    render(<DayColumn {...dayColumnProps({ fuelCost: null, fuelConfigPartial: true })} />);
+    render(withQueryClient(<DayColumn {...dayColumnProps({ fuelCost: null, fuelConfigPartial: true })} />));
     expect(screen.getByTestId('fuel-config-nudge')).toBeInTheDocument();
   });
   it('AC3: nudge click fires the callback', () => {
     const onConfigure = vi.fn();
     render(
-      <DayColumn
-        {...dayColumnProps({ fuelCost: null, fuelConfigPartial: true, onConfigureFuel: onConfigure })}
-      />,
+      withQueryClient(
+        <DayColumn
+          {...dayColumnProps({ fuelCost: null, fuelConfigPartial: true, onConfigureFuel: onConfigure })}
+        />,
+      ),
     );
     fireEvent.click(screen.getByTestId('fuel-config-nudge'));
     expect(onConfigure).toHaveBeenCalledTimes(1);
   });
   it('AC5: ready state shows cost, no nudge', () => {
-    render(<DayColumn {...dayColumnProps({ fuelCost: '€124', fuelConfigPartial: false })} />);
+    render(withQueryClient(<DayColumn {...dayColumnProps({ fuelCost: '€124', fuelConfigPartial: false })} />));
     expect(screen.getByText('€124')).toBeInTheDocument();
     expect(screen.queryByTestId('fuel-config-nudge')).not.toBeInTheDocument();
   });

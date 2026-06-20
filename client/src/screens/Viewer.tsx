@@ -442,6 +442,7 @@ export function Viewer() {
                   longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                   fuelTimeline={fuelTimeline}
                   tankRangeKm={trip.tankRangeKm}
+                  trip={{ id: trip.id, name: trip.name }}
                 />
               ))
             )

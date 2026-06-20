@@ -21,6 +21,8 @@ type Props = {
   onRemoveHighlight: (id: string, text: string) => void;
   onDemote?: (stop: Stop) => void;
   demotingStopId?: string | null;
+  onFavoriteAdd?: (stop: Stop) => void;
+  onFavoriteRemove?: (favoriteId: string) => void;
   onDragStart: (id: string, ev: React.DragEvent) => void;
   onDragEnd: () => void;
   onDragOver: (id: string, ev: React.DragEvent) => void;
@@ -87,6 +89,8 @@ export function StopList(p: Props) {
               onRemoveHighlight={p.onRemoveHighlight}
               onDemote={p.onDemote}
               demotingStopId={p.demotingStopId}
+              onFavoriteAdd={p.onFavoriteAdd}
+              onFavoriteRemove={p.onFavoriteRemove}
               onDragStart={p.onDragStart}
               onDragEnd={p.onDragEnd}
               onDragOver={p.onDragOver}

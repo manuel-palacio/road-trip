@@ -3,6 +3,8 @@ import { flagEmoji } from '../../lib/flags';
 import { dayColor } from '../../lib/compute';
 import { getStopRoutingFailed } from '../../hooks/useRouteSegments';
 import { StopIdentityBadge } from '../StopIdentityBadge';
+import { FavoriteToggle } from '../FavoriteToggle';
+import { useFavorites } from '../../hooks/useFavorites';
 import type { Stop, StopRouteMode } from '../../lib/types';
 
 type Props = {
@@ -17,6 +19,8 @@ type Props = {
   onRemoveHighlight: (id: string, text: string) => void;
   onDemote?: (stop: Stop) => void;
   demotingStopId?: string | null;
+  onFavoriteAdd?: (stop: Stop) => void;
+  onFavoriteRemove?: (favoriteId: string) => void;
   // DnD
   onDragStart: (id: string, ev: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -45,6 +49,8 @@ export function StopRow(p: Props) {
   const [chipDraft, setChipDraft] = useState('');
   const [dropZone, setDropZone] = useState<'above' | 'below' | null>(null);
   const [dragging, setDragging] = useState(false);
+  const { favoriteIdForStop, addPending, removePending } = useFavorites();
+  const favoriteId = favoriteIdForStop(stop);
 
   const flag = flagEmoji(stop.countryCode);
   const accentBorder = ({
@@ -264,6 +270,16 @@ export function StopRow(p: Props) {
         </div>
       </div>
 
+      {p.onFavoriteAdd && p.onFavoriteRemove && (
+        <div className="absolute top-1.5 right-8">
+          <FavoriteToggle
+            isFavorited={!!favoriteId}
+            pending={addPending || removePending}
+            onAdd={() => p.onFavoriteAdd!(stop)}
+            onRemove={() => favoriteId && p.onFavoriteRemove!(favoriteId)}
+          />
+        </div>
+      )}
       <button
         type="button"
         aria-label="Remove stop"
