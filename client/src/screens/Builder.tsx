@@ -6,7 +6,7 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { usePinModal } from '../hooks/usePinModal';
-import { usePins } from '../hooks/usePins';
+import { useCreatePin, usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { useAutoFuel } from '../hooks/useAutoFuel';
 import { useFavorites } from '../hooks/useFavorites';
@@ -32,7 +32,7 @@ import { EmojiPicker } from '../components/builder/EmojiPicker';
 import { StopList } from '../components/builder/StopList';
 import { DayColumn } from '../components/builder/DayColumn';
 import { DayNav } from '../components/builder/DayNav';
-import { NearbyFinder, type NearbyResult } from '../components/builder/NearbyFinder';
+import { NearbyFinder, type NearbyResult, type SelectMode } from '../components/builder/NearbyFinder';
 import { PinMapLayer } from '../components/viewer/PinMapLayer';
 import { Toast } from '../components/Toast';
 import { useLayoutMode } from '../hooks/useLayoutMode';
@@ -429,6 +429,7 @@ export function Builder() {
   // immediately, then the trip query reload pulls fresh state.
   const promotePin = usePromotePin(state.tripId || '', state.stops);
   const demoteStop = useDemoteStop(state.tripId || '', state.stops);
+  const createPin = useCreatePin(state.tripId || '');
 
   // Enrich stops with km/duration/path from Directions API
   const routes = useRouteSegments(state.stops, maps);
@@ -510,11 +511,24 @@ export function Builder() {
     if (!target) return;
     setNearbyOpen({ category, target });
   }
-  async function onNearbyResultSelected(result: NearbyResult) {
+  async function onNearbyResultSelected(result: NearbyResult, mode: SelectMode) {
     if (!nearbyOpen) return;
     const { category, target } = nearbyOpen;
-    const insertAt = target.insertAtFlatIndex;
     setNearbyOpen(null);
+
+    if (mode === 'pin') {
+      createPin.mutate({
+        name: result.name,
+        lat: result.lat,
+        lng: result.lng,
+        category,
+        priority: 'want',
+        notes: '',
+      });
+      return;
+    }
+
+    const insertAt = target.insertAtFlatIndex;
     // Look up the locality so the chip reads "Grenoble" instead of
     // "Circle K Grenoble Autoroute A48". Falls back to the result name
     // when the Places Details call can't resolve a usable locality.

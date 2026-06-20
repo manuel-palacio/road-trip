@@ -14,6 +14,8 @@ export type NearbyResult = {
   lng: number;
 };
 
+export type SelectMode = 'stop' | 'pin';
+
 type Props = {
   /** Which kind of POI to look for. Determines the Google Places `type`
    * filter, the modal heading + button labels, and the empty-state
@@ -23,7 +25,7 @@ type Props = {
   // Google Maps SDK + a map instance for the legacy PlacesService.
   maps: typeof google.maps;
   map: google.maps.Map;
-  onSelect: (r: NearbyResult) => void;
+  onSelect: (r: NearbyResult, mode: SelectMode) => void;
   onClose: () => void;
   /** When set, each result's perpendicular distance to legPolyline is
    * computed via measureDetour and results beyond the cap are dropped
@@ -58,14 +60,30 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
   const startedRef = useRef(false);
   const meta = PIN_CATEGORY_META[category];
   const placeType = placeTypeForCategory(category);
+  const defaultMode: SelectMode = category === 'fuel' ? 'stop' : 'pin';
+  const otherMode: SelectMode = defaultMode === 'stop' ? 'pin' : 'stop';
+
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { onClose(); return; }
+      if (!results || results.length === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedIndex((i) => (i === null ? 0 : Math.min(i + 1, results.length - 1)));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedIndex((i) => (i === null ? results.length - 1 : Math.max(i - 1, 0)));
+      } else if (e.key === 'Enter' && focusedIndex !== null) {
+        e.preventDefault();
+        const r = results[focusedIndex];
+        onSelect(r, e.shiftKey ? otherMode : defaultMode);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, results, focusedIndex, onSelect, defaultMode, otherMode]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -165,14 +183,15 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
-              {results.map((r) => {
+              {results.map((r, idx) => {
                 const distKm = haversineKm(target.midpoint, { lat: r.lat, lng: r.lng });
+                const isFocused = focusedIndex === idx;
                 return (
                   <li key={r.placeId || `${r.lat},${r.lng}`}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(r)}
-                      className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-md border border-line bg-canvas hover:border-accent hover:bg-accent-soft transition-colors"
+                    <div
+                      className={`flex items-start gap-3 px-3 py-2.5 rounded-md border bg-canvas transition-colors ${isFocused ? 'border-accent bg-accent-soft' : 'border-line'}`}
+                      onMouseEnter={() => setFocusedIndex(idx)}
+                      onMouseLeave={() => setFocusedIndex(null)}
                     >
                       <span aria-hidden className="text-[18px] leading-none mt-0.5">{meta.emoji}</span>
                       <span className="flex-1 min-w-0">
@@ -181,13 +200,31 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
                           <span className="block text-paper-dim text-[11.5px] truncate">{r.vicinity}</span>
                         )}
                       </span>
-                      <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-paper-muted shrink-0 mt-0.5 text-right">
+                      <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-paper-muted shrink-0 mt-0.5 text-right mr-2">
                         <span className="block text-paper">{distKm.toFixed(1)} km</span>
                         {typeof r.rating === 'number' && (
                           <span className="block">★ {r.rating.toFixed(1)}</span>
                         )}
                       </span>
-                    </button>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onSelect(r, defaultMode)}
+                          data-testid={`btn-${defaultMode}`}
+                          className="px-2 py-1 rounded text-[11px] font-mono tracking-[0.1em] uppercase bg-accent text-canvas hover:bg-accent/80 transition-colors"
+                        >
+                          + {defaultMode === 'stop' ? 'Stop' : 'Pin'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSelect(r, otherMode)}
+                          data-testid={`btn-${otherMode}`}
+                          className="px-2 py-1 rounded text-[11px] font-mono tracking-[0.1em] uppercase border border-line text-paper-dim hover:border-paper-dim hover:text-paper transition-colors"
+                        >
+                          + {otherMode === 'stop' ? 'Stop' : 'Pin'}
+                        </button>
+                      </div>
+                    </div>
                   </li>
                 );
               })}

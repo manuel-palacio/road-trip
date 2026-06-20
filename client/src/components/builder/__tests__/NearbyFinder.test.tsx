@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { NearbyFinder } from '../NearbyFinder';
 import type { FuelSearchTarget } from '../../../lib/fuel-stops';
 import type { Stop } from '../../../lib/types';
@@ -167,5 +167,113 @@ describe('NearbyFinder (issue #71)', () => {
     await screen.findByText('Near A');
     await screen.findByText('Near B');
     expect(screen.queryByText('Far')).toBeNull();
+  });
+});
+
+// Issue #73 — dual +Stop / +Pin affordance per result row
+
+function mapsWithOneResult(name: string) {
+  const station = {
+    place_id: 'P1', name, vicinity: 'Test St',
+    geometry: { location: { lat: () => 50.01, lng: () => 10.01 } },
+  };
+  return {
+    places: {
+      PlacesService: class {
+        constructor(_: unknown) {}
+        nearbySearch(_req: unknown, cb: (r: typeof station[], status: string) => void) {
+          cb([station], 'OK');
+        }
+      },
+      PlacesServiceStatus: { OK: 'OK', ZERO_RESULTS: 'ZERO_RESULTS' },
+    },
+  } as unknown as typeof google.maps;
+}
+
+describe('NearbyFinder dual-button affordance (issue #73)', () => {
+  it('renders both +Stop and +Pin buttons for each result', async () => {
+    render(
+      <NearbyFinder
+        category="food"
+        target={targetOf()}
+        maps={mapsWithOneResult('Café Roma')}
+        map={fakeMap}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    await screen.findByText('Café Roma');
+    expect(screen.getByTestId('btn-stop')).toBeInTheDocument();
+    expect(screen.getByTestId('btn-pin')).toBeInTheDocument();
+  });
+
+  it('fuel category: +Stop button carries accent styling (is primary)', async () => {
+    render(
+      <NearbyFinder
+        category="fuel"
+        target={targetOf()}
+        maps={mapsWithOneResult('Shell')}
+        map={fakeMap}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    await screen.findByText('Shell');
+    const stopBtn = screen.getByTestId('btn-stop');
+    const pinBtn = screen.getByTestId('btn-pin');
+    expect(stopBtn.className).toMatch(/bg-accent/);
+    expect(pinBtn.className).not.toMatch(/bg-accent/);
+  });
+
+  it('food category: +Pin button carries accent styling (is primary)', async () => {
+    render(
+      <NearbyFinder
+        category="food"
+        target={targetOf()}
+        maps={mapsWithOneResult('Pizza Place')}
+        map={fakeMap}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    await screen.findByText('Pizza Place');
+    const pinBtn = screen.getByTestId('btn-pin');
+    const stopBtn = screen.getByTestId('btn-stop');
+    expect(pinBtn.className).toMatch(/bg-accent/);
+    expect(stopBtn.className).not.toMatch(/bg-accent/);
+  });
+
+  it('clicking +Pin calls onSelect with mode "pin"', async () => {
+    const onSelect = vi.fn();
+    render(
+      <NearbyFinder
+        category="food"
+        target={targetOf()}
+        maps={mapsWithOneResult('Tapas Bar')}
+        map={fakeMap}
+        onSelect={onSelect}
+        onClose={() => {}}
+      />,
+    );
+    await screen.findByText('Tapas Bar');
+    fireEvent.click(screen.getByTestId('btn-pin'));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ name: 'Tapas Bar' }), 'pin');
+  });
+
+  it('clicking +Stop calls onSelect with mode "stop"', async () => {
+    const onSelect = vi.fn();
+    render(
+      <NearbyFinder
+        category="food"
+        target={targetOf()}
+        maps={mapsWithOneResult('Burger Joint')}
+        map={fakeMap}
+        onSelect={onSelect}
+        onClose={() => {}}
+      />,
+    );
+    await screen.findByText('Burger Joint');
+    fireEvent.click(screen.getByTestId('btn-stop'));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ name: 'Burger Joint' }), 'stop');
   });
 });
