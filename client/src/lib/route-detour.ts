@@ -1,3 +1,5 @@
+import { haversineKm } from './pin-attachment';
+
 type LatLng = { lat: number; lng: number };
 
 export type DetourMeasurement = {
@@ -7,32 +9,24 @@ export type DetourMeasurement = {
   routeKmFromStart: number;
 };
 
-const EARTH_KM = 6371;
-
-function toRad(deg: number) { return (deg * Math.PI) / 180; }
-
-function haversineKm(a: LatLng, b: LatLng): number {
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const sa = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_KM * Math.asin(Math.min(1, Math.sqrt(sa)));
-}
-
 /** Closest-point projection of `p` onto the segment `a → b` in an equirectangular
- * approximation (good enough for road-trip-scale polylines; bias is well under
- * the 5 km detour cap at temperate latitudes). Returns the projected point and
- * the parametric t in [0,1] along the segment. */
+ * approximation. Scales longitudes by cos(midLat) so a 1° step east-west covers
+ * the same metric distance as a 1° step north-south at this latitude — without
+ * this, `t` is skewed up to 2× at lat 60°. Returns the projected point and the
+ * parametric t in [0,1] along the segment. */
 function projectOntoSegment(p: LatLng, a: LatLng, b: LatLng): { point: LatLng; t: number } {
-  const ax = a.lng, ay = a.lat;
-  const bx = b.lng, by = b.lat;
-  const px = p.lng, py = p.lat;
+  const midLatRad = ((a.lat + b.lat) / 2) * Math.PI / 180;
+  const lngScale = Math.cos(midLatRad);
+  const ax = a.lng * lngScale, ay = a.lat;
+  const bx = b.lng * lngScale, by = b.lat;
+  const px = p.lng * lngScale, py = p.lat;
   const dx = bx - ax, dy = by - ay;
   const lenSq = dx * dx + dy * dy;
   if (lenSq === 0) return { point: a, t: 0 };
   let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
   if (t < 0) t = 0;
   if (t > 1) t = 1;
-  return { point: { lat: ay + dy * t, lng: ax + dx * t }, t };
+  return { point: { lat: ay + dy * t, lng: (ax + dx * t) / lngScale }, t };
 }
 
 export function measureDetour(station: LatLng, polyline: readonly LatLng[]): DetourMeasurement {
@@ -49,10 +43,10 @@ export function measureDetour(station: LatLng, polyline: readonly LatLng[]): Det
   for (let i = 0; i < polyline.length - 1; i++) {
     const a = polyline[i];
     const b = polyline[i + 1];
+    const segLen = haversineKm(a, b);
     const { point, t } = projectOntoSegment(station, a, b);
     const detour = haversineKm(station, point);
     if (detour < best.detourKm) {
-      const segLen = haversineKm(a, b);
       best = {
         detourKm: detour,
         routePoint: point,
@@ -60,7 +54,7 @@ export function measureDetour(station: LatLng, polyline: readonly LatLng[]): Det
         routeKmFromStart: cumKm + segLen * t,
       };
     }
-    cumKm += haversineKm(a, b);
+    cumKm += segLen;
   }
   return best;
 }

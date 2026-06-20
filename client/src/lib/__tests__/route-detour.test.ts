@@ -36,6 +36,23 @@ describe('measureDetour', () => {
     expect(r.routeKmFromStart).toBeGreaterThan(100);
     expect(r.routeKmFromStart).toBeLessThan(250);
   });
+
+  it('handles a single-vertex polyline (returns sentinel)', () => {
+    const r = measureDetour({ lat: 0, lng: 0 }, [{ lat: 0, lng: 0 }]);
+    expect(r.segmentIdx).toBe(0);
+    expect(r.detourKm).toBe(Infinity);
+  });
+
+  it('produces a correct closest-point at high latitude (lat ~60)', () => {
+    // East-west segment at lat 60; station 0.05° north of the midpoint.
+    // True perpendicular distance ≈ 5.55 km regardless of longitude scale.
+    const highLatPolyline = [{ lat: 60, lng: 10 }, { lat: 60, lng: 12 }];
+    const r = measureDetour({ lat: 60.05, lng: 11 }, highLatPolyline);
+    expect(r.detourKm).toBeCloseTo(5.56, 0);
+    // routePoint should snap near (60, 11), not skewed
+    expect(r.routePoint.lat).toBeCloseTo(60, 4);
+    expect(r.routePoint.lng).toBeCloseTo(11, 1);
+  });
 });
 
 describe('pointAtRouteKm', () => {
