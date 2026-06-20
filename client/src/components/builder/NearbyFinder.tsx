@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FuelSearchTarget } from '../../lib/fuel-stops';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 import { placeTypeForCategory } from '../../lib/nearby-search';
+import { measureDetour } from '../../lib/route-detour';
 import type { PinCategory } from '../../lib/types';
 
 export type NearbyResult = {
@@ -24,6 +25,12 @@ type Props = {
   map: google.maps.Map;
   onSelect: (r: NearbyResult) => void;
   onClose: () => void;
+  /** When set, each result's perpendicular distance to legPolyline is
+   * computed via measureDetour and results beyond the cap are dropped
+   * before display. Auto-fuel passes 5 km for the manual fuel category;
+   * the manual fuel button after a "no-station" warning passes 10 km. */
+  detourCapKm?: number;
+  legPolyline?: { lat: number; lng: number }[];
 };
 
 const SEARCH_RADIUS_M = 10000;
@@ -45,7 +52,7 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
  * surrounding UI copy so the same component handles fuel / food /
  * hotel / scenic etc. Uses the legacy PlacesService API which is
  * stable; Place.searchNearby() would also work. */
-export function NearbyFinder({ category, target, maps, map, onSelect, onClose }: Props) {
+export function NearbyFinder({ category, target, maps, map, onSelect, onClose, detourCapKm, legPolyline }: Props) {
   const [results, setResults] = useState<NearbyResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
@@ -77,7 +84,7 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose }:
         }
         return;
       }
-      const items: NearbyResult[] = raw
+      const mapped: NearbyResult[] = raw
         .filter((r) => r.geometry?.location)
         .map((r) => ({
           placeId: r.place_id || '',
@@ -86,15 +93,21 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose }:
           rating: typeof r.rating === 'number' ? r.rating : undefined,
           lat: r.geometry!.location!.lat(),
           lng: r.geometry!.location!.lng(),
-        }))
-        // Closest first.
-        .sort(
-          (a, b) =>
-            haversineKm(target.midpoint, { lat: a.lat, lng: a.lng })
-            - haversineKm(target.midpoint, { lat: b.lat, lng: b.lng }),
+        }));
+      const useDetour = detourCapKm != null && legPolyline != null && legPolyline.length >= 2;
+      let filtered = useDetour
+        ? mapped.filter((r) => measureDetour({ lat: r.lat, lng: r.lng }, legPolyline!).detourKm <= detourCapKm!)
+        : mapped;
+      filtered = filtered
+        .sort((a, b) =>
+          useDetour
+            ? measureDetour({ lat: a.lat, lng: a.lng }, legPolyline!).detourKm
+              - measureDetour({ lat: b.lat, lng: b.lng }, legPolyline!).detourKm
+            : haversineKm(target.midpoint, { lat: a.lat, lng: a.lng })
+              - haversineKm(target.midpoint, { lat: b.lat, lng: b.lng }),
         )
         .slice(0, 10);
-      setResults(items);
+      setResults(filtered);
     });
   }, [maps, map, target.midpoint, placeType, meta.label]);
 
