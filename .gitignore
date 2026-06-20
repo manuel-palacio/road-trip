@@ -18,3 +18,4 @@ road-trip-service.json
 
 # Claude Code per-project state (scheduled tasks etc)
 .claude/
+verify-*.png
