@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const PDFDocument = require('pdfkit');
-const { admin, getDb } = require('../lib/firebase');
+const { admin, getAuth, getDb } = require('../lib/firebase');
 const { effectiveTripLimit } = require('../lib/limits');
 
 // shared/*.js modules are ESM (so Vite can tree-shake them for the client).
@@ -1053,6 +1053,90 @@ router.delete('/api/trips/:id/publish-template', async (req, res) => {
     res.json({ ok: true, isTemplate: false });
   } catch (e) {
     console.error('DELETE /api/trips/:id/publish-template failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+const COLLABORATOR_LIMIT_FREE = 1;
+
+// POST /api/trips/:id/collaborators — owner-only, adds a collaborator by email.
+// Resolves email → uid via the Admin SDK; 404 when not a known user. Free tier
+// capped at COLLABORATOR_LIMIT_FREE collaborator per trip.
+router.post('/api/trips/:id/collaborators', async (req, res) => {
+  try {
+    const db = getDb();
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Trip not found', code: 'NOT_FOUND' });
+    const data = snap.data();
+    if (data.ownerUid !== req.uid) return res.status(403).json({ error: 'Owner only', code: 'FORBIDDEN' });
+
+    const email = ((req.body || {}).email || '').toString().trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'email required', code: 'INVALID' });
+
+    let collaboratorUid;
+    try {
+      const u = await getAuth().getUserByEmail(email);
+      collaboratorUid = u.uid;
+    } catch {
+      return res.status(404).json({ error: 'No such user', code: 'NOT_FOUND' });
+    }
+
+    if (collaboratorUid === req.uid) {
+      return res.status(400).json({ error: 'You are already the owner', code: 'INVALID' });
+    }
+
+    const existing = Array.isArray(data.collaborators) ? data.collaborators : [];
+    if (existing.includes(collaboratorUid)) {
+      return res.status(409).json({ error: 'Already a collaborator', code: 'ALREADY_EXISTS' });
+    }
+
+    const userSnap = await db.collection('users').doc(req.uid).get();
+    const user = userSnap.exists ? userSnap.data() : null;
+    const isPro = user && user.plan === 'pro';
+    if (!isPro && existing.length >= COLLABORATOR_LIMIT_FREE) {
+      return res.status(402).json({
+        error: `Free plan is capped at ${COLLABORATOR_LIMIT_FREE} collaborator${COLLABORATOR_LIMIT_FREE === 1 ? '' : 's'} per trip. Upgrade to Pro for unlimited collaborators.`,
+        code: 'COLLABORATOR_LIMIT_REACHED',
+        limit: COLLABORATOR_LIMIT_FREE,
+      });
+    }
+
+    await ref.update({
+      collaborators: [...existing, collaboratorUid],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.json({ ok: true, uid: collaboratorUid });
+  } catch (e) {
+    console.error('POST /api/trips/:id/collaborators failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+// DELETE /api/trips/:id/collaborators/:uid — owner-only, removes a collaborator.
+router.delete('/api/trips/:id/collaborators/:uid', async (req, res) => {
+  try {
+    const db = getDb();
+    const ref = db.collection('trips').doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Trip not found', code: 'NOT_FOUND' });
+    const data = snap.data();
+    if (data.ownerUid !== req.uid) return res.status(403).json({ error: 'Owner only', code: 'FORBIDDEN' });
+
+    const existing = Array.isArray(data.collaborators) ? data.collaborators : [];
+    const next = existing.filter((u) => u !== req.params.uid);
+    if (next.length === existing.length) {
+      return res.status(404).json({ error: 'Collaborator not found', code: 'NOT_FOUND' });
+    }
+
+    await ref.update({
+      collaborators: next,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/trips/:id/collaborators/:uid failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
   }
 });

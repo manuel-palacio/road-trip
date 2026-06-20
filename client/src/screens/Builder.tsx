@@ -10,8 +10,9 @@ import { useCreatePin, usePins } from '../hooks/usePins';
 import { useDemoteStop, usePromotePin } from '../hooks/usePromoteAction';
 import { useAutoFuel } from '../hooks/useAutoFuel';
 import { useFavorites } from '../hooks/useFavorites';
+import { useMe } from '../hooks/useMe';
 import type { PlacesSearchFn } from '../lib/auto-fuel-pick';
-import { ApiError, createTrip, getTrip, updateTrip } from '../lib/api';
+import { ApiError, addCollaborator, createTrip, getTrip, lookupUserByEmail, removeCollaborator, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
@@ -25,6 +26,7 @@ import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
 import type { FuelOverride, FuelUnit, PinCategory, Stop, Trip } from '../lib/types';
+import { CollaboratorList } from '../components/builder/CollaboratorList';
 import { CountryOverrideRow } from '../components/builder/CountryOverrideRow';
 import { FUEL_BOUNDS, validateConsumption, validatePrice, validateTankRange, validateTankSize } from '../lib/fuel-bounds';
 import { DatePicker } from '../components/DatePicker';
@@ -210,10 +212,19 @@ export function Builder() {
     enabled: isEditing,
   });
 
+  const me = useMe(true);
+
   const [state, setState] = useState<BuilderState>(empty);
   const [hydrated, setHydrated] = useState(!isEditing);
   const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+
+  // Collaborator invite state — only used when the trip details modal is open
+  // and the current user is the owner.
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [collabError, setCollabError] = useState<string | null>(null);
+  const [collabPending, setCollabPending] = useState(false);
+  const [collaboratorProfiles, setCollaboratorProfiles] = useState<Record<string, { displayName: string; photoURL: string }>>({});
   const [autoFuelWarnings, setAutoFuelWarnings] = useState<Record<number, number>>({});
   const [autoFuelToast, setAutoFuelToast] = useState<{ message: string } | null>(null);
   const undoSnapshotRef = useRef<Stop[] | null>(null);
@@ -629,6 +640,39 @@ export function Builder() {
 
   function removeFuelOverride(id: string) {
     setState((s) => ({ ...s, fuelOverrides: s.fuelOverrides.filter((o) => o.id !== id) }));
+  }
+
+  async function handleCollaboratorInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setCollabError(null);
+    setCollabPending(true);
+    try {
+      const email = inviteEmail.trim().toLowerCase();
+      const result = await addCollaborator(state.tripId!, email);
+      setInviteEmail('');
+      // Fetch display name for the newly added collaborator and cache it.
+      const profile = await lookupUserByEmail(email);
+      if (profile) {
+        setCollaboratorProfiles((p) => ({ ...p, [result.uid]: { displayName: profile.displayName, photoURL: profile.photoURL } }));
+      }
+      queryClient.invalidateQueries({ queryKey: ['trip', state.tripId] });
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      if (apiErr.code === 'COLLABORATOR_LIMIT_REACHED') {
+        setCollabError(apiErr.message + ' Upgrade to Pro to invite more.');
+      } else if (apiErr.status === 404) {
+        setCollabError(`No user found with email ${inviteEmail}`);
+      } else {
+        setCollabError(apiErr.message || 'Failed to invite');
+      }
+    } finally {
+      setCollabPending(false);
+    }
+  }
+
+  async function handleCollaboratorRemove(uid: string) {
+    await removeCollaborator(state.tripId!, uid);
+    queryClient.invalidateQueries({ queryKey: ['trip', state.tripId] });
   }
   /** Upsert a per-country fuel override by countryCode (not by row id).
    * Powers the auto-populated rows in the trip-details modal: each row
@@ -1359,6 +1403,39 @@ export function Builder() {
                     </div>
                   );
                 })}
+            </div>
+          )}
+          {/* Collaborators — only for saved trips where the current user is the owner. */}
+          {state.tripId && tripQuery.data?.ownerUid === me.data?.uid && (
+            <div className="border-t border-line pt-4">
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-3">
+                Collaborators
+              </span>
+              <form onSubmit={handleCollaboratorInvite} className="flex gap-1.5 mb-3">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="friend@example.com"
+                  className="flex-1 bg-canvas border border-line rounded px-2.5 py-1.5 text-paper text-[13px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={collabPending || !inviteEmail.trim()}
+                  className="px-3 py-1.5 bg-accent text-canvas text-[11px] font-mono uppercase tracking-[0.16em] rounded disabled:opacity-50 transition-opacity"
+                >
+                  {collabPending ? '…' : 'Invite'}
+                </button>
+              </form>
+              {collabError && (
+                <p className="text-red-400 text-[11.5px] mb-3">{collabError}</p>
+              )}
+              <CollaboratorList
+                collaborators={tripQuery.data?.collaborators || []}
+                collaboratorProfiles={collaboratorProfiles}
+                onRemove={handleCollaboratorRemove}
+              />
             </div>
           )}
         </div>

@@ -46,6 +46,7 @@ app.use(tripsRouter);
 app.use(shareRouter);
 app.use(templatesRouter);
 app.use(require('./routes/favorites'));
+app.use(require('./routes/users'));
 
 // Dev-only impersonation endpoint. Conditionally mounted — in any
 // hosted environment (Cloud Run, Heroku, Fly, Railway, NODE_ENV=production)

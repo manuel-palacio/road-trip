@@ -183,6 +183,24 @@ export async function deleteFavorite(id: string): Promise<void> {
   })));
 }
 
+export async function lookupUserByEmail(email: string): Promise<{ uid: string; displayName: string; photoURL: string } | null> {
+  const r = await fetch(`/api/users/lookup?email=${encodeURIComponent(email)}`, await withToken());
+  if (r.status === 404) return null;
+  return handle<{ uid: string; displayName: string; photoURL: string }>(r);
+}
+
+export async function addCollaborator(tripId: string, email: string): Promise<{ uid: string }> {
+  return handle<{ uid: string }>(await fetch(`/api/trips/${encodeURIComponent(tripId)}/collaborators`, await withToken({
+    method: 'POST', body: JSON.stringify({ email }),
+  })));
+}
+
+export async function removeCollaborator(tripId: string, uid: string): Promise<void> {
+  await handle<unknown>(await fetch(`/api/trips/${encodeURIComponent(tripId)}/collaborators/${encodeURIComponent(uid)}`, await withToken({
+    method: 'DELETE',
+  })));
+}
+
 export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {
   const res = await fetch(path, await withToken());
   if (!res.ok) {
