@@ -55,7 +55,7 @@ export function Share() {
   const owner = sharedQuery.data?.owner;
   const stops = useMemo<Stop[]>(() => trip?.stops || [], [trip]);
 
-  const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
+  const [activeTab, setActiveTab] = useState<'days' | 'pins' | 'budget'>('days');
   // Mobile drawer state — sidebar slides in from left below md (768px).
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hiddenDays, setHiddenDays] = useState<Set<number>>(new Set());
@@ -385,6 +385,8 @@ export function Share() {
             active={activeTab}
             daysCount={groups.length}
             pinsCount={pins.length}
+            budgetCount={0}
+            isPro={false}
             onChange={setActiveTab}
           />
 

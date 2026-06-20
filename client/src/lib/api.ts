@@ -1,5 +1,5 @@
 import { getFirebaseAuth } from './firebase';
-import type { AppConfig, Favorite, MeResponse, Pin, TemplateCard, Trip } from './types';
+import type { AppConfig, BudgetItem, Favorite, FxRates, MeResponse, Pin, TemplateCard, Trip } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -269,6 +269,57 @@ export async function adminDeleteTrip(id: string): Promise<{ ok: boolean }> {
   return handle<{ ok: boolean }>(await fetch(`/api/admin/trips/${encodeURIComponent(id)}`, await withToken({
     method: 'DELETE',
   })));
+}
+
+export async function listBudget(tripId: string): Promise<{ items: BudgetItem[] }> {
+  return handle<{ items: BudgetItem[] }>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/budget`, await withToken()),
+  );
+}
+
+export async function createBudgetItem(
+  tripId: string,
+  body: Omit<BudgetItem, 'id' | 'addedByUid' | 'createdAt' | 'updatedAt'>,
+): Promise<BudgetItem> {
+  return handle<BudgetItem>(
+    await fetch(`/api/trips/${encodeURIComponent(tripId)}/budget`, await withToken({
+      method: 'POST', body: JSON.stringify(body),
+    })),
+  );
+}
+
+export async function updateBudgetItem(
+  tripId: string,
+  itemId: string,
+  body: Partial<BudgetItem>,
+): Promise<BudgetItem> {
+  return handle<BudgetItem>(
+    await fetch(
+      `/api/trips/${encodeURIComponent(tripId)}/budget/${encodeURIComponent(itemId)}`,
+      await withToken({ method: 'PATCH', body: JSON.stringify(body) }),
+    ),
+  );
+}
+
+export async function deleteBudgetItem(tripId: string, itemId: string): Promise<void> {
+  await handle<unknown>(
+    await fetch(
+      `/api/trips/${encodeURIComponent(tripId)}/budget/${encodeURIComponent(itemId)}`,
+      await withToken({ method: 'DELETE' }),
+    ),
+  );
+}
+
+export async function getFxRates(date: string): Promise<FxRates> {
+  return handle<FxRates>(
+    await fetch(`/api/fx/${encodeURIComponent(date)}`, await withToken()),
+  );
+}
+
+export async function updateHomeCurrency(homeCurrency: string): Promise<{ ok: boolean }> {
+  return handle<{ ok: boolean }>(
+    await fetch('/api/me', await withToken({ method: 'PATCH', body: JSON.stringify({ homeCurrency }) })),
+  );
 }
 
 export async function downloadAuthed(path: string, fallbackName: string): Promise<void> {

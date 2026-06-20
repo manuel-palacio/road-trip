@@ -25,6 +25,7 @@ export type MeResponse = {
   plan: 'free' | 'pro';
   tripLimit: number;
   tripCount: number;
+  homeCurrency?: string;
   createdAt?: unknown;
 };
 
@@ -91,6 +92,28 @@ export type Pin = {
   addedByUid?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+};
+
+export type BudgetCategory = 'fuel' | 'hotel' | 'food' | 'tolls' | 'activities' | 'other';
+
+export type BudgetItem = {
+  id: string;
+  stopId?: string | null;
+  dayNumber?: number | null;
+  category: BudgetCategory;
+  label: string;
+  amount: number;
+  currency: string;   // ISO 4217 uppercase
+  isPaid?: boolean;
+  addedByUid?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+export type FxRates = {
+  base: string;       // e.g. 'EUR'
+  date: string;       // ISO YYYY-MM-DD
+  rates: Record<string, number>;
 };
 
 export type Favorite = {

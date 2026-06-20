@@ -10,6 +10,9 @@ import { usePinModal } from '../hooks/usePinModal';
 import { useMe } from '../hooks/useMe';
 import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
+import { useBudget } from '../hooks/useBudget';
+import { useFxRates } from '../hooks/useFxRates';
+import { BudgetPanel } from '../components/viewer/BudgetPanel';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
@@ -60,7 +63,7 @@ export function Viewer() {
   const pinsQuery = usePins(tripId);
   const pins = useMemo(() => pinsQuery.data || [], [pinsQuery.data]);
 
-  const [activeTab, setActiveTab] = useState<'days' | 'pins'>('days');
+  const [activeTab, setActiveTab] = useState<'days' | 'pins' | 'budget'>('days');
   // Mobile drawer state — sidebar slides in from left below md (768px).
   // Open by default on desktop (where it's static); closed on mobile.
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -98,6 +101,11 @@ export function Viewer() {
   const me = useMe(true);
   const isPro = me.data?.plan === 'pro';
 
+  const budget = useBudget(tripId);
+  const homeCurrency = me.data?.homeCurrency ?? 'EUR';
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const fxRates = useFxRates(todayIso);
+
   const [exporting, setExporting] = useState<'pdf' | 'pdf-branded' | 'gpx' | null>(null);
   const [handoffOpen, setHandoffOpen] = useState(false);
   async function exportTrip(kind: 'pdf' | 'pdf-branded' | 'gpx') {
@@ -123,6 +131,46 @@ export function Viewer() {
     [routes.enriched, trip?.maxKmPerDay],
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+
+  // Auto-seed fuel budget items from existing fuel cost calc on first load.
+  // A localStorage flag per trip prevents re-seeding after the user deletes them.
+  const autoFuelFlagKey = tripId ? `autoFuelBudget:${tripId}` : null;
+
+  useEffect(() => {
+    if (!tripId) return;
+    if (!trip?.fuelConsumption || !trip?.fuelPrice) return;
+    if (budget.isLoading) return;
+    if (budget.items.length > 0) return;
+    if (!autoFuelFlagKey) return;
+    if (localStorage.getItem(autoFuelFlagKey)) return;
+
+    localStorage.setItem(autoFuelFlagKey, '1');
+
+    groups.forEach((g) => {
+      const breakdown = fuelBreakdownForLegs(
+        g.stops.map((x) => x.stop),
+        trip.fuelConsumption,
+        trip.fuelUnit,
+        trip.fuelPrice,
+        trip.fuelCurrency,
+        trip.fuelOverrides,
+      );
+      if (!breakdown || breakdown.size === 0) return;
+      breakdown.forEach((amount, currency) => {
+        const rounded = Math.round(amount * 100) / 100;
+        if (rounded <= 0) return;
+        budget.add({
+          category: 'fuel',
+          label: `Fuel — Day ${g.day} (estimated)`,
+          amount: rounded,
+          currency,
+          dayNumber: g.day,
+        });
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId, trip, budget.isLoading, budget.items.length, groups]);
+
   const fuelTimeline = useMemo(
     () => computeFuelTimeline(dayedStops, trip?.tankRangeKm || 0),
     [dayedStops, trip?.tankRangeKm],
@@ -419,6 +467,8 @@ export function Viewer() {
           active={activeTab}
           daysCount={groups.length}
           pinsCount={pins.length}
+          budgetCount={budget.items.length}
+          isPro={isPro}
           onChange={setActiveTab}
         />
 
@@ -453,6 +503,35 @@ export function Viewer() {
                   trip={{ id: trip.id, name: trip.name }}
                 />
               ))
+            )
+          ) : activeTab === 'budget' ? (
+            isPro ? (
+              <BudgetPanel
+                tripId={tripId!}
+                homeCurrency={homeCurrency}
+                totalDays={totals.totalDays}
+                rates={fxRates.data ?? null}
+                items={budget.items}
+                onAdd={budget.add}
+                onDelete={budget.remove}
+                addPending={budget.addPending}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                <span className="text-[28px]">💰</span>
+                <p className="font-serif italic text-[15px] text-paper leading-snug">
+                  Track multi-currency expenses
+                </p>
+                <p className="font-mono text-[11px] tracking-[0.08em] text-paper-muted">
+                  Add/edit budget items per day, see totals in your home currency — Pro feature.
+                </p>
+                <a
+                  href="/#upgrade"
+                  className="mt-1 inline-block bg-accent text-white px-4 py-2 rounded font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-accent/90 transition-colors"
+                >
+                  Upgrade to Pro
+                </a>
+              </div>
             )
           ) : (
             <PinList

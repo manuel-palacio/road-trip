@@ -1141,4 +1141,122 @@ router.delete('/api/trips/:id/collaborators/:uid', async (req, res) => {
   }
 });
 
+// ─── Budget items ─────────────────────────────────────────────────────────────
+
+const BUDGET_CATEGORIES = ['fuel', 'hotel', 'food', 'tolls', 'activities', 'other'];
+
+function validateBudgetPayload(body, { partial }) {
+  const out = {};
+  if ('category' in body) {
+    if (!BUDGET_CATEGORIES.includes(body.category)) {
+      return { error: `category must be one of ${BUDGET_CATEGORIES.join(', ')}` };
+    }
+    out.category = body.category;
+  } else if (!partial) {
+    return { error: 'category required' };
+  }
+  if ('label' in body) {
+    if (typeof body.label !== 'string') return { error: 'label must be a string' };
+    out.label = body.label.slice(0, 100);
+  } else if (!partial) {
+    return { error: 'label required' };
+  }
+  if ('amount' in body) {
+    if (typeof body.amount !== 'number' || !Number.isFinite(body.amount) || body.amount < 0) {
+      return { error: 'amount must be a non-negative number' };
+    }
+    out.amount = body.amount;
+  } else if (!partial) {
+    return { error: 'amount required' };
+  }
+  if ('currency' in body) {
+    if (typeof body.currency !== 'string' || !/^[A-Za-z]{3}$/.test(body.currency)) {
+      return { error: 'currency must be 3 letters' };
+    }
+    out.currency = body.currency.toUpperCase();
+  } else if (!partial) {
+    return { error: 'currency required' };
+  }
+  if ('stopId' in body) {
+    if (body.stopId !== null && typeof body.stopId !== 'string') {
+      return { error: 'stopId must be a string or null' };
+    }
+    out.stopId = body.stopId;
+  }
+  if ('dayNumber' in body) {
+    if (body.dayNumber !== null && typeof body.dayNumber !== 'number') {
+      return { error: 'dayNumber must be a number or null' };
+    }
+    out.dayNumber = body.dayNumber;
+  }
+  if ('isPaid' in body) {
+    if (typeof body.isPaid !== 'boolean') return { error: 'isPaid must be boolean' };
+    out.isPaid = body.isPaid;
+  }
+  return { value: out };
+}
+
+router.get('/api/trips/:id/budget', async (req, res) => {
+  try {
+    const ref = await loadTripForAccess(req, res, false);
+    if (!ref) return;
+    const snap = await ref.collection('budget_items').orderBy('createdAt', 'asc').get();
+    res.json({ items: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+  } catch (e) {
+    console.error('GET budget failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.post('/api/trips/:id/budget', async (req, res) => {
+  try {
+    const ref = await loadTripForAccess(req, res, true);
+    if (!ref) return;
+    const { error, value } = validateBudgetPayload(req.body || {}, { partial: false });
+    if (error) return res.status(400).json({ error, code: 'INVALID' });
+    const newItem = {
+      ...value,
+      addedByUid: req.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const itemRef = await ref.collection('budget_items').add(newItem);
+    const snap = await itemRef.get();
+    res.status(201).json({ id: itemRef.id, ...snap.data() });
+  } catch (e) {
+    console.error('POST budget failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.patch('/api/trips/:id/budget/:itemId', async (req, res) => {
+  try {
+    const ref = await loadTripForAccess(req, res, true);
+    if (!ref) return;
+    const { error, value } = validateBudgetPayload(req.body || {}, { partial: true });
+    if (error) return res.status(400).json({ error, code: 'INVALID' });
+    const itemRef = ref.collection('budget_items').doc(req.params.itemId);
+    const snap = await itemRef.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
+    await itemRef.update({ ...value, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    const updated = await itemRef.get();
+    res.json({ id: updated.id, ...updated.data() });
+  } catch (e) {
+    console.error('PATCH budget failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
+router.delete('/api/trips/:id/budget/:itemId', async (req, res) => {
+  try {
+    const ref = await loadTripForAccess(req, res, true);
+    if (!ref) return;
+    await ref.collection('budget_items').doc(req.params.itemId).delete();
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE budget failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
 module.exports = router;

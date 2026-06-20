@@ -46,4 +46,29 @@ router.get('/api/me', authRequired, async (req, res) => {
   }
 });
 
+router.patch('/api/me', authRequired, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const updates = {};
+    if ('homeCurrency' in body) {
+      if (typeof body.homeCurrency !== 'string' || !/^[A-Za-z]{3}$/.test(body.homeCurrency)) {
+        return res.status(400).json({ error: 'homeCurrency must be 3 letters', code: 'INVALID' });
+      }
+      updates.homeCurrency = body.homeCurrency.toUpperCase();
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No updatable fields provided', code: 'INVALID' });
+    }
+    const db = getDb();
+    await db.collection('users').doc(req.uid).update({
+      ...updates,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('PATCH /api/me failed:', e);
+    res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
+  }
+});
+
 module.exports = router;
