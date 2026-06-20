@@ -95,6 +95,13 @@ export function Dashboard({ me }: { me: MeResponse }) {
           >
             Templates
           </button>
+          <button
+            type="button"
+            onClick={() => navigate('/favorites')}
+            className="bg-transparent border border-line text-paper-dim px-3 md:px-[14px] py-[6px] md:py-[7px] rounded text-[11px] md:text-[12px] shrink-0 transition-colors duration-200 ease-out-soft hover:border-paper-dim hover:text-paper"
+          >
+            Favorites
+          </button>
           <ThemeToggle />
           <InstallAppButton />
           <button

@@ -13,6 +13,7 @@ import { Viewer } from './screens/Viewer';
 import { Share } from './screens/Share';
 import { Handoff } from './screens/Handoff';
 import { Templates } from './screens/Templates';
+import { Favorites } from './screens/Favorites';
 import { OfflineBadge } from './components/OfflineBadge';
 import type { MeResponse } from './lib/types';
 
@@ -72,6 +73,7 @@ function AuthedRoutes({ me }: { me: MeResponse }) {
       <Route path="/builder/:tripId" element={<Builder />} />
       <Route path="/viewer/:tripId" element={<Viewer />} />
       <Route path="/handoff/:tripId" element={<Handoff />} />
+      <Route path="/favorites" element={<Favorites />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
