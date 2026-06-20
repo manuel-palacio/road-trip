@@ -142,16 +142,18 @@ export function makeCostChipIcon(text: string): google.maps.Icon {
   };
 }
 
-export function makeMarkerIcon(
+/** Returns an HTMLDivElement with the stop marker SVG — a category-tinted
+ * circular bead with a day-color ring and a numbered corner pip. Used as
+ * the `content` of an AdvancedMarkerElement. */
+export function makeMarkerContent(
   num: number,
   ringColor: string = '#f3ecde',
   category?: PinCategory,
-): google.maps.Icon {
-  // Every marker is iconified: category-tinted inner disc + day-color ring
-  // + category emoji + small day-color corner pip with the sequence number.
-  // Card and map stay in lockstep via StopIdentityBadge.
+): HTMLDivElement {
   const meta = category ? PIN_CATEGORY_META[category] : DEFAULT_STOP_META;
-  const svg =
+  const div = document.createElement('div');
+  div.style.cssText = 'position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;';
+  div.innerHTML =
     `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'>` +
       `<circle cx='22' cy='22' r='15' fill='${ringColor}'/>` +
       `<circle cx='22' cy='22' r='12' fill='${meta.tint}'/>` +
@@ -159,11 +161,16 @@ export function makeMarkerIcon(
       `<circle cx='34' cy='34' r='7.5' fill='${ringColor}' stroke='#f3ecde' stroke-width='1'/>` +
       `<text x='34' y='37.5' text-anchor='middle' font-family='ui-monospace,monospace' font-size='9' font-weight='600' fill='#0d0e11'>${num}</text>` +
     `</svg>`;
-  return {
-    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    anchor: new google.maps.Point(22, 22),
-    scaledSize: new google.maps.Size(44, 44),
-  };
+  return div;
+}
+
+/** @deprecated Use makeMarkerContent — returns HTMLDivElement for AdvancedMarkerElement.content */
+export function makeMarkerIcon(
+  num: number,
+  ringColor: string = '#f3ecde',
+  category?: PinCategory,
+): HTMLDivElement {
+  return makeMarkerContent(num, ringColor, category);
 }
 
 type PinIconStyle = { ringColor: string; ringWidth: number; haloOpacity: number };
@@ -181,20 +188,40 @@ const PRIORITY_ICON_STYLE: Record<'must' | 'want' | 'maybe', (tint: string) => P
 // dropped highlights, stops read as route beads.
 const PIN_PATH = 'M22 2 C10.4 2 1 11.4 1 23 C1 38 22 54 22 54 C22 54 43 38 43 23 C43 11.4 33.6 2 22 2 Z';
 
-export function makePinIcon(emoji: string, tint: string, priority: 'must' | 'want' | 'maybe' = 'want'): google.maps.Icon {
+/** Returns an HTMLDivElement containing the teardrop pin SVG. Used as the
+ * `content` of an AdvancedMarkerElement. The anchor is set via
+ * `collisionBehavior` / CSS; the SVG itself places the tip at bottom-center. */
+export function makePinContent(
+  emoji: string,
+  tint: string,
+  priority: 'must' | 'want' | 'maybe' = 'want',
+): HTMLDivElement {
   const { ringColor, ringWidth, haloOpacity } = PRIORITY_ICON_STYLE[priority](tint);
   const halo = haloOpacity > 0
     ? `<ellipse cx='22' cy='23' rx='22' ry='22' fill='${ringColor}' fill-opacity='${haloOpacity}'/>`
     : '';
   const opacity = priority === 'maybe' ? 0.78 : 1;
-  // Emoji centered in the bulb (around y=23). Text-shadow via filter for legibility.
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='56' viewBox='0 0 44 56'><g opacity='${opacity}'>${halo}<path d='${PIN_PATH}' fill='#0d0e11' stroke='${ringColor}' stroke-width='${ringWidth}' stroke-linejoin='round'/><text x='22' y='23' text-anchor='middle' dominant-baseline='central' font-size='17'>${emoji}</text></g></svg>`;
-  return {
-    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    // Anchor at the tip of the teardrop (bottom center) so the pin "drops" on the location.
-    anchor: new google.maps.Point(22, 54),
-    scaledSize: new google.maps.Size(44, 56),
-  };
+  const div = document.createElement('div');
+  // Shift the element up so the teardrop tip sits on the coordinate point.
+  div.style.cssText = 'position:relative;width:44px;height:56px;margin-bottom:-54px;';
+  div.innerHTML =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='56' viewBox='0 0 44 56'>` +
+      `<g opacity='${opacity}'>` +
+        halo +
+        `<path d='${PIN_PATH}' fill='#0d0e11' stroke='${ringColor}' stroke-width='${ringWidth}' stroke-linejoin='round'/>` +
+        `<text x='22' y='23' text-anchor='middle' dominant-baseline='central' font-size='17'>${emoji}</text>` +
+      `</g>` +
+    `</svg>`;
+  return div;
+}
+
+/** @deprecated Use makePinContent — returns HTMLDivElement for AdvancedMarkerElement.content */
+export function makePinIcon(
+  emoji: string,
+  tint: string,
+  priority: 'must' | 'want' | 'maybe' = 'want',
+): HTMLDivElement {
+  return makePinContent(emoji, tint, priority);
 }
 
 // Polyline options for a given leg's routeMode. Scenic legs (which avoid

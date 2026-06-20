@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { makePinIcon, mapStyleForDropModeForTheme, mapStyleForTheme } from '../../lib/google-maps';
+import { makePinContent, mapStyleForDropModeForTheme, mapStyleForTheme } from '../../lib/google-maps';
 import { useTheme } from '../../hooks/useTheme';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 import { guessCategoryFromTypes } from '../../lib/place-to-category';
@@ -15,18 +15,6 @@ type Props = {
   onRequestEdit: (pin: Pin) => void;
   onRequestDelete: (pin: Pin) => void;
 };
-
-function markerLabelFor(pin: Pin): google.maps.MarkerLabel {
-  const isMust = pin.priority === 'must';
-  return {
-    text: pin.name,
-    fontSize: '11px',
-    fontFamily: "Geist, sans-serif",
-    fontWeight: isMust ? '500' : '400',
-    color: isMust ? '#f3ecde' : '#cfc6b3',
-    className: isMust ? 'pin-name-label pin-name-label--must' : 'pin-name-label',
-  };
-}
 
 export type PinMapLayerHandle = {
   focusPin: (pin: Pin) => void;
@@ -59,7 +47,7 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
 ) {
   const [dropMode, setDropMode] = useState(false);
   const theme = useTheme();
-  const pinMarkersRef = useRef<Map<string, google.maps.Marker>>(new globalThis.Map());
+  const pinMarkersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new globalThis.Map());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
@@ -72,7 +60,7 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
     infoWindowRef.current = new maps.InfoWindow();
   }, [maps]);
 
-  function openInfoWindow(pin: Pin, marker: google.maps.Marker) {
+  function openInfoWindow(pin: Pin, marker: google.maps.marker.AdvancedMarkerElement) {
     if (!infoWindowRef.current || !map) return;
     infoWindowRef.current.setContent(pinInfoHtml(pin));
     infoWindowRef.current.open({ map, anchor: marker });
@@ -94,31 +82,32 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
     const liveIds = new Set(pins.map((p) => p.id));
     pinMarkersRef.current.forEach((marker, id) => {
       if (!liveIds.has(id)) {
-        marker.setMap(null);
+        marker.map = null;
         pinMarkersRef.current.delete(id);
       }
     });
-    pins.forEach((pin) => {
-      const meta = PIN_CATEGORY_META[pin.category];
-      const priority = pin.priority || 'want';
-      const existing = pinMarkersRef.current.get(pin.id);
-      if (existing) {
-        existing.setPosition({ lat: pin.lat, lng: pin.lng });
-        existing.setIcon(makePinIcon(meta.emoji, meta.tint, priority));
-        existing.setTitle(pin.name);
-        existing.setLabel(markerLabelFor(pin));
-        return;
-      }
-      const marker = new maps.Marker({
-        position: { lat: pin.lat, lng: pin.lng },
-        map,
-        icon: makePinIcon(meta.emoji, meta.tint, priority),
-        label: markerLabelFor(pin),
-        title: pin.name,
-        zIndex: priority === 'must' ? 60 : 50,
+    void (google.maps as any).importLibrary('marker').then(() => {
+      const { AdvancedMarkerElement } = google.maps.marker;
+      pins.forEach((pin) => {
+        const meta = PIN_CATEGORY_META[pin.category];
+        const priority = pin.priority || 'want';
+        const existing = pinMarkersRef.current.get(pin.id);
+        if (existing) {
+          existing.position = { lat: pin.lat, lng: pin.lng };
+          existing.content = makePinContent(meta.emoji, meta.tint, priority);
+          existing.title = pin.name;
+          return;
+        }
+        const marker = new AdvancedMarkerElement({
+          position: { lat: pin.lat, lng: pin.lng },
+          map,
+          content: makePinContent(meta.emoji, meta.tint, priority),
+          title: pin.name,
+          zIndex: priority === 'must' ? 60 : 50,
+        });
+        marker.addListener('gmp-click', () => openInfoWindow(pin, marker));
+        pinMarkersRef.current.set(pin.id, marker);
       });
-      marker.addListener('click', () => openInfoWindow(pin, marker));
-      pinMarkersRef.current.set(pin.id, marker);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maps, map, pins]);
@@ -186,7 +175,7 @@ export const PinMapLayer = forwardRef<PinMapLayerHandle, Props>(function PinMapL
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      pinMarkersRef.current.forEach((m) => m.setMap(null));
+      pinMarkersRef.current.forEach((m) => { m.map = null; });
       pinMarkersRef.current.clear();
       mapClickListenerRef.current?.remove();
       infoWindowRef.current?.close();

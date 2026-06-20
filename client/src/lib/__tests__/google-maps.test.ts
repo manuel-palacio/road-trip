@@ -1,54 +1,72 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { makeMarkerIcon } from '../google-maps';
+import { makeMarkerContent, makePinContent } from '../google-maps';
 
-// Mock google.maps.Point / google.maps.Size — the marker uses them as
-// plain x/y holders; the SVG payload is what we assert on.
+// Minimal DOM stubs needed for the content-builder functions.
 beforeAll(() => {
-  (globalThis as any).google = {
-    maps: {
-      Point: class { constructor(public x: number, public y: number) {} },
-      Size:  class { constructor(public w: number, public h: number) {} },
-    },
-  };
+  (globalThis as any).google = { maps: {} };
 });
 
-function decode(icon: ReturnType<typeof makeMarkerIcon>): string {
-  const raw = icon.url ?? '';
-  const i = raw.indexOf(',');
-  return decodeURIComponent(raw.slice(i + 1));
-}
+describe('makeMarkerContent', () => {
+  it('returns a div with SVG innerHTML', () => {
+    const div = makeMarkerContent(3, '#e76f51');
+    expect(div.tagName).toBe('DIV');
+    expect(div.innerHTML).toContain('<svg');
+  });
 
-describe('makeMarkerIcon', () => {
   it('no category: SVG embeds the city emoji and the corner sequence number', () => {
-    const svg = decode(makeMarkerIcon(3, '#e76f51'));
-    expect(svg).toContain('🏙');
-    expect(svg).toContain('>3<');
+    const div = makeMarkerContent(3, '#e76f51');
+    expect(div.innerHTML).toContain('🏙');
+    expect(div.innerHTML).toContain('>3<');
   });
 
   it('category=fuel: SVG embeds the fuel emoji and the corner sequence number', () => {
-    const svg = decode(makeMarkerIcon(3, '#e76f51', 'fuel'));
-    expect(svg).toContain('⛽');
-    expect(svg).toContain('>3<');
+    const div = makeMarkerContent(3, '#e76f51', 'fuel');
+    expect(div.innerHTML).toContain('⛽');
+    expect(div.innerHTML).toContain('>3<');
   });
 
   it('category=hotel: SVG embeds the hotel emoji', () => {
-    const svg = decode(makeMarkerIcon(5, '#e76f51', 'hotel'));
-    expect(svg).toContain('🛏');
-    expect(svg).toContain('>5<');
+    const div = makeMarkerContent(5, '#e76f51', 'hotel');
+    expect(div.innerHTML).toContain('🛏');
+    expect(div.innerHTML).toContain('>5<');
   });
 
   it('category=food: SVG embeds the food emoji', () => {
-    const svg = decode(makeMarkerIcon(1, '#e76f51', 'food'));
-    expect(svg).toContain('🍴');
+    const div = makeMarkerContent(1, '#e76f51', 'food');
+    expect(div.innerHTML).toContain('🍴');
   });
 
   it('category=scenic: SVG embeds the scenic emoji', () => {
-    const svg = decode(makeMarkerIcon(2, '#e76f51', 'scenic'));
-    expect(svg).toContain('🌄');
+    const div = makeMarkerContent(2, '#e76f51', 'scenic');
+    expect(div.innerHTML).toContain('🌄');
   });
 
   it('category=landmark: SVG embeds the landmark emoji', () => {
-    const svg = decode(makeMarkerIcon(4, '#e76f51', 'landmark'));
-    expect(svg).toContain('📍');
+    const div = makeMarkerContent(4, '#e76f51', 'landmark');
+    expect(div.innerHTML).toContain('📍');
+  });
+});
+
+describe('makePinContent', () => {
+  it('returns a div with the teardrop SVG path', () => {
+    const div = makePinContent('🍴', '#a0c4a0');
+    expect(div.tagName).toBe('DIV');
+    expect(div.innerHTML).toContain('<svg');
+    expect(div.innerHTML).toContain('M22 2');
+  });
+
+  it('embeds the emoji in the SVG', () => {
+    const div = makePinContent('⛽', '#f0a000', 'must');
+    expect(div.innerHTML).toContain('⛽');
+  });
+
+  it('priority=maybe reduces opacity', () => {
+    const div = makePinContent('📍', '#a0a0a0', 'maybe');
+    expect(div.innerHTML).toContain('opacity="0.78"');
+  });
+
+  it('priority=must applies accent ring color', () => {
+    const div = makePinContent('🛏', '#a0a0a0', 'must');
+    expect(div.innerHTML).toContain('#e76f51');
   });
 });

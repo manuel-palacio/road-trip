@@ -15,7 +15,7 @@ import type { PlacesSearchFn } from '../lib/auto-fuel-pick';
 import { ApiError, addCollaborator, createTrip, getTrip, lookupUserByEmail, removeCollaborator, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
-import { lookupLocalityForPlace, mapStyleForTheme, makeMarkerIcon, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
+import { lookupLocalityForPlace, makeMarkerContent, mapStyleForTheme, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
 import { stopCategory } from '../lib/pin-meta';
 import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-category';
 import { useTheme } from '../hooks/useTheme';
@@ -356,7 +356,7 @@ export function Builder() {
   const [mapDiv, setMapDiv] = useState<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
@@ -717,6 +717,7 @@ export function Builder() {
     const m = new maps.Map(mapDiv, {
       center: map?.getCenter() ?? { lat: 60, lng: 18 },
       zoom: map?.getZoom() ?? 4,
+      mapId: cfg.data?.mapId || 'DEMO_MAP_ID',
       styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
@@ -797,7 +798,7 @@ export function Builder() {
   // Sync markers to dayedStops (so colors reflect day numbers)
   useEffect(() => {
     if (!maps || !map) return;
-    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current.forEach((m) => { m.map = null; });
     if (!infoWindowRef.current) {
       infoWindowRef.current = new maps.InfoWindow({ disableAutoPan: true });
     }
@@ -807,33 +808,36 @@ export function Builder() {
       pinnedMarkerIdRef.current = null;
       iw.close();
     });
-    markersRef.current = dayedStops.map((stop, i) => {
-      const marker = new maps.Marker({
-        position: { lat: stop.lat, lng: stop.lng },
-        map,
-        icon: makeMarkerIcon(i + 1, dayColor(stop.dayNumber), stopCategory(stop)),
-        title: stop.label || stop.name,
+    void (google.maps as any).importLibrary('marker').then(() => {
+      const { AdvancedMarkerElement } = google.maps.marker;
+      markersRef.current = dayedStops.map((stop, i) => {
+        const marker = new AdvancedMarkerElement({
+          position: { lat: stop.lat, lng: stop.lng },
+          map,
+          content: makeMarkerContent(i + 1, dayColor(stop.dayNumber), stopCategory(stop)),
+          title: stop.label || stop.name,
+        });
+        const showInfo = () => {
+          iw.setContent(renderStopInfoHtml(stop, i + 1));
+          iw.open({ map, anchor: marker });
+        };
+        marker.addListener('mouseover', () => {
+          // While another marker is pinned, hover doesn't take over.
+          if (pinnedMarkerIdRef.current && pinnedMarkerIdRef.current !== stop.id) return;
+          showInfo();
+        });
+        marker.addListener('mouseout', () => {
+          if (pinnedMarkerIdRef.current === stop.id) return;
+          iw.close();
+        });
+        marker.addListener('gmp-click', () => {
+          pinnedMarkerIdRef.current = stop.id;
+          showInfo();
+        });
+        return marker;
       });
-      const showInfo = () => {
-        iw.setContent(renderStopInfoHtml(stop, i + 1));
-        iw.open({ map, anchor: marker });
-      };
-      marker.addListener('mouseover', () => {
-        // While another marker is pinned, hover doesn't take over.
-        if (pinnedMarkerIdRef.current && pinnedMarkerIdRef.current !== stop.id) return;
-        showInfo();
-      });
-      marker.addListener('mouseout', () => {
-        if (pinnedMarkerIdRef.current === stop.id) return;
-        iw.close();
-      });
-      marker.addListener('click', () => {
-        pinnedMarkerIdRef.current = stop.id;
-        showInfo();
-      });
-      return marker;
+      fitBounds(map, dayedStops);
     });
-    fitBounds(map, dayedStops);
     return () => {
       maps.event.removeListener(mapClickListener);
     };
@@ -859,7 +863,7 @@ export function Builder() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current.forEach((m) => { m.map = null; });
       markersRef.current = [];
       polylinesRef.current.forEach((p) => p.setMap(null));
       polylinesRef.current = [];

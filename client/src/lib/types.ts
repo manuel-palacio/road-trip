@@ -11,6 +11,7 @@ export type FirebaseClientConfig = {
 export type AppConfig = {
   firebaseConfig: Partial<FirebaseClientConfig>;
   mapsApiKey: string;
+  mapId: string;
   adminEmail: string;
   bookingAffiliateId?: string;
   getYourGuidePartnerId?: string;

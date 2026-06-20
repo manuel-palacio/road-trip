@@ -33,6 +33,10 @@ router.get('/config', (req, res) => {
   res.json({
     firebaseConfig,
     mapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+    // AdvancedMarkerElement requires a Map ID. 'DEMO_MAP_ID' is a Google
+    // built-in that enables the API without production styling; set
+    // MAPS_MAP_ID to a real Cloud Console Map ID for full visual control.
+    mapId: process.env.MAPS_MAP_ID || 'DEMO_MAP_ID',
     adminEmail: process.env.ADMIN_EMAIL || '',
     // Booking.com affiliate partner id — appended to hotel-search links
     // as `aid=`. Empty string when unset; the frontend treats falsy

@@ -17,7 +17,7 @@ import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, fo
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { flagEmoji } from '../lib/flags';
-import { mapStyleForTheme, makeMarkerIcon, polylineOptionsFor } from '../lib/google-maps';
+import { makeMarkerContent, mapStyleForTheme, polylineOptionsFor } from '../lib/google-maps';
 import { stopCategory } from '../lib/pin-meta';
 import { useTheme } from '../hooks/useTheme';
 import type { Stop } from '../lib/types';
@@ -236,7 +236,7 @@ export function Viewer() {
   // and the map would never construct.
   const [mapDiv, setMapDiv] = useState<HTMLDivElement | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const stopMarkersRef = useRef<google.maps.Marker[]>([]);
+  const stopMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const stopInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const pinLayerRef = useRef<PinMapLayerHandle>(null);
@@ -255,6 +255,7 @@ export function Viewer() {
     const m = new maps.Map(mapDiv, {
       center: { lat: 60, lng: 18 },
       zoom: 4,
+      mapId: cfg.data?.mapId || 'DEMO_MAP_ID',
       styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
@@ -277,40 +278,43 @@ export function Viewer() {
   useEffect(() => {
     if (!maps || !map) return;
 
-    stopMarkersRef.current.forEach((m) => m.setMap(null));
+    stopMarkersRef.current.forEach((m) => { m.map = null; });
     stopMarkersRef.current = [];
     polylinesRef.current.forEach((p) => p.setMap(null));
     polylinesRef.current = [];
 
     const visibleStops = dayedStops.filter((s) => !hiddenDays.has(s.dayNumber || 1));
 
-    visibleStops.forEach((stop) => {
-      const originalIndex = dayedStops.findIndex((x) => x.id === stop.id);
-      const marker = new maps.Marker({
-        position: { lat: stop.lat, lng: stop.lng },
-        map,
-        icon: makeMarkerIcon(originalIndex + 1, dayColor(stop.dayNumber), stopCategory(stop)),
-        title: stop.label || stop.name,
+    void (google.maps as any).importLibrary('marker').then(() => {
+      const { AdvancedMarkerElement } = google.maps.marker;
+      visibleStops.forEach((stop) => {
+        const originalIndex = dayedStops.findIndex((x) => x.id === stop.id);
+        const marker = new AdvancedMarkerElement({
+          position: { lat: stop.lat, lng: stop.lng },
+          map,
+          content: makeMarkerContent(originalIndex + 1, dayColor(stop.dayNumber), stopCategory(stop)),
+          title: stop.label || stop.name,
+        });
+        marker.addListener('gmp-click', () => {
+          if (!stopInfoWindowRef.current) return;
+          const flag = flagEmoji(stop.countryCode);
+          const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
+          const dur = stop.durationFromPrevious || '';
+          const meta = [km, dur].filter(Boolean).join(' · ');
+          const highlights = (stop.highlights || []).map((h) => escapeHtml(h)).join(' · ');
+          const html = `
+            <div style="font-family:Geist,sans-serif;color:#1a1a1a;max-width:240px;">
+              <div style="font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6358;">Day ${stop.dayNumber || 1}</div>
+              <div style="font-family:Fraunces,serif;font-style:italic;font-size:18px;line-height:1.15;margin-top:2px;">${escapeHtml(stop.label || stop.name)}${flag ? ` ${flag}` : ''}</div>
+              ${meta ? `<div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#6b6358;margin-top:4px;text-transform:uppercase;">${meta}</div>` : ''}
+              ${highlights ? `<div style="font-size:12px;color:#3d3633;margin-top:6px;line-height:1.5;font-style:italic;">${highlights}</div>` : ''}
+            </div>
+          `;
+          stopInfoWindowRef.current.setContent(html);
+          stopInfoWindowRef.current.open({ map, anchor: marker });
+        });
+        stopMarkersRef.current.push(marker);
       });
-      marker.addListener('click', () => {
-        if (!stopInfoWindowRef.current) return;
-        const flag = flagEmoji(stop.countryCode);
-        const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
-        const dur = stop.durationFromPrevious || '';
-        const meta = [km, dur].filter(Boolean).join(' · ');
-        const highlights = (stop.highlights || []).map((h) => escapeHtml(h)).join(' · ');
-        const html = `
-          <div style="font-family:Geist,sans-serif;color:#1a1a1a;max-width:240px;">
-            <div style="font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:#6b6358;">Day ${stop.dayNumber || 1}</div>
-            <div style="font-family:Fraunces,serif;font-style:italic;font-size:18px;line-height:1.15;margin-top:2px;">${escapeHtml(stop.label || stop.name)}${flag ? ` ${flag}` : ''}</div>
-            ${meta ? `<div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#6b6358;margin-top:4px;text-transform:uppercase;">${meta}</div>` : ''}
-            ${highlights ? `<div style="font-size:12px;color:#3d3633;margin-top:6px;line-height:1.5;font-style:italic;">${highlights}</div>` : ''}
-          </div>
-        `;
-        stopInfoWindowRef.current.setContent(html);
-        stopInfoWindowRef.current.open({ map, anchor: marker });
-      });
-      stopMarkersRef.current.push(marker);
     });
 
     for (let i = 1; i < dayedStops.length; i++) {
@@ -333,7 +337,7 @@ export function Viewer() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopMarkersRef.current.forEach((m) => m.setMap(null));
+      stopMarkersRef.current.forEach((m) => { m.map = null; });
       stopMarkersRef.current = [];
       polylinesRef.current.forEach((p) => p.setMap(null));
       polylinesRef.current = [];
