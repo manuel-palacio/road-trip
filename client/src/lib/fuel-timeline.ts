@@ -6,6 +6,10 @@ export type FuelEvent = { stopIndex: number; kind: 'start' | 'refuel' | 'overnig
 export type FuelGap = {
   afterStopIndex: number;
   beforeStopIndex: number;
+  /** Peak cumulative km reached within this refill segment — i.e. the
+   * single-tank distance the driver would have to cover without refueling
+   * if no fuel stop is inserted. Used by the engine to decide whether a
+   * stop is needed AND as the user-visible "X km without refuel" warning. */
   gapKm: number;
   legPolyline: { lat: number; lng: number }[];
 };
@@ -40,12 +44,12 @@ export function computeFuelTimeline(stops: readonly Stop[], tankRangeKm: number)
   let segPolyline: { lat: number; lng: number }[] = [];
 
   function closeSegment(endIndex: number) {
-    if (segPeak > REFILL_THRESHOLD * tankRangeKm && segPolyline.length >= 2) {
+    if (segPeak > REFILL_THRESHOLD * tankRangeKm) {
       gaps.push({
         afterStopIndex: segStartIndex,
         beforeStopIndex: endIndex,
         gapKm: segPeak,
-        legPolyline: segPolyline,
+        legPolyline: segPolyline,  // may be empty/short; consumer's responsibility
       });
     }
   }

@@ -93,11 +93,23 @@ describe('computeFuelTimeline', () => {
     expect(r.gaps[0].legPolyline.length).toBeGreaterThan(0);
   });
 
+  it('still emits a gap when routePath is missing (consumer defers)', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', kmFromPrevious: 600 }),  // no routePath
+      stop({ id: 'c', type: 'destination', kmFromPrevious: 100 }),
+    ];
+    const r = computeFuelTimeline(stops, 500);
+    expect(r.gaps.length).toBe(1);
+    expect(r.gaps[0].legPolyline).toEqual([]);
+    expect(r.gaps[0].gapKm).toBe(700);
+  });
+
   it('treats overnight as a refill — second day under range produces no gap', () => {
     const stops = [
       stop({ id: 'a', type: 'start' }),
       stop({ id: 'b', type: 'overnight', kmFromPrevious: 480 }),
-      stop({ id: 'c', type: 'destination', kmFromPrevious: 480 }),
+      stop({ id: 'c', type: 'destination', kmFromPrevious: 200 }),
     ];
     expect(computeFuelTimeline(stops, 500).gaps).toEqual([]);
   });
