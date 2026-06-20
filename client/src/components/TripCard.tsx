@@ -34,6 +34,11 @@ export function TripCard({ trip, onEdit, onView, onDelete, onTemplate }: Props) 
           className="absolute top-3.5 right-3.5 inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-accent-soft border border-accent text-accent font-mono text-[9px] tracking-[0.16em] uppercase"
         >
           <span aria-hidden>★</span> Template
+          {trip.templateVisibility === 'unlisted' && (
+            <span className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-paper-muted ml-1.5 px-1.5 py-[2px] border border-line rounded">
+              Unlisted
+            </span>
+          )}
         </span>
       )}
       <div className="text-[40px] leading-none">{trip.coverEmoji || '🚗'}</div>

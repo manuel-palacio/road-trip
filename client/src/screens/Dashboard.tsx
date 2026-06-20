@@ -38,10 +38,11 @@ export function Dashboard({ me }: { me: MeResponse }) {
   const [templateTrip, setTemplateTrip] = useState<Trip | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const publishMut = useMutation({
-    mutationFn: (vars: { tripId: string; templateDescription: string; templateTags: string[] }) =>
+    mutationFn: (vars: { tripId: string; templateDescription: string; templateTags: string[]; templateVisibility: 'public' | 'unlisted' }) =>
       publishTemplate(vars.tripId, {
         templateDescription: vars.templateDescription,
         templateTags: vars.templateTags,
+        templateVisibility: vars.templateVisibility,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trips'] });
@@ -195,6 +196,7 @@ export function Dashboard({ me }: { me: MeResponse }) {
               tripId: templateTrip.id,
               templateDescription: input.templateDescription,
               templateTags: input.templateTags,
+              templateVisibility: input.templateVisibility,
             })
           }
           onUnpublish={() => unpublishMut.mutate(templateTrip.id)}

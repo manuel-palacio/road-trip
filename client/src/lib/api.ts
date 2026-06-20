@@ -135,6 +135,7 @@ export async function getSharedTrip(token: string): Promise<SharedTripResponse> 
 export type PublishTemplateInput = {
   templateDescription: string;
   templateTags: string[];
+  templateVisibility?: 'public' | 'unlisted';
 };
 
 export async function publishTemplate(tripId: string, body: PublishTemplateInput): Promise<{ ok: boolean; isTemplate: boolean }> {

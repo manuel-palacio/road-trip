@@ -159,6 +159,11 @@ export type Trip = {
   isTemplate?: boolean;
   templateDescription?: string;
   templateTags?: string[];
+  /** Template visibility. 'public' (default, shown in the marketplace) or
+   * 'unlisted' (accessible by direct link only — for travel agents, content
+   * creators sharing bespoke itineraries privately). Only meaningful when
+   * isTemplate === true. */
+  templateVisibility?: 'public' | 'unlisted';
   cloneCount?: number;
   publishedAt?: unknown;
   // Schema-version stamp. v2 normalized stray 'overnight' types; v3

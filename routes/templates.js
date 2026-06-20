@@ -72,8 +72,11 @@ router.get('/api/templates', async (req, res) => {
     }
 
     const snap = await q.get();
-    const owners = await resolveOwners(db, snap.docs.map((d) => d.data().ownerUid));
-    const items = snap.docs
+    const visibleDocs = snap.docs.filter(
+      (d) => (d.data().templateVisibility || 'public') !== 'unlisted',
+    );
+    const owners = await resolveOwners(db, visibleDocs.map((d) => d.data().ownerUid));
+    const items = visibleDocs
       .map((d) =>
         templateCardFromTrip(d.id, d.data(), owners.get(d.data().ownerUid) || {
           displayName: 'A road tripper',

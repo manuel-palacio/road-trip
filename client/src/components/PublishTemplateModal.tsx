@@ -6,7 +6,7 @@ type Props = {
   isPro: boolean;
   busy: boolean;
   errorMessage: string | null;
-  onPublish: (input: { templateDescription: string; templateTags: string[] }) => void;
+  onPublish: (input: { templateDescription: string; templateTags: string[]; templateVisibility: 'public' | 'unlisted' }) => void;
   onUnpublish: () => void;
   onClose: () => void;
 };
@@ -28,6 +28,7 @@ export function PublishTemplateModal({
   const [description, setDescription] = useState(trip.templateDescription || '');
   const [tagDraft, setTagDraft] = useState('');
   const [tags, setTags] = useState<string[]>(trip.templateTags || []);
+  const [visibility, setVisibility] = useState<'public' | 'unlisted'>(trip.templateVisibility || 'public');
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -165,6 +166,40 @@ export function PublishTemplateModal({
           />
         </div>
 
+        <fieldset className="mt-3">
+          <legend className="text-paper text-[13px] mb-1">Visibility</legend>
+          <label className="flex items-start gap-2 mb-2">
+            <input
+              type="radio"
+              name="templateVisibility"
+              checked={visibility === 'public'}
+              onChange={() => setVisibility('public')}
+              className="mt-0.5 accent-accent"
+            />
+            <span className="flex-1">
+              <span className="text-paper text-[13px]">Public</span>
+              <span className="block text-paper-muted text-[11.5px] mt-0.5">
+                Shown in the templates marketplace; anyone can browse and clone.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input
+              type="radio"
+              name="templateVisibility"
+              checked={visibility === 'unlisted'}
+              onChange={() => setVisibility('unlisted')}
+              className="mt-0.5 accent-accent"
+            />
+            <span className="flex-1">
+              <span className="text-paper text-[13px]">Unlisted</span>
+              <span className="block text-paper-muted text-[11.5px] mt-0.5">
+                Hidden from the gallery; shareable by direct link only.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+
         {errorMessage && (
           <div className="text-[#ec8e74] font-mono text-[10px] tracking-[0.14em] uppercase">
             {errorMessage}
@@ -194,7 +229,7 @@ export function PublishTemplateModal({
             </button>
             <button
               type="button"
-              onClick={() => onPublish({ templateDescription: description, templateTags: tags })}
+              onClick={() => onPublish({ templateDescription: description, templateTags: tags, templateVisibility: visibility })}
               disabled={busy || !isPro || tooFewStops}
               className="bg-accent text-canvas border border-accent rounded px-3.5 py-[7px] text-[12px] tracking-wide font-medium transition-colors hover:opacity-90 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed"
             >

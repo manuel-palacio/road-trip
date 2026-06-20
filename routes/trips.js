@@ -33,6 +33,7 @@ const UPDATABLE_FIELDS = [
   'tankSizeLitres',
   'dataVersion',
   'autoFuel',
+  'templateVisibility',
 ];
 
 // Type checks for the non-fuel updatable fields — PUT must not persist
@@ -65,6 +66,9 @@ function validateTripField(key, value) {
       return { value };
     case 'autoFuel':
       if (typeof value !== 'boolean') return { error: 'autoFuel must be a boolean' };
+      return { value };
+    case 'templateVisibility':
+      if (value !== 'public' && value !== 'unlisted') return { error: 'templateVisibility must be public or unlisted' };
       return { value };
     default:
       return null;
@@ -713,10 +717,13 @@ router.post('/api/trips/:id/publish-template', async (req, res) => {
       ? body.templateDescription.trim().slice(0, TEMPLATE_DESCRIPTION_MAX)
       : '';
     const tags = normaliseTemplateTags(body.templateTags);
+    const rawVisibility = body.templateVisibility;
+    const templateVisibility = rawVisibility === 'unlisted' ? 'unlisted' : 'public';
     const update = {
       isTemplate: true,
       templateDescription: description,
       templateTags: tags,
+      templateVisibility,
       publishedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
