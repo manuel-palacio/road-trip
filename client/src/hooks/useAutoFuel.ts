@@ -6,7 +6,6 @@ import { isFuelStop } from '../lib/compute';
 import type { Stop } from '../lib/types';
 
 const DEBOUNCE_MS = 600;
-const SAME_GAP_TOLERANCE = 0.15;
 
 type Warning = { dayNumber: number; gapKm: number };
 
