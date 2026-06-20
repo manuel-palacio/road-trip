@@ -27,6 +27,11 @@ export async function pickFuelStation(opts: {
   placesSearch: PlacesSearchFn;
   detourCapKm?: number;
 }): Promise<StationCandidate | PickError> {
+  // Polyline empty (useRouteSegments hasn't filled routePath yet). The
+  // consumer (useAutoFuel) treats no-station as a deferral signal — the
+  // next render after routes resolve will re-evaluate.
+  if (opts.gap.legPolyline.length === 0) return { error: 'no-station' };
+
   const detourCap = opts.detourCapKm ?? DEFAULT_DETOUR_CAP_KM;
   const targetWithinLeg = TARGET_FRACTION_OF_TANK * opts.tankRangeKm;
   const targetPoint =

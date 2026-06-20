@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { pickFuelStation } from '../auto-fuel-pick';
 import type { FuelGap } from '../fuel-timeline';
 import type { NearbyResult } from '../../components/builder/NearbyFinder';
@@ -55,6 +55,19 @@ describe('pickFuelStation', () => {
     ];
     const r = await pickFuelStation({ gap: gap(), tankRangeKm: 500, legStartRouteKm: 0, placesSearch, detourCapKm: 5 });
     expect('placeId' in r && r.placeId).toBe('CLOSE');
+  });
+
+  it('returns no-station when gap.legPolyline is empty (defers until routes load)', async () => {
+    const placesSearch = vi.fn(async () => [station({ lat: 0, lng: 0, rating: 5 })]);
+    const r = await pickFuelStation({
+      gap: { ...gap(), legPolyline: [] },
+      tankRangeKm: 500,
+      legStartRouteKm: 0,
+      placesSearch,
+    });
+    expect(r).toEqual({ error: 'no-station' });
+    // Also assert placesSearch was never called — the guard short-circuits.
+    expect(placesSearch).not.toHaveBeenCalled();
   });
 
   it('clamps target to the leg endpoint when the leg is shorter than the target km', async () => {
