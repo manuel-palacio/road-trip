@@ -103,7 +103,12 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
   const reqRef = useRef(0);
 
   useEffect(() => {
-    if (!maps || stops.length < 2) return;
+    // Reset on the paths that don't fetch: a previous run may have set
+    // loading=true and then been cancelled before its own reset ran.
+    if (!maps || stops.length < 2) {
+      setLoading(false);
+      return;
+    }
     const myReq = ++reqRef.current;
     let cancelled = false;
 
@@ -115,7 +120,10 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
       const key = pairKey(from.id, to.id, to.routeMode);
       if (!cache.has(key)) missing.push({ from, to, key, mode: to.routeMode });
     }
-    if (missing.length === 0) return;
+    if (missing.length === 0) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     (async () => {

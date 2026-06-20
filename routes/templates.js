@@ -83,10 +83,11 @@ router.get('/api/templates', async (req, res) => {
       .sort((a, b) => {
         const byClones = (b.cloneCount || 0) - (a.cloneCount || 0);
         if (byClones !== 0) return byClones;
-        // Tiebreak: most recently published first. publishedAt is a
-        // Firestore Timestamp serialised as { _seconds, _nanoseconds }.
-        const aT = a.publishedAt && a.publishedAt._seconds || 0;
-        const bT = b.publishedAt && b.publishedAt._seconds || 0;
+        // Tiebreak: most recently published first. publishedAt is a live
+        // Admin SDK Timestamp here (pre-serialization), so use the public
+        // toMillis() API rather than the private _seconds field.
+        const aT = a.publishedAt?.toMillis?.() || 0;
+        const bT = b.publishedAt?.toMillis?.() || 0;
         return bT - aT;
       })
       .slice(0, limit);
@@ -159,13 +160,15 @@ router.post('/api/templates/:id/clone', authRequired, async (req, res) => {
       fuelOverrides: Array.isArray(source.fuelOverrides)
         ? JSON.parse(JSON.stringify(source.fuelOverrides))
         : [],
+      tankRangeKm: source.tankRangeKm ?? null,
+      tankSizeLitres: source.tankSizeLitres ?? null,
       clonedFrom: req.params.id,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     // Strip null/undefined fuel fields — keeps the doc shape consistent
     // with create flow which only sets them when explicitly provided.
-    for (const k of ['fuelConsumption', 'fuelUnit', 'fuelPrice', 'fuelCurrency']) {
+    for (const k of ['fuelConsumption', 'fuelUnit', 'fuelPrice', 'fuelCurrency', 'tankRangeKm', 'tankSizeLitres']) {
       if (cloneData[k] == null) delete cloneData[k];
     }
 

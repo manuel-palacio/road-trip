@@ -38,8 +38,8 @@ export function dayColor(n: number | undefined): string {
 
 /** A stop is treated as a fuel/refuel pit-stop when its type is 'fuel', or
  * when it's a legacy fuel waypoint (saved before issue #52 as type='waypoint'
- * + category='fuel'). Used wherever fuel stops are visually compacted or
- * excluded from Android Auto stop counts. */
+ * + category='fuel'). Used wherever fuel stops need pit-stop treatment
+ * (they count as real Android Auto waypoints since commit da583e7). */
 export function isFuelStop(s: Stop): boolean {
   return s.type === 'fuel' || (s.type === 'waypoint' && s.category === 'fuel');
 }

@@ -34,6 +34,39 @@ const UPDATABLE_FIELDS = [
   'dataVersion',
 ];
 
+// Type checks for the non-fuel updatable fields — PUT must not persist
+// shapes that POST would have rejected (fuel fields go through
+// validateFuelField instead). Returns { value } or { error }, or null for
+// keys it doesn't cover.
+function validateTripField(key, value) {
+  switch (key) {
+    case 'name':
+      if (typeof value !== 'string' || !value.trim()) return { error: 'name must be a non-empty string' };
+      return { value: value.trim() };
+    case 'description':
+    case 'coverEmoji':
+      if (typeof value !== 'string') return { error: `${key} must be a string` };
+      return { value };
+    case 'startDate':
+      if (value !== null && typeof value !== 'string') return { error: 'startDate must be a string or null' };
+      return { value };
+    case 'maxKmPerDay':
+      if (typeof value !== 'number' || !(value > 0)) return { error: 'maxKmPerDay must be a positive number' };
+      return { value };
+    case 'totalKm':
+    case 'totalDays':
+    case 'dataVersion':
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return { error: `${key} must be a non-negative number` };
+      return { value };
+    case 'stops':
+    case 'countries':
+      if (!Array.isArray(value)) return { error: `${key} must be an array` };
+      return { value };
+    default:
+      return null;
+  }
+}
+
 const PIN_CATEGORIES = ['food', 'hotel', 'scenic', 'fuel', 'landmark', 'other'];
 const PIN_PRIORITIES = ['must', 'want', 'maybe'];
 const PIN_UPDATABLE_FIELDS = ['name', 'category', 'notes', 'lat', 'lng', 'priority'];
@@ -121,7 +154,7 @@ router.post('/api/trips', async (req, res) => {
   try {
     const db = getDb();
 
-    // Plan limit enforcement: both Free and Pro have caps now (1 / 10
+    // Plan limit enforcement: both Free and Pro have caps now (2 / 10
     // by default). Resolved through effectiveTripLimit so future env
     // changes apply uniformly.
     const userSnap = await db.collection('users').doc(req.uid).get();
@@ -221,7 +254,7 @@ router.put('/api/trips/:id', async (req, res) => {
     const update = {};
     for (const key of UPDATABLE_FIELDS) {
       if (!(key in body)) continue;
-      const result = validateFuelField(key, body[key]);
+      const result = validateFuelField(key, body[key]) || validateTripField(key, body[key]);
       if (result && result.error) {
         return res.status(400).json({ error: result.error, code: 'INVALID' });
       }

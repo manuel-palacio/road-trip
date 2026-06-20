@@ -23,37 +23,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ─── Trips: owner or collaborator ───────────────────────────────────
-    // Reads + updates require being on the trip's access list.
-    // Creates require setting yourself as ownerUid (no impersonation).
-    // Deletes are owner-only.
-    match /trips/{tripId} {
-      allow read: if request.auth != null && (
-        resource.data.ownerUid == request.auth.uid ||
-        (resource.data.collaborators is list && request.auth.uid in resource.data.collaborators)
-      );
-      allow create: if request.auth != null
-        && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if request.auth != null && (
-        resource.data.ownerUid == request.auth.uid ||
-        (resource.data.collaborators is list && request.auth.uid in resource.data.collaborators)
-      );
-      allow delete: if request.auth != null
-        && resource.data.ownerUid == request.auth.uid;
-
-      // Pins subcollection: same access as parent trip.
-      // Uses get() to fetch the parent doc — costs one document read per
-      // rule evaluation, which is acceptable for the pin volume per trip.
-      match /pins/{pinId} {
-        allow read, write: if request.auth != null
-          && (
-            get(/databases/$(database)/documents/trips/$(tripId)).data.ownerUid == request.auth.uid ||
-            (
-              get(/databases/$(database)/documents/trips/$(tripId)).data.collaborators is list &&
-              request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.collaborators
-            )
-          );
-      }
-    }
+    // ─── Trips: server-only ─────────────────────────────────────────────
+    // All trip + pin reads/writes go through the Express API (Admin SDK,
+    // which bypasses these rules). Direct client access is deliberately
+    // denied: a previous allow block here let any authenticated Firebase
+    // user create trips (bypassing the server-side trip limit and the
+    // email allowlist) and let collaborators rewrite ownerUid/shareToken/
+    // isTemplate — none of which the server permits. The catch-all deny
+    // above covers trips/{tripId} and its pins subcollection.
   }
 }

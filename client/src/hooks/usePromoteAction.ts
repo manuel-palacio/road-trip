@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPin, deletePin, updateTrip } from '../lib/api';
 import { findBestInsertIndex, pinToStop, reassignStopTypes, stopToPinDraft } from '../lib/promote';
+import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import type { Pin, Stop } from '../lib/types';
 
 /**
@@ -15,9 +16,9 @@ export function usePromotePin(tripId: string, currentStops: readonly Stop[]) {
     mutationFn: async (pin: Pin) => {
       const newStop = pinToStop(pin);
       const insertAt = findBestInsertIndex(currentStops, pin.lat, pin.lng);
-      const nextStops = [...currentStops];
-      nextStops.splice(insertAt, 0, newStop);
-      const finalStops = reassignStopTypes(nextStops);
+      // spliceStopAt clears the successor's persisted km/duration/routePath —
+      // its inbound leg changed, so the old values must not reach Firestore.
+      const finalStops = reassignStopTypes(spliceStopAt(currentStops, insertAt, newStop));
       await updateTrip(tripId, { stops: finalStops });
       await deletePin(tripId, pin.id);
       return { tripId, pinId: pin.id };
@@ -50,8 +51,9 @@ export function useDemoteStop(tripId: string, currentStops: readonly Stop[]) {
       const stop = 'stop' in input ? input.stop : input;
       const draft = 'draft' in input ? input.draft : stopToPinDraft(stop);
       await createPin(tripId, draft);
-      const remaining = currentStops.filter((s) => s.id !== stop.id);
-      const finalStops = reassignStopTypes(remaining);
+      // removeStopById clears the stale inbound leg of the stop that now
+      // occupies the removed slot (its predecessor changed).
+      const finalStops = reassignStopTypes(removeStopById(currentStops, stop.id));
       await updateTrip(tripId, { stops: finalStops });
       return { tripId, stopId: stop.id };
     },

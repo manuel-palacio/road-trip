@@ -22,7 +22,12 @@ router.get('/api/share/:shareToken', async (req, res) => {
     }
 
     const pinsSnap = await doc.ref.collection('pins').orderBy('createdAt', 'asc').get();
-    const pins = pinsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // addedByUid is a Firebase UID — same field class the trip sanitizer
+    // below strips, so it must not reach the unauthenticated response.
+    const pins = pinsSnap.docs.map((d) => {
+      const { addedByUid: _addedByUid, ...publicPin } = d.data();
+      return { id: d.id, ...publicPin };
+    });
 
     let owner = { displayName: 'A traveller', photoURL: '' };
     try {

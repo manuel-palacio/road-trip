@@ -6,6 +6,7 @@ const STOP_TYPE_LABEL: Record<Stop['type'], string> = {
   destination: 'Destination',
   overnight: 'Overnight',
   waypoint: 'Waypoint',
+  fuel: 'Fuel stop',
 };
 
 function escape(s: string): string {

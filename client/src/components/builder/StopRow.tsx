@@ -36,6 +36,7 @@ const TYPE_OPTIONS: { value: Stop['type']; label: string }[] = [
   { value: 'start', label: 'Start' },
   { value: 'overnight', label: 'Overnight' },
   { value: 'waypoint', label: 'Waypoint' },
+  { value: 'fuel', label: 'Fuel' },
   { value: 'destination', label: 'Destination' },
 ];
 
@@ -46,12 +47,13 @@ export function StopRow(p: Props) {
   const [dragging, setDragging] = useState(false);
 
   const flag = flagEmoji(stop.countryCode);
-  const accentBorder = {
+  const accentBorder = ({
     start: 'border-l-accent',
     destination: 'border-l-paper',
     waypoint: 'border-l-paper-muted',
     overnight: 'border-l-line',
-  }[stop.type];
+    fuel: 'border-l-paper-muted',
+  } satisfies Record<Stop['type'], string>)[stop.type];
   const color = dayColor(stop.dayNumber);
   const routingFailed = getStopRoutingFailed(stop);
   const isForced = stop.forceDayStart === true;

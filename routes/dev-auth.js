@@ -59,7 +59,7 @@ router.post('/api/dev/auth/impersonate', async (req, res) => {
     return res.json({ token });
   } catch (err) {
     console.error('[dev-auth] createCustomToken failed:', err.message);
-    return res.status(500).json({ error: 'Failed to mint custom token' });
+    return res.status(500).json({ error: 'Failed to mint custom token', code: 'INTERNAL' });
   }
 });
 

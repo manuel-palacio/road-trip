@@ -562,12 +562,17 @@ export function Builder() {
     });
   }
 
-  // Init map + autocomplete once SDK ready
+  // Init map + autocomplete once SDK ready. Re-runs when mapDiv changes:
+  // each layout mode (plan/map) mounts its own map container + search input,
+  // so toggling layouts must re-create the Map and re-bind the Autocomplete —
+  // otherwise both stay attached to unmounted DOM nodes. Center/zoom carry
+  // over from the previous instance; marker/polyline effects re-sync because
+  // they depend on `map`.
   useEffect(() => {
-    if (!maps || !mapDiv || map) return;
+    if (!maps || !mapDiv) return;
     const m = new maps.Map(mapDiv, {
-      center: { lat: 60, lng: 18 },
-      zoom: 4,
+      center: map?.getCenter() ?? { lat: 60, lng: 18 },
+      zoom: map?.getZoom() ?? 4,
       styles: mapStyleForTheme(theme.resolved),
       disableDefaultUI: true,
       zoomControl: true,
@@ -578,6 +583,9 @@ export function Builder() {
     });
     setMap(m);
     if (searchInputRef.current) {
+      if (autocompleteRef.current) {
+        maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
       autocompleteRef.current = new maps.places.Autocomplete(searchInputRef.current, {
         fields: ['name', 'formatted_address', 'geometry.location', 'address_components', 'types'],
       });
@@ -625,9 +633,12 @@ export function Builder() {
     map.setOptions({ styles: mapStyleForTheme(theme.resolved) });
   }, [map, theme.resolved]);
 
-  // Geolocation centering for new trips (once map is ready)
+  // Geolocation centering for new trips (once map is ready). The ref guard
+  // keeps a layout-toggle map re-creation from re-centering mid-session.
+  const geolocatedRef = useRef(false);
   useEffect(() => {
-    if (!maps || !map || isEditing) return;
+    if (!maps || !map || isEditing || geolocatedRef.current) return;
+    geolocatedRef.current = true;
     let alive = true;
     requestGeolocation().then((loc) => {
       if (!alive) return;
@@ -1451,8 +1462,6 @@ export function Builder() {
                   fuelVolume={fuelVolumeForStops(g.stops.map((x) => x.stop))}
                   fuelConfigPartial={fuelPartial}
                   onConfigureFuel={() => setDetailsOpen(true)}
-                  totalStops={dayedStops.length}
-                  isFirstDay={gi === 0}
                   onChangeType={setStopType}
                   onChangeRouteMode={setStopRouteMode}
                   onRemove={removeStop}

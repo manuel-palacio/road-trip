@@ -23,6 +23,12 @@ export function loadMapsSdk(apiKey: string): Promise<typeof google.maps> {
     s.onerror = () => reject(new Error('Failed to load Google Maps SDK'));
     document.body.appendChild(s);
   });
+  // A failed load must not poison the cache — clearing it lets a later
+  // call (e.g. a remount after a network blip) retry instead of replaying
+  // the same rejection until full page reload.
+  loadPromise.catch(() => {
+    loadPromise = null;
+  });
   return loadPromise;
 }
 

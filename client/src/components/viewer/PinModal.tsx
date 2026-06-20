@@ -253,7 +253,7 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
                     disabled={saving || !name.trim()}
                     className={ACCENT_BTN_CLS}
                   >
-                    {submitLabel}
+                    {computedSubmitLabel}
                   </button>
                 </>
               );

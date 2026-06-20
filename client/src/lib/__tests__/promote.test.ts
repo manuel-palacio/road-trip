@@ -96,6 +96,12 @@ describe('pinToStop / stopToPinDraft', () => {
     expect(s.id).not.toBe(samplePin.id); // fresh stop id
   });
 
+  it('promotes a fuel pin into a first-class fuel stop (not legacy waypoint+category)', () => {
+    const s = pinToStop({ ...samplePin, category: 'fuel' });
+    expect(s.type).toBe('fuel');
+    expect(s.category).toBe('fuel');
+  });
+
   it('demotes a stop back to a pin, preserving promoted metadata', () => {
     const s = pinToStop(samplePin);
     const draft = stopToPinDraft(s);

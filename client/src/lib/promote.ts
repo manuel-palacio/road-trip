@@ -45,8 +45,8 @@ export function findBestInsertIndex(
 
 /**
  * After insert/remove, reassign types so the route's first stop is 'start',
- * the last is 'destination', and middle stops keep their existing type
- * (defaulting to 'overnight' if they were start/destination before).
+ * the last is 'destination', middle stops keep 'overnight'/'fuel', and
+ * everything else (including former start/destination) becomes 'waypoint'.
  */
 export function reassignStopTypes(stops: readonly Stop[]): Stop[] {
   const n = stops.length;
@@ -71,7 +71,9 @@ export function pinToStop(pin: Pin): Stop {
     label: pin.name,
     lat: pin.lat,
     lng: pin.lng,
-    type: 'waypoint',
+    // Fuel pins become first-class fuel stops — not the legacy
+    // waypoint+category:'fuel' shape the v3 migration retired.
+    type: pin.category === 'fuel' ? 'fuel' : 'waypoint',
     highlights: [],
     kmFromPrevious: 0,
     category: pin.category,
