@@ -63,6 +63,11 @@ export type Stop = {
   /** True when the Routes API failed for this leg in the last fetch — used
    * by the builder to flag the row visually. Not persisted across saves. */
   routingFailed?: boolean;
+  /** True when the auto-fuel engine inserted this stop. Cleared whenever the
+   * user mutates the stop (rename, reorder, type change, highlight edit).
+   * Once cleared, the engine treats the stop as user-owned and never removes
+   * it. Only ever set on type='fuel' stops. */
+  addedByAuto?: boolean;
 };
 
 export type PinCategory = 'food' | 'hotel' | 'scenic' | 'fuel' | 'landmark' | 'other';
@@ -127,6 +132,11 @@ export type Trip = {
   // "approx. N fill-ups" trip-summary annotation. Optional; no fill-up
   // estimate when unset.
   tankSizeLitres?: number;
+  /** Per-trip toggle for the auto-fuel engine. When true (or undefined for
+   * existing trips), the engine reactively inserts fuel stops where the tank
+   * would run low. Default-on retroactively applies to trips that pre-date
+   * this field. */
+  autoFuel?: boolean;
   // Community templates — when isTemplate=true the trip is visible at
   // /api/templates (public, no auth) and clonable by anyone. The owner
   // controls publishing; cloneCount is server-incremented on each clone.

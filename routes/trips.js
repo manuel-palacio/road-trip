@@ -32,6 +32,7 @@ const UPDATABLE_FIELDS = [
   'tankRangeKm',
   'tankSizeLitres',
   'dataVersion',
+  'autoFuel',
 ];
 
 // Type checks for the non-fuel updatable fields — PUT must not persist
@@ -61,6 +62,9 @@ function validateTripField(key, value) {
     case 'stops':
     case 'countries':
       if (!Array.isArray(value)) return { error: `${key} must be an array` };
+      return { value };
+    case 'autoFuel':
+      if (typeof value !== 'boolean') return { error: 'autoFuel must be a boolean' };
       return { value };
     default:
       return null;
