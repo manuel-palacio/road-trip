@@ -1,6 +1,9 @@
+const crypto = require('crypto');
 const express = require('express');
 const { admin, getDb } = require('../lib/firebase');
 const { authRequired } = require('../middleware/auth');
+
+const FAVORITES_PER_USER_LIMIT = 500;
 
 const router = express.Router();
 router.use('/api/favorites', authRequired);
@@ -10,6 +13,10 @@ const PIN_CATEGORIES = ['food', 'hotel', 'scenic', 'fuel', 'landmark', 'other'];
 function sigKey(body) {
   if (body.placeId) return `pid:${body.placeId}`;
   return `coord:${body.name}|${body.lat.toFixed(4)}|${body.lng.toFixed(4)}`;
+}
+
+function favoriteDocId(uid, key) {
+  return uid + '_' + crypto.createHash('sha1').update(key).digest('hex').slice(0, 16);
 }
 
 function validateFavoritePayload(body) {
@@ -25,11 +32,11 @@ function validateFavoritePayload(body) {
     lat: body.lat,
     lng: body.lng,
   };
-  if (typeof body.placeId === 'string' && body.placeId) out.placeId = body.placeId;
-  if (typeof body.countryCode === 'string' && body.countryCode) out.countryCode = body.countryCode;
+  if (typeof body.placeId === 'string' && body.placeId) out.placeId = body.placeId.slice(0, 128);
+  if (typeof body.countryCode === 'string' && body.countryCode) out.countryCode = body.countryCode.slice(0, 8);
   if (body.category) out.category = body.category;
-  if (typeof body.sourceTripId === 'string') out.sourceTripId = body.sourceTripId;
-  if (typeof body.sourceTripName === 'string') out.sourceTripName = body.sourceTripName;
+  if (typeof body.sourceTripId === 'string') out.sourceTripId = body.sourceTripId.slice(0, 64);
+  if (typeof body.sourceTripName === 'string') out.sourceTripName = body.sourceTripName.slice(0, 80);
   return { value: out };
 }
 
@@ -51,19 +58,30 @@ router.post('/api/favorites', async (req, res) => {
     const { error, value } = validateFavoritePayload(req.body || {});
     if (error) return res.status(400).json({ error, code: 'INVALID' });
     const db = getDb();
-    const target = sigKey(value);
-    const existingSnap = await db.collection('favorites').where('ownerUid', '==', req.uid).get();
-    const dup = existingSnap.docs.find((d) => sigKey(d.data()) === target);
-    if (dup) return res.json({ id: dup.id, ...dup.data() });
+
+    const countSnap = await db.collection('favorites').where('ownerUid', '==', req.uid).count().get();
+    if (countSnap.data().count >= FAVORITES_PER_USER_LIMIT) {
+      return res.status(402).json({
+        error: `Favorites limit reached (${FAVORITES_PER_USER_LIMIT}). Remove some to add new ones.`,
+        code: 'FAVORITES_LIMIT_REACHED',
+        limit: FAVORITES_PER_USER_LIMIT,
+      });
+    }
+
+    const docId = favoriteDocId(req.uid, sigKey(value));
+    const ref = db.collection('favorites').doc(docId);
+    const existing = await ref.get();
+    if (existing.exists) return res.json({ id: docId, ...existing.data() });
+
     const favorite = {
       ownerUid: req.uid,
       ...value,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
-    const ref = await db.collection('favorites').add(favorite);
+    await ref.set(favorite);
     const snap = await ref.get();
-    res.status(201).json({ id: ref.id, ...snap.data() });
+    res.status(201).json({ id: docId, ...snap.data() });
   } catch (e) {
     console.error('POST /api/favorites failed:', e);
     res.status(500).json({ error: 'Internal error', code: 'INTERNAL' });
