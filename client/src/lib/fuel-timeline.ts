@@ -58,6 +58,21 @@ export function computeFuelTimeline(stops: readonly Stop[], tankRangeKm: number)
     const s = stops[i];
     const ev = isRefillEvent(s, i);
     if (ev.isEvent) {
+      // The leg arriving at this refill event belongs to the prior segment —
+      // accumulate it so closeSegment can detect gaps that end at a refill
+      // (e.g. two overnight stops with a 547 km leg between them). i=0 has
+      // no inbound leg, so skip it.
+      if (i > 0) {
+        const legKm = s.kmFromPrevious || 0;
+        cumKm += legKm;
+        if (cumKm > segPeak) segPeak = cumKm;
+        if (s.routePath && s.routePath.length >= 2) {
+          const last = segPolyline.length ? segPolyline[segPolyline.length - 1] : null;
+          const first = s.routePath[0];
+          const start = last && Math.abs(last.lat - first.lat) < 1e-6 && Math.abs(last.lng - first.lng) < 1e-6 ? 1 : 0;
+          for (let j = start; j < s.routePath.length; j++) segPolyline.push(s.routePath[j]);
+        }
+      }
       closeSegment(i);
       events.push({ stopIndex: i, kind: ev.kind });
       cumulativeSinceLastFill.push(0);

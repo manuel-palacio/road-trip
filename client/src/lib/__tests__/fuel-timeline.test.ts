@@ -105,12 +105,45 @@ describe('computeFuelTimeline', () => {
     expect(r.gaps[0].gapKm).toBe(700);
   });
 
-  it('treats overnight as a refill — second day under range produces no gap', () => {
+  it('treats overnight as a refill — both days under range produce no gap', () => {
     const stops = [
       stop({ id: 'a', type: 'start' }),
-      stop({ id: 'b', type: 'overnight', kmFromPrevious: 480 }),
+      stop({ id: 'b', type: 'overnight', kmFromPrevious: 400 }),
       stop({ id: 'c', type: 'destination', kmFromPrevious: 200 }),
     ];
     expect(computeFuelTimeline(stops, 500).gaps).toEqual([]);
+  });
+
+  it('detects a gap when the long leg ends AT a refill event (refill→refill)', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', type: 'fuel', kmFromPrevious: 435, routePath: [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }] }),
+      stop({ id: 'c', type: 'overnight', kmFromPrevious: 547, routePath: [{ lat: 0, lng: 1 }, { lat: 0, lng: 2 }] }),
+    ];
+    const r = computeFuelTimeline(stops, 500);
+    expect(r.gaps.length).toBe(1);
+    expect(r.gaps[0].afterStopIndex).toBe(1);
+    expect(r.gaps[0].beforeStopIndex).toBe(2);
+    expect(r.gaps[0].gapKm).toBe(547);
+  });
+
+  it('does not flag a gap when the leg ending at a refill event is under threshold', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', type: 'fuel', kmFromPrevious: 200, routePath: [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }] }),
+      stop({ id: 'c', type: 'overnight', kmFromPrevious: 300, routePath: [{ lat: 0, lng: 1 }, { lat: 0, lng: 2 }] }),
+    ];
+    const r = computeFuelTimeline(stops, 500);
+    expect(r.gaps).toEqual([]);
+  });
+
+  it('cumulativeSinceLastFill is still 0 at refill events after the leg-km fix', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', type: 'fuel', kmFromPrevious: 435 }),
+      stop({ id: 'c', type: 'overnight', kmFromPrevious: 547 }),
+    ];
+    const r = computeFuelTimeline(stops, 500);
+    expect(r.cumulativeSinceLastFill).toEqual([0, 0, 0]);
   });
 });
