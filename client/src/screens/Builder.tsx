@@ -56,6 +56,7 @@ type BuilderState = {
   fuelOverrides: FuelOverrideDraft[];
   tankRangeKm: number;
   tankSizeLitres: string;     // string for the same blank-vs-0 reason
+  autoFuel: boolean;
 };
 
 // Curated currency dropdown — covers Europe + the usual road-trip suspects.
@@ -121,6 +122,7 @@ const empty = (): BuilderState => ({
   fuelOverrides: [],
   tankRangeKm: 500,
   tankSizeLitres: '',
+  autoFuel: true,
 });
 
 /** One-shot per-version migrations applied on read. v2 normalised legacy
@@ -307,6 +309,7 @@ export function Builder() {
       tankSizeLitres: typeof t.tankSizeLitres === 'number' && t.tankSizeLitres > 0
         ? String(t.tankSizeLitres)
         : '',
+      autoFuel: t.autoFuel ?? true,
     };
     setState(next);
     snapshotRef.current = serializeSnapshot(next);
@@ -860,6 +863,7 @@ export function Builder() {
       })),
       tankRangeKm: s.tankRangeKm || 500,
       tankSizeLitres: s.tankSizeLitres || '',
+      autoFuel: s.autoFuel ?? true,
       stops: (s.stops || []).map((x) => ({
         id: x.id, name: x.name, label: x.label,
         lat: x.lat, lng: x.lng,
@@ -907,6 +911,7 @@ export function Builder() {
           const litres = parseFloat(state.tankSizeLitres);
           return Number.isFinite(litres) && litres > 0 ? litres : undefined;
         })(),
+        autoFuel: state.autoFuel,
         dataVersion: 3,
         stops: stops.map((s) => {
           // Persist the polyline path so viewer / share / next-builder-open
@@ -1054,6 +1059,23 @@ export function Builder() {
               <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">km</span>
             </label>
           </div>
+          <label className={`flex items-start gap-2 -mt-1 ${state.tankRangeKm ? '' : 'opacity-50 cursor-not-allowed'}`}>
+            <input
+              type="checkbox"
+              checked={state.autoFuel !== false}
+              disabled={!state.tankRangeKm}
+              onChange={(e) => setState((s) => ({ ...s, autoFuel: e.target.checked }))}
+              className="mt-0.5 accent-accent"
+            />
+            <span className="flex-1">
+              <span className="text-paper text-[13px]">Auto-fuel this trip</span>
+              <span className="block text-paper-muted text-[11.5px] mt-0.5">
+                {state.tankRangeKm
+                  ? 'Insert fuel stops where the tank would run low. You can undo each addition.'
+                  : 'Set tank range to enable.'}
+              </span>
+            </span>
+          </label>
           <label className="block">
             <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Description</span>
             <textarea
