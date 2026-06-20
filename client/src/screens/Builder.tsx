@@ -1335,6 +1335,56 @@ export function Builder() {
     </div>
   ) : null;
 
+  const sharedOverlays = (
+    <>
+      {pinModal.modalElement}
+      {tripDetailsModal}
+      {nearbyOpen && maps && map && (
+        <NearbyFinder
+          category={nearbyOpen.category}
+          target={nearbyOpen.target}
+          maps={maps}
+          map={map}
+          onSelect={onNearbyResultSelected}
+          onClose={() => setNearbyOpen(null)}
+          detourCapKm={nearbyOpen.category === 'fuel' ? (nearbyOpen.widened ? 10 : 5) : undefined}
+          legPolyline={nearbyOpen.legPolyline}
+        />
+      )}
+      {savedToast && (
+        <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
+      )}
+      {autoFuelToast && (
+        <Toast
+          message={autoFuelToast.message.replace(' · Undo', '')}
+          variant="auto-fuel"
+          durationMs={8000}
+          actionLabel="Undo"
+          onAction={() => {
+            if (undoSnapshotRef.current) {
+              setState((s) => ({ ...s, stops: undoSnapshotRef.current! }));
+              undoSnapshotRef.current = null;
+            }
+            setAutoFuelToast(null);
+          }}
+          onDismiss={() => {
+            // Don't null undoSnapshotRef here — see comment in onPropose.
+            // The next auto-fuel run will keep using the SAME snapshot (the
+            // !undoSnapshotRef.current guard skips re-snapshotting), which is
+            // what we want: stacked auto-adds inside a single session undo
+            // back to BEFORE the first one. The snapshot resets to null
+            // when the user explicitly undoes via onAction above.
+            setAutoFuelToast(null);
+          }}
+        />
+      )}
+      <Toast
+        message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
+        onDismiss={routes.clearFailure}
+      />
+    </>
+  );
+
   if (layout.mode === 'plan') {
     return (
       <section className="relative h-screen overflow-hidden flex flex-col bg-surface">
@@ -1592,49 +1642,7 @@ export function Builder() {
           )}
         </div>
 
-        {pinModal.modalElement}
-
-        {tripDetailsModal}
-
-        {nearbyOpen && maps && map && (
-          <NearbyFinder
-            category={nearbyOpen.category}
-            target={nearbyOpen.target}
-            maps={maps}
-            map={map}
-            onSelect={onNearbyResultSelected}
-            onClose={() => setNearbyOpen(null)}
-            detourCapKm={nearbyOpen.category === 'fuel' ? (nearbyOpen.widened ? 10 : 5) : undefined}
-            legPolyline={nearbyOpen.legPolyline}
-          />
-        )}
-
-        {savedToast && (
-          <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
-        )}
-        {autoFuelToast && (
-          <Toast
-            message={autoFuelToast.message.replace(' · Undo', '')}
-            variant="auto-fuel"
-            durationMs={8000}
-            actionLabel="Undo"
-            onAction={() => {
-              if (undoSnapshotRef.current) {
-                setState((s) => ({ ...s, stops: undoSnapshotRef.current! }));
-                undoSnapshotRef.current = null;
-              }
-              setAutoFuelToast(null);
-            }}
-            onDismiss={() => {
-              undoSnapshotRef.current = null;
-              setAutoFuelToast(null);
-            }}
-          />
-        )}
-        <Toast
-          message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
-          onDismiss={routes.clearFailure}
-        />
+        {sharedOverlays}
       </section>
     );
   }
@@ -1878,49 +1886,7 @@ export function Builder() {
         )}
       </div>
 
-      {pinModal.modalElement}
-
-      {tripDetailsModal}
-
-      {nearbyOpen && maps && map && (
-        <NearbyFinder
-          category={nearbyOpen.category}
-          target={nearbyOpen.target}
-          maps={maps}
-          map={map}
-          onSelect={onNearbyResultSelected}
-          onClose={() => setNearbyOpen(null)}
-          detourCapKm={nearbyOpen.category === 'fuel' ? (nearbyOpen.widened ? 10 : 5) : undefined}
-          legPolyline={nearbyOpen.legPolyline}
-        />
-      )}
-
-      {savedToast && (
-        <Toast message="Saved" variant="success" onDismiss={() => setSavedToast(false)} durationMs={1800} />
-      )}
-      {autoFuelToast && (
-        <Toast
-          message={autoFuelToast.message.replace(' · Undo', '')}
-          variant="auto-fuel"
-          durationMs={8000}
-          actionLabel="Undo"
-          onAction={() => {
-            if (undoSnapshotRef.current) {
-              setState((s) => ({ ...s, stops: undoSnapshotRef.current! }));
-              undoSnapshotRef.current = null;
-            }
-            setAutoFuelToast(null);
-          }}
-          onDismiss={() => {
-            undoSnapshotRef.current = null;
-            setAutoFuelToast(null);
-          }}
-        />
-      )}
-      <Toast
-        message={routes.lastFailure ? `Couldn't route ${routes.lastFailure}` : null}
-        onDismiss={routes.clearFailure}
-      />
+      {sharedOverlays}
     </section>
   );
 }
