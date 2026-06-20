@@ -4,10 +4,12 @@ const PDFDocument = require('pdfkit');
 const { admin, getDb } = require('../lib/firebase');
 const { effectiveTripLimit } = require('../lib/limits');
 
-// shared/fuel.js is ESM (so Vite can tree-shake it for the client). This CJS
-// file loads it via dynamic import — the Promise resolves once and is cached.
+// shared/*.js modules are ESM (so Vite can tree-shake them for the client).
+// This CJS file loads them via dynamic import — each Promise resolves once and
+// is cached.
 const fuelModulePromise = import('../shared/fuel.js');
 const fuelValidationPromise = import('../shared/fuel-validation.js');
+const pdfSummaryPromise = import('../shared/pdf-summary.js');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -483,10 +485,396 @@ router.get('/api/trips/:id/export/gpx', async (req, res) => {
   }
 });
 
+// ─── PDF format helpers ───────────────────────────────────────────────────────
+
+// Builds the fuel helper functions used by both PDF formats.
+function makeFuelHelpers(fuel, trip) {
+  const breakdownForStops = (stops) => fuel.fuelBreakdownForLegs(
+    stops, trip.fuelConsumption, trip.fuelUnit, trip.fuelPrice, trip.fuelCurrency, trip.fuelOverrides,
+  );
+  const breakdownToStr = (b) => fuel.formatBreakdown(b, 'en-US');
+  const volumeForStops = (stops) => fuel.fuelVolumeForLegs(stops, trip.fuelConsumption, trip.fuelUnit);
+  const volumeToStr = (stops) => fuel.formatVolume(volumeForStops(stops), trip.fuelUnit);
+  const fillUpsForStops = (stops) => fuel.formatFillUps(
+    volumeForStops(stops), trip.tankSizeLitres, trip.fuelUnit,
+  );
+  return { breakdownForStops, breakdownToStr, volumeForStops, volumeToStr, fillUpsForStops };
+}
+
+function formatPlain(doc, trip, pins, fuelHelpers) {
+  const { breakdownForStops, breakdownToStr, volumeToStr, fillUpsForStops } = fuelHelpers;
+
+  // Header
+  doc
+    .font('Times-Italic')
+    .fontSize(28)
+    .text(trip.name || 'Untitled trip', { align: 'left' });
+  if (trip.description) {
+    doc.moveDown(0.4).font('Times-Italic').fontSize(12).fillColor('#555').text(trip.description);
+  }
+
+  // Totals strip
+  const stopsForPricing = Array.isArray(trip.stops) ? trip.stops : [];
+  const totals = [];
+  if (typeof trip.totalKm === 'number') totals.push(`${trip.totalKm.toLocaleString('en-US')} km`);
+  if (typeof trip.totalDays === 'number') totals.push(`${trip.totalDays} day${trip.totalDays === 1 ? '' : 's'}`);
+  if (Array.isArray(trip.countries) && trip.countries.length) totals.push(trip.countries.join(' '));
+  const totalBreakdownStr = breakdownToStr(breakdownForStops(stopsForPricing));
+  if (totalBreakdownStr) totals.push(`Est. fuel ${totalBreakdownStr}`);
+  const totalVolumeStr = volumeToStr(stopsForPricing);
+  if (totalVolumeStr) {
+    const fillUpsStr = fillUpsForStops(stopsForPricing);
+    totals.push(fillUpsStr ? `${totalVolumeStr} · ${fillUpsStr}` : totalVolumeStr);
+  }
+  doc
+    .moveDown(0.8)
+    .fillColor('#000')
+    .font('Helvetica')
+    .fontSize(10)
+    .text(totals.join('  ·  '));
+
+  // Days
+  const stops = Array.isArray(trip.stops) ? trip.stops : [];
+  const grouped = groupStopsByDay(stops);
+  for (const [day, dayStops] of grouped) {
+    const dayKm = dayStops.reduce((acc, s) => acc + (s.kmFromPrevious || 0), 0);
+    const dayBreakdownStr = breakdownToStr(breakdownForStops(dayStops));
+    const dayCostStr = dayBreakdownStr ? `  ·  ${dayBreakdownStr}` : '';
+    const dayVolumeStr = volumeToStr(dayStops);
+    const dayVolStr = dayVolumeStr ? `  ·  ${dayVolumeStr}` : '';
+    doc
+      .moveDown(1.1)
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor('#000')
+      .text(`Day ${day}${dayKm > 0 ? `  ·  ${dayKm} km${dayCostStr}${dayVolStr}` : ''}`, { continued: false });
+    doc.moveDown(0.3);
+    for (const stop of dayStops) {
+      const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
+      const dur = stop.durationFromPrevious || '';
+      const meta = [km, dur].filter(Boolean).join(' · ');
+      doc.font('Helvetica').fontSize(11).fillColor('#000').text(stop.label || stop.name || '—', { continued: !!meta });
+      if (meta) {
+        doc.font('Helvetica').fontSize(9).fillColor('#666').text(`   ${meta}`);
+      }
+      if (stop.highlights && stop.highlights.length) {
+        doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${stop.highlights.join(' · ')}`);
+      }
+      if (stop.type === 'overnight' || stop.type === 'destination') {
+        const bookingUrl = bookingUrlForStop(stop, trip);
+        if (bookingUrl) {
+          doc
+            .font('Helvetica')
+            .fontSize(9)
+            .fillColor('#2a6dba')
+            .text(`   🏨 Find a hotel: ${bookingUrl}`, { link: bookingUrl, underline: false });
+        }
+      }
+      doc.moveDown(0.2);
+    }
+  }
+
+  // Pins
+  if (pins.length) {
+    doc
+      .moveDown(1.2)
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor('#000')
+      .text('Pins');
+    doc.moveDown(0.3);
+    for (const pin of pins) {
+      const cat = pin.category ? `[${pin.category}] ` : '';
+      doc.font('Helvetica').fontSize(11).fillColor('#000').text(`${cat}${pin.name || ''}`);
+      if (pin.notes) {
+        doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${pin.notes}`);
+      }
+      doc.moveDown(0.15);
+    }
+  }
+
+  doc.moveDown(2);
+  doc.font('Helvetica').fontSize(8).fillColor('#999').text('Generated by Road Trip', { align: 'center' });
+}
+
+function formatBranded(doc, trip, pins, fuelHelpers, brandedSummaryRows) {
+  const { breakdownForStops, breakdownToStr, volumeToStr, fillUpsForStops } = fuelHelpers;
+  const stops = Array.isArray(trip.stops) ? trip.stops : [];
+
+  // ── Page 1: Cover ──────────────────────────────────────────────────────────
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = 56;
+
+  // Accent bar at top
+  doc.rect(0, 0, pageWidth, 6).fill('#E76F51');
+
+  // Cover emoji — centered, large
+  const emoji = trip.coverEmoji || '🚗';
+  doc
+    .fillColor('#000')
+    .font('Helvetica')
+    .fontSize(64)
+    .text(emoji, margin, 80, { width: pageWidth - margin * 2, align: 'center' });
+
+  // Trip name
+  doc
+    .moveDown(0.6)
+    .font('Helvetica-Bold')
+    .fontSize(28)
+    .fillColor('#111')
+    .text(trip.name || 'Untitled trip', { align: 'center' });
+
+  // Country flags
+  if (Array.isArray(trip.countries) && trip.countries.length) {
+    doc
+      .moveDown(0.5)
+      .font('Helvetica')
+      .fontSize(20)
+      .fillColor('#333')
+      .text(trip.countries.join('  '), { align: 'center' });
+  }
+
+  // Date range
+  if (trip.startDate && typeof trip.totalDays === 'number' && trip.totalDays > 0) {
+    const start = new Date(`${trip.startDate}T00:00:00Z`);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + trip.totalDays - 1);
+    const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    doc
+      .moveDown(0.5)
+      .font('Helvetica')
+      .fontSize(13)
+      .fillColor('#555')
+      .text(`${fmt(start)} – ${fmt(end)}`, { align: 'center' });
+  } else if (trip.startDate) {
+    doc
+      .moveDown(0.5)
+      .font('Helvetica')
+      .fontSize(13)
+      .fillColor('#555')
+      .text(trip.startDate, { align: 'center' });
+  }
+
+  // Quick stats row
+  const statParts = [];
+  if (typeof trip.totalKm === 'number') statParts.push(`${trip.totalKm.toLocaleString('en-US')} km`);
+  if (typeof trip.totalDays === 'number') statParts.push(`${trip.totalDays} day${trip.totalDays === 1 ? '' : 's'}`);
+  if (statParts.length) {
+    doc
+      .moveDown(0.6)
+      .font('Helvetica')
+      .fontSize(11)
+      .fillColor('#777')
+      .text(statParts.join('  ·  '), { align: 'center' });
+  }
+
+  // Footer
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor('#bbb')
+    .text('Generated by Road Trip', margin, pageHeight - margin, { width: pageWidth - margin * 2, align: 'center' });
+
+  // ── Pages 2+: Per-day spreads ───────────────────────────────────────────────
+  const grouped = groupStopsByDay(stops);
+  for (const [day, dayStops] of grouped) {
+    doc.addPage();
+
+    // Accent bar
+    doc.rect(0, 0, pageWidth, 4).fill('#E76F51');
+
+    // Day number heading
+    const dayKm = dayStops.reduce((acc, s) => acc + (s.kmFromPrevious || 0), 0);
+    let dayHeading = `Day ${day}`;
+    if (trip.startDate) {
+      const d = new Date(`${trip.startDate}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + day - 1);
+      const dayDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+      dayHeading = `Day ${day}  ·  ${dayDate}`;
+    }
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(18)
+      .fillColor('#111')
+      .text(dayHeading, margin, 28, { width: pageWidth - margin * 2 });
+
+    // Day stats
+    const dayBreakdownStr = breakdownToStr(breakdownForStops(dayStops));
+    const dayVolumeStr = volumeToStr(dayStops);
+    const dayStatParts = [];
+    if (dayKm > 0) dayStatParts.push(`${dayKm} km`);
+    if (dayBreakdownStr) dayStatParts.push(`Est. fuel ${dayBreakdownStr}`);
+    if (dayVolumeStr) dayStatParts.push(dayVolumeStr);
+    if (dayStatParts.length) {
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#666')
+        .text(dayStatParts.join('  ·  '));
+    }
+
+    doc.moveDown(0.6);
+
+    // Divider
+    doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).strokeColor('#e0e0e0').lineWidth(0.5).stroke();
+    doc.moveDown(0.4);
+
+    // Stops
+    for (const stop of dayStops) {
+      const typeEmoji = {
+        start: '🏁', overnight: '🌙', destination: '🏆', waypoint: '📍', fuel: '⛽',
+      }[stop.type] || '📍';
+      const stopName = stop.label || stop.name || '—';
+      const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
+      const dur = stop.durationFromPrevious || '';
+      const meta = [km, dur].filter(Boolean).join(' · ');
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11)
+        .fillColor('#222')
+        .text(`${typeEmoji}  ${stopName}`, { continued: false });
+
+      if (meta) {
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .fillColor('#888')
+          .text(`     ${meta}`);
+      }
+      if (stop.highlights && stop.highlights.length) {
+        doc
+          .font('Helvetica-Oblique')
+          .fontSize(9)
+          .fillColor('#555')
+          .text(`     ${stop.highlights.join(' · ')}`);
+      }
+      if (stop.type === 'overnight' || stop.type === 'destination') {
+        const bookingUrl = bookingUrlForStop(stop, trip);
+        if (bookingUrl) {
+          doc
+            .font('Helvetica')
+            .fontSize(8)
+            .fillColor('#2a6dba')
+            .text(`     🏨 Find a hotel: ${bookingUrl}`, { link: bookingUrl, underline: false });
+        }
+      }
+      doc.moveDown(0.35);
+    }
+  }
+
+  // ── Final page: Trip summary ────────────────────────────────────────────────
+  doc.addPage();
+  doc.rect(0, 0, pageWidth, 4).fill('#E76F51');
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(20)
+    .fillColor('#111')
+    .text('Trip Summary', margin, 28, { width: pageWidth - margin * 2 });
+
+  doc.moveDown(0.5);
+  doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).strokeColor('#e0e0e0').lineWidth(0.5).stroke();
+  doc.moveDown(0.5);
+
+  const summaryRows = brandedSummaryRows(trip, fuelHelpers);
+
+  const rows = [
+    ['Total distance', summaryRows.totalKm > 0 ? `${summaryRows.totalKm.toLocaleString('en-US')} km` : '—'],
+    ['Total days', summaryRows.totalDays > 0 ? `${summaryRows.totalDays}` : '—'],
+    ['Stops', `${summaryRows.stopCount}`],
+  ];
+  if (summaryRows.fuelCostStr) rows.push(['Est. fuel cost', summaryRows.fuelCostStr]);
+  if (summaryRows.fuelVolumeStr) {
+    const vol = summaryRows.fillUpsStr
+      ? `${summaryRows.fuelVolumeStr}  (${summaryRows.fillUpsStr})`
+      : summaryRows.fuelVolumeStr;
+    rows.push(['Est. fuel volume', vol]);
+  }
+  if (Array.isArray(trip.countries) && trip.countries.length) {
+    rows.push(['Countries', trip.countries.join('  ')]);
+  }
+
+  for (const [label, value] of rows) {
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .fillColor('#444')
+      .text(label, margin, doc.y, { continued: true, width: 180 });
+    doc
+      .font('Helvetica')
+      .fontSize(10)
+      .fillColor('#111')
+      .text(value);
+    doc.moveDown(0.3);
+  }
+
+  // Category breakdown
+  const catEntries = Object.entries(summaryRows.categoryCounts);
+  if (catEntries.length) {
+    doc.moveDown(0.5);
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor('#333')
+      .text('Stops by category');
+    doc.moveDown(0.2);
+    for (const [cat, count] of catEntries.sort((a, b) => b[1] - a[1])) {
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#555')
+        .text(`  ${cat}  ×${count}`);
+    }
+  }
+
+  // Pins summary
+  if (pins.length) {
+    doc.moveDown(0.5);
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor('#333')
+      .text(`Saved pins  (${pins.length})`);
+    doc.moveDown(0.2);
+    for (const pin of pins) {
+      const cat = pin.category ? `[${pin.category}] ` : '';
+      doc.font('Helvetica').fontSize(10).fillColor('#555').text(`  ${cat}${pin.name || ''}`);
+      if (pin.notes) {
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor('#888').text(`    ${pin.notes}`);
+      }
+    }
+  }
+
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor('#bbb')
+    .text('Generated by Road Trip', margin, pageHeight - margin, { width: pageWidth - margin * 2, align: 'center' });
+}
+
+// ─── PDF export route ─────────────────────────────────────────────────────────
+
 router.get('/api/trips/:id/export/pdf', async (req, res) => {
   try {
+    const db = getDb();
     const ref = await loadTripForAccess(req, res, false);
     if (!ref) return;
+
+    const format = req.query.format === 'branded' ? 'branded' : 'plain';
+
+    if (format === 'branded') {
+      const userSnap = await db.collection('users').doc(req.uid).get();
+      const user = userSnap.exists ? userSnap.data() : null;
+      if (!user || user.plan !== 'pro') {
+        return res.status(402).json({
+          error: 'Branded PDF export is a Pro feature. Upgrade to Pro to unlock.',
+          code: 'PRO_FEATURE_REQUIRED',
+        });
+      }
+    }
+
     const snap = await ref.get();
     const trip = snap.data();
     const pinsSnap = await ref.collection('pins').orderBy('createdAt', 'asc').get();
@@ -494,15 +882,8 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
     const fuel = await fuelModulePromise;
     // 'en-US' keeps the PDF's currency rendering deterministic regardless of
     // the server's runtime locale.
-    const breakdownForTrip = (stops) => fuel.fuelBreakdownForLegs(
-      stops, trip.fuelConsumption, trip.fuelUnit, trip.fuelPrice, trip.fuelCurrency, trip.fuelOverrides,
-    );
-    const breakdownToStr = (b) => fuel.formatBreakdown(b, 'en-US');
-    const volumeForStops = (stops) => fuel.fuelVolumeForLegs(stops, trip.fuelConsumption, trip.fuelUnit);
-    const volumeToStr = (stops) => fuel.formatVolume(volumeForStops(stops), trip.fuelUnit);
-    const fillUpsForStops = (stops) => fuel.formatFillUps(
-      volumeForStops(stops), trip.tankSizeLitres, trip.fuelUnit,
-    );
+    const fuelHelpers = makeFuelHelpers(fuel, trip);
+
     const filename = `${sanitizeFilename(trip.name)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -510,97 +891,13 @@ router.get('/api/trips/:id/export/pdf', async (req, res) => {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } });
     doc.pipe(res);
 
-    // Header
-    doc
-      .font('Times-Italic')
-      .fontSize(28)
-      .text(trip.name || 'Untitled trip', { align: 'left' });
-    if (trip.description) {
-      doc.moveDown(0.4).font('Times-Italic').fontSize(12).fillColor('#555').text(trip.description);
+    if (format === 'branded') {
+      const { brandedSummaryRows } = await pdfSummaryPromise;
+      formatBranded(doc, trip, pins, fuelHelpers, brandedSummaryRows);
+    } else {
+      formatPlain(doc, trip, pins, fuelHelpers);
     }
 
-    // Totals strip
-    const totals = [];
-    if (typeof trip.totalKm === 'number') totals.push(`${trip.totalKm.toLocaleString('en-US')} km`);
-    if (typeof trip.totalDays === 'number') totals.push(`${trip.totalDays} day${trip.totalDays === 1 ? '' : 's'}`);
-    if (Array.isArray(trip.countries) && trip.countries.length) totals.push(trip.countries.join(' '));
-    const stopsForPricing = Array.isArray(trip.stops) ? trip.stops : [];
-    const totalBreakdownStr = breakdownToStr(breakdownForTrip(stopsForPricing));
-    if (totalBreakdownStr) totals.push(`Est. fuel ${totalBreakdownStr}`);
-    const totalVolumeStr = volumeToStr(stopsForPricing);
-    if (totalVolumeStr) {
-      const fillUpsStr = fillUpsForStops(stopsForPricing);
-      totals.push(fillUpsStr ? `${totalVolumeStr} · ${fillUpsStr}` : totalVolumeStr);
-    }
-    doc
-      .moveDown(0.8)
-      .fillColor('#000')
-      .font('Helvetica')
-      .fontSize(10)
-      .text(totals.join('  ·  '));
-
-    // Days
-    const stops = Array.isArray(trip.stops) ? trip.stops : [];
-    const grouped = groupStopsByDay(stops);
-    for (const [day, dayStops] of grouped) {
-      const dayKm = dayStops.reduce((acc, s) => acc + (s.kmFromPrevious || 0), 0);
-      const dayBreakdownStr = breakdownToStr(breakdownForTrip(dayStops));
-      const dayCostStr = dayBreakdownStr ? `  ·  ${dayBreakdownStr}` : '';
-      const dayVolumeStr = volumeToStr(dayStops);
-      const dayVolStr = dayVolumeStr ? `  ·  ${dayVolumeStr}` : '';
-      doc
-        .moveDown(1.1)
-        .font('Helvetica-Bold')
-        .fontSize(11)
-        .fillColor('#000')
-        .text(`Day ${day}${dayKm > 0 ? `  ·  ${dayKm} km${dayCostStr}${dayVolStr}` : ''}`, { continued: false });
-      doc.moveDown(0.3);
-      for (const stop of dayStops) {
-        const km = stop.kmFromPrevious ? `${stop.kmFromPrevious} km` : '';
-        const dur = stop.durationFromPrevious || '';
-        const meta = [km, dur].filter(Boolean).join(' · ');
-        doc.font('Helvetica').fontSize(11).fillColor('#000').text(stop.label || stop.name || '—', { continued: !!meta });
-        if (meta) {
-          doc.font('Helvetica').fontSize(9).fillColor('#666').text(`   ${meta}`);
-        }
-        if (stop.highlights && stop.highlights.length) {
-          doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${stop.highlights.join(' · ')}`);
-        }
-        if (stop.type === 'overnight' || stop.type === 'destination') {
-          const bookingUrl = bookingUrlForStop(stop, trip);
-          if (bookingUrl) {
-            doc
-              .font('Helvetica')
-              .fontSize(9)
-              .fillColor('#2a6dba')
-              .text(`   🏨 Find a hotel: ${bookingUrl}`, { link: bookingUrl, underline: false });
-          }
-        }
-        doc.moveDown(0.2);
-      }
-    }
-
-    // Pins
-    if (pins.length) {
-      doc
-        .moveDown(1.2)
-        .font('Helvetica-Bold')
-        .fontSize(11)
-        .fillColor('#000')
-        .text('Pins');
-      doc.moveDown(0.3);
-      for (const pin of pins) {
-        const cat = pin.category ? `[${pin.category}] ` : '';
-        doc.font('Helvetica').fontSize(11).fillColor('#000').text(`${cat}${pin.name || ''}`);
-        if (pin.notes) {
-          doc.font('Helvetica-Oblique').fontSize(10).fillColor('#444').text(`   ${pin.notes}`);
-        }
-        doc.moveDown(0.15);
-      }
-    }
-
-    doc.moveDown(2);
-    doc.font('Helvetica').fontSize(8).fillColor('#999').text('Generated by Road Trip', { align: 'center' });
     doc.end();
   } catch (e) {
     console.error('GET /api/trips/:id/export/pdf failed:', e);

@@ -7,6 +7,7 @@ import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { usePins } from '../hooks/usePins';
 import { usePinModal } from '../hooks/usePinModal';
+import { useMe } from '../hooks/useMe';
 import { usePromotePin } from '../hooks/usePromoteAction';
 import { downloadAuthed, enableShare, getTrip, revokeShare } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
@@ -94,18 +95,23 @@ export function Viewer() {
     setShareToast('Link copied');
   }
 
-  const [exporting, setExporting] = useState<'pdf' | 'gpx' | null>(null);
+  const me = useMe(true);
+  const isPro = me.data?.plan === 'pro';
+
+  const [exporting, setExporting] = useState<'pdf' | 'pdf-branded' | 'gpx' | null>(null);
   const [handoffOpen, setHandoffOpen] = useState(false);
-  async function exportTrip(kind: 'pdf' | 'gpx') {
+  async function exportTrip(kind: 'pdf' | 'pdf-branded' | 'gpx') {
     if (!tripId || exporting) return;
     setExporting(kind);
     try {
-      const path = `/api/trips/${encodeURIComponent(tripId)}/export/${kind}`;
-      const fallback = `${(trip?.name || 'road-trip').replace(/[^A-Za-z0-9\-_]+/g, '-')}.${kind}`;
+      const fileExt = kind === 'gpx' ? 'gpx' : 'pdf';
+      const basePath = `/api/trips/${encodeURIComponent(tripId)}/export/${fileExt}`;
+      const path = kind === 'pdf-branded' ? `${basePath}?format=branded` : basePath;
+      const fallback = `${(trip?.name || 'road-trip').replace(/[^A-Za-z0-9\-_]+/g, '-')}.${fileExt}`;
       await downloadAuthed(path, fallback);
     } catch (err) {
       console.error('Export failed', err);
-      setShareToast(`Could not export ${kind.toUpperCase()}`);
+      setShareToast(`Could not export ${kind === 'gpx' ? 'GPX' : 'PDF'}`);
     } finally {
       setExporting(null);
     }
@@ -514,6 +520,17 @@ export function Viewer() {
             >
               {exporting === 'pdf' ? '…' : 'PDF'}
             </button>
+            {isPro && (
+              <button
+                type="button"
+                onClick={() => exportTrip('pdf-branded')}
+                disabled={exporting !== null}
+                title="Download a polished branded PDF — Pro feature"
+                className="bg-transparent border border-accent text-accent px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:bg-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {exporting === 'pdf-branded' ? '…' : 'PDF Pro'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => exportTrip('gpx')}
