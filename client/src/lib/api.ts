@@ -1,5 +1,5 @@
 import { getFirebaseAuth } from './firebase';
-import type { AppConfig, MeResponse, Pin, TemplateCard, Trip } from './types';
+import type { AppConfig, Favorite, MeResponse, Pin, TemplateCard, Trip } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -162,6 +162,23 @@ export async function listTemplates(opts: { tag?: string; limit?: number } = {})
 export async function cloneTemplate(templateId: string): Promise<Trip> {
   return handle<Trip>(await fetch(`/api/templates/${encodeURIComponent(templateId)}/clone`, await withToken({
     method: 'POST',
+  })));
+}
+
+export async function listFavorites(): Promise<Favorite[]> {
+  const j = await handle<{ favorites: Favorite[] }>(await fetch('/api/favorites', await withToken()));
+  return j.favorites;
+}
+
+export async function createFavorite(body: Omit<Favorite, 'id' | 'ownerUid' | 'createdAt' | 'updatedAt'>): Promise<Favorite> {
+  return handle<Favorite>(await fetch('/api/favorites', await withToken({
+    method: 'POST', body: JSON.stringify(body),
+  })));
+}
+
+export async function deleteFavorite(id: string): Promise<void> {
+  await handle<unknown>(await fetch(`/api/favorites/${encodeURIComponent(id)}`, await withToken({
+    method: 'DELETE',
   })));
 }
 
