@@ -28,6 +28,16 @@ const FEATURES = [
     body: 'We track the ten-stop-per-day limit so the dashboard never drops half your route on the way.',
   },
   {
+    glyph: '⛽',
+    label: 'Fuel stops, handled',
+    body: "Tank running low? Fuel stops insert themselves before you run dry. Undo any addition. Each day card shows what's left in the tank.",
+  },
+  {
+    glyph: '★',
+    label: 'Favorites across trips',
+    body: 'Star any stop in the builder or viewer. Find everything starred — across all your trips — at /favorites.',
+  },
+  {
     glyph: '✦',
     label: 'Highlights, not itineraries',
     body: 'A few words per stop. The vibe and the must-sees, not a minute-by-minute timetable.',

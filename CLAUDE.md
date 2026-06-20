@@ -53,6 +53,10 @@ Frontend tree (`client/src/`): `screens/` = page components, `components/` = sha
 
 **PWA (Workbox via `vite-plugin-pwa`).** App shell precached at build time; API responses (GET `/api/*` and `/config`) use `NetworkFirst` with a 4s timeout so trips render offline after first visit. Service worker is disabled in dev (`devOptions.enabled: false`) — to test offline locally, `npm run build && npx vite preview`. Google Maps tiles are not cacheable due to ToS, so the map area goes blank offline (known and intentional).
 
+**Auto-fuel engine.** `hooks/useAutoFuel.ts` runs after every route-segment update. It walks the stop timeline, accumulates fuel consumption leg-by-leg, and reactively inserts the nearest fuel stop (Places API, filtered to ≤5 km detour via `NearbyFinder`'s `detourCapKm` + `legPolyline` props) before the tank would hit empty. Each insertion is undoable for 8 s via a toast action. Per-trip toggle in `TripDetailsModal` (default on); `addedByAuto` flag on the stop marks it for the `StopIdentityBadge`. Day cards show a fuel-remaining badge (green/amber/red).
+
+**Favorites.** Per-user collection at `users/{uid}/favorites/{favoriteId}` in Firestore. Dedup'd by `placeId` (when present) or a `name+coord` signature via `favoriteKey` helper (`client/src/lib/favorites.ts`). Server routes in `routes/favorites.js` (auth-required). `useFavorites` hook exposes add/remove + list; `FavoriteToggle` component wires the star UI used in Builder `StopRow` and Viewer `DayCard`. Accessible at the `/favorites` route.
+
 **Plan limits.** `routes/trips.js` enforces `FREE_TRIP_LIMIT` / `PRO_TRIP_LIMIT` server-side on create; client gets a `402 TRIP_LIMIT_REACHED` and surfaces an upgrade prompt.
 
 **Deployment.** Cloud Build watches `main` and deploys to Cloud Run on push. There is no staging environment — local dev runs against the same Firebase project as production. Trip data created on `localhost` lives in the same Firestore.
