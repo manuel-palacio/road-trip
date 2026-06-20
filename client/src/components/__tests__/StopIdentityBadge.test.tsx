@@ -67,3 +67,17 @@ describe('StopIdentityBadge', () => {
     expect(screen.getByTestId('stop-identity-badge')).toHaveTextContent('🌄');
   });
 });
+
+describe('addedByAuto glyph', () => {
+  it('renders a small "auto" marker when stop.addedByAuto is true', () => {
+    const testStop = stop({ id: 's', category: 'fuel', addedByAuto: true });
+    const { container } = render(<StopIdentityBadge stop={testStop} index={1} variant="card" />);
+    expect(container.textContent).toMatch(/auto/i);
+  });
+
+  it('does NOT render the "auto" marker when addedByAuto is false or absent', () => {
+    const testStop = stop({ id: 's', category: 'fuel' });
+    const { container } = render(<StopIdentityBadge stop={testStop} index={1} variant="card" />);
+    expect(container.textContent).not.toMatch(/auto/i);
+  });
+});

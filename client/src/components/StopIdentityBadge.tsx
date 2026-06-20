@@ -34,6 +34,14 @@ export function StopIdentityBadge({ stop, index, variant = 'card' }: Props) {
       }}
     >
       <span aria-hidden style={{ fontSize: emojiSize, lineHeight: 1 }}>{meta.emoji}</span>
+      {stop.addedByAuto && (
+        <span
+          className="font-mono text-[8px] tracking-[0.12em] uppercase text-paper-muted ml-0.5"
+          title="Added automatically — drag, rename, or edit to take ownership."
+        >
+          auto
+        </span>
+      )}
       <span
         data-testid="stop-identity-badge-number"
         className="absolute font-mono font-semibold rounded-full flex items-center justify-center"
