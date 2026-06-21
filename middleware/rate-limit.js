@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase();
 
@@ -6,7 +7,7 @@ function makeLimiter({ windowMs, max, label }) {
   return rateLimit({
     windowMs,
     max,
-    keyGenerator: (req) => req.uid || req.ip,
+    keyGenerator: (req) => req.uid || ipKeyGenerator(req.ip),
     skip: (req) => ADMIN_EMAIL && (req.userEmail || '').toLowerCase() === ADMIN_EMAIL,
     standardHeaders: true,
     legacyHeaders: false,
