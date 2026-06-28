@@ -15,7 +15,14 @@ npm run build        # Production build into dist/. Also emits sw.js + manifest.
 npm start            # Production server (node server.js) — what Cloud Run runs.
 ```
 
-**Local data isolation.** `npm run dev` runs the **Firestore Local Emulator** and points the server at it via `FIRESTORE_EMULATOR_HOST=localhost:8089`, so localhost reads/writes never touch production. Auth stays REAL (dev-impersonate + token verification are unaffected); only Firestore is emulated. Emulator data persists to the gitignored `.emulator-data/` (starts empty). The emulator needs **JDK 21+** — the `dev:firestore` script auto-selects it via `/usr/libexec/java_home -v 21`, independent of the system-default `java`. Use `npm run dev:cloud` for the rare case you need real prod data.
+**Local data isolation.** `npm run dev` runs the server+client (the `dev:app` script) *inside* `firebase emulators:exec`, which boots the **Firestore Local Emulator** and points the server at it via `FIRESTORE_EMULATOR_HOST=localhost:8089` — so localhost reads/writes never touch production. Auth stays REAL (dev-impersonate + token verification are unaffected); only Firestore is emulated.
+
+Persistence details that matter:
+- Data persists to the gitignored `.emulator-data/` via `--export-on-exit`. `emulators:exec` (not a sibling under `concurrently`) owns the lifecycle so the export reliably fires on Ctrl-C; `--import` is guarded on the export metadata so the first run starts clean.
+- The emulator path forces `FIRESTORE_DATABASE_ID=(default)` (prod uses `road-trip-db`). The emulator's export/import only covers the `(default)` database — data written to a *named* DB works in-session but **silently vanishes on restart**. Locally the DB name is irrelevant (it's isolated), so we use `(default)` to get persistence.
+- Needs **JDK 21+** (firebase-tools 15+ requirement); the script auto-selects it via `/usr/libexec/java_home -v 21`, independent of the system-default `java`.
+
+Use `npm run dev:cloud` for the rare case you need real prod data.
 
 Single-test workflow: `npx vitest run client/src/lib/__tests__/<name>.test.ts` (or `npx vitest <name>` for substring match).
 
