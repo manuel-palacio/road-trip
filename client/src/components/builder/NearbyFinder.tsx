@@ -87,23 +87,21 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
   }, [onClose, results, focusedIndex, onSelect, defaultMode, otherMode]);
 
   useEffect(() => {
+    // startedRef (not a cancellation flag) guards against StrictMode's
+    // double-invoke — a cleanup-set `cancelled` would trip the surviving run.
     if (startedRef.current) return;
     startedRef.current = true;
-    let cancelled = false;
     (async () => {
       try {
         await claimNearbySearch();
       } catch (err) {
         if ((err as { code?: string }).code === 'NEARBY_SEARCH_LIMIT') {
-          if (!cancelled) {
-            setResults([]);
-            setError('Daily map search limit reached. Resets tomorrow.');
-          }
+          setResults([]);
+          setError('Daily map search limit reached. Resets tomorrow.');
           return;
         }
         // Fail open on any other error — proceed with the search.
       }
-      if (cancelled) return;
       const service = new maps.places.PlacesService(map);
       const request: google.maps.places.PlaceSearchRequest = {
         location: target.midpoint,
@@ -144,7 +142,6 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
       setResults(filtered);
     });
     })();
-    return () => { cancelled = true; };
   }, [maps, map, target.midpoint, placeType, meta.label]);
 
   const startName = target.legStart.label || target.legStart.name || 'start';
