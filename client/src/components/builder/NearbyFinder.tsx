@@ -3,6 +3,7 @@ import type { FuelSearchTarget } from '../../lib/fuel-stops';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
 import { placeTypeForCategory } from '../../lib/nearby-search';
 import { measureDetour } from '../../lib/route-detour';
+import { claimNearbySearch } from '../../lib/api';
 import type { PinCategory } from '../../lib/types';
 
 export type NearbyResult = {
@@ -88,13 +89,28 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    const service = new maps.places.PlacesService(map);
-    const request: google.maps.places.PlaceSearchRequest = {
-      location: target.midpoint,
-      radius: SEARCH_RADIUS_M,
-      ...(placeType ? { type: placeType } : {}),
-    };
-    service.nearbySearch(request, (raw, status) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await claimNearbySearch();
+      } catch (err) {
+        if ((err as { code?: string }).code === 'NEARBY_SEARCH_LIMIT') {
+          if (!cancelled) {
+            setResults([]);
+            setError('Daily map search limit reached. Resets tomorrow.');
+          }
+          return;
+        }
+        // Fail open on any other error — proceed with the search.
+      }
+      if (cancelled) return;
+      const service = new maps.places.PlacesService(map);
+      const request: google.maps.places.PlaceSearchRequest = {
+        location: target.midpoint,
+        radius: SEARCH_RADIUS_M,
+        ...(placeType ? { type: placeType } : {}),
+      };
+      service.nearbySearch(request, (raw, status) => {
       if (status !== maps.places.PlacesServiceStatus.OK || !raw) {
         setResults([]);
         if (status !== maps.places.PlacesServiceStatus.ZERO_RESULTS) {
@@ -127,6 +143,8 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
         .slice(0, 10);
       setResults(filtered);
     });
+    })();
+    return () => { cancelled = true; };
   }, [maps, map, target.midpoint, placeType, meta.label]);
 
   const startName = target.legStart.label || target.legStart.name || 'start';
