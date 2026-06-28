@@ -2,5 +2,15 @@
   "firestore": {
     "rules": "firestore.rules",
     "database": "road-trip-db"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8089
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
   }
 }

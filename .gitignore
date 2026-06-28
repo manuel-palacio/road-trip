@@ -19,3 +19,9 @@ road-trip-service.json
 # Claude Code per-project state (scheduled tasks etc)
 .claude/
 verify-*.png
+
+# Firebase Local Emulator (local dev data + emulator logs)
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
