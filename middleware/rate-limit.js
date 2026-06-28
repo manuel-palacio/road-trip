@@ -33,4 +33,5 @@ module.exports = {
   pdfExport: makeLimiter({ windowMs: 60 * 1000, max: 5, label: 'pdf-export' }),
   publicShare: makeLimiter({ windowMs: 60 * 1000, max: 30, label: 'public-share' }),
   templateClone: makeLimiter({ windowMs: 60 * 1000, max: 10, label: 'template-clone' }),
+  usageWrite: makeLimiter({ windowMs: 60 * 1000, max: 120, label: 'usage-write' }),
 };

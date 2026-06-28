@@ -49,6 +49,7 @@ app.use(require('./routes/favorites'));
 app.use(require('./routes/users'));
 app.use(require('./routes/admin'));
 app.use(require('./routes/fx'));
+app.use(require('./routes/usage'));
 
 // Dev-only impersonation endpoint. Conditionally mounted — in any
 // hosted environment (Cloud Run, Heroku, Fly, Railway, NODE_ENV=production)
