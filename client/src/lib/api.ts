@@ -52,6 +52,15 @@ export async function getMe(): Promise<MeResponse> {
   return handle<MeResponse>(await fetch('/api/me', await withToken()));
 }
 
+// Claims one unit of the per-user daily Nearby Search quota. Resolves when the
+// search is allowed; throws ApiError with code 'NEARBY_SEARCH_LIMIT' once the
+// daily cap is hit. Callers fail open on any other error.
+export async function claimNearbySearch(): Promise<{ used: number; limit: number }> {
+  return handle<{ used: number; limit: number }>(
+    await fetch('/api/usage/nearby-search', await withToken({ method: 'POST' })),
+  );
+}
+
 export async function listTrips(): Promise<{ trips: Trip[] }> {
   return handle<{ trips: Trip[] }>(await fetch('/api/trips', await withToken()));
 }
