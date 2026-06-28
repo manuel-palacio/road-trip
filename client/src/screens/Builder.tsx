@@ -12,7 +12,7 @@ import { useAutoFuel } from '../hooks/useAutoFuel';
 import { useFavorites } from '../hooks/useFavorites';
 import { useMe } from '../hooks/useMe';
 import type { PlacesSearchFn } from '../lib/auto-fuel-pick';
-import { ApiError, addCollaborator, createTrip, getTrip, lookupUserByEmail, removeCollaborator, updateTrip } from '../lib/api';
+import { ApiError, addCollaborator, claimNearbySearch, createTrip, getTrip, lookupUserByEmail, removeCollaborator, updateTrip } from '../lib/api';
 import { extractCountryCode, flagEmoji } from '../lib/flags';
 import { renderStopInfoHtml } from '../lib/stop-info-html';
 import { lookupLocalityForPlace, makeMarkerContent, mapStyleForTheme, polylineOptionsFor, requestGeolocation } from '../lib/google-maps';
@@ -359,6 +359,7 @@ export function Builder() {
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const autoFuelPausedRef = useRef(false);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   // Stop id whose InfoWindow is pinned-open by a click. Mouseover/out on
   // other markers won't override it; map background click clears it.
@@ -463,25 +464,40 @@ export function Builder() {
 
   const placesSearch: PlacesSearchFn | null = useMemo(() => {
     if (!maps || !map) return null;
-    return (location, radiusMeters) => new Promise<import('../components/builder/NearbyFinder').NearbyResult[]>((resolve) => {
-      const svc = new maps.places.PlacesService(map);
-      svc.nearbySearch(
-        { location, radius: radiusMeters, type: 'gas_station' },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (raw: any, status: any) => {
-          if (status !== maps.places.PlacesServiceStatus.OK || !raw) return resolve([]);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          resolve(raw.filter((r: any) => r.geometry?.location).map((r: any) => ({
-            placeId: r.place_id || '',
-            name: r.name || 'Fuel stop',
-            vicinity: r.vicinity || '',
-            rating: typeof r.rating === 'number' ? r.rating : undefined,
-            lat: r.geometry!.location!.lat(),
-            lng: r.geometry!.location!.lng(),
-          })));
+    return async (location, radiusMeters) => {
+      if (autoFuelPausedRef.current) return [];
+      try {
+        await claimNearbySearch();
+      } catch (err) {
+        if ((err as { code?: string }).code === 'NEARBY_SEARCH_LIMIT') {
+          if (!autoFuelPausedRef.current) {
+            autoFuelPausedRef.current = true;
+            setAutoFuelToast({ message: 'Daily map limit reached — auto-fuel paused until tomorrow.' });
+          }
+          return [];
         }
-      );
-    });
+        // Fail open on any other error — proceed with the search.
+      }
+      return new Promise<import('../components/builder/NearbyFinder').NearbyResult[]>((resolve) => {
+        const svc = new maps.places.PlacesService(map);
+        svc.nearbySearch(
+          { location, radius: radiusMeters, type: 'gas_station' },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (raw: any, status: any) => {
+            if (status !== maps.places.PlacesServiceStatus.OK || !raw) return resolve([]);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            resolve(raw.filter((r: any) => r.geometry?.location).map((r: any) => ({
+              placeId: r.place_id || '',
+              name: r.name || 'Fuel stop',
+              vicinity: r.vicinity || '',
+              rating: typeof r.rating === 'number' ? r.rating : undefined,
+              lat: r.geometry!.location!.lat(),
+              lng: r.geometry!.location!.lng(),
+            })));
+          }
+        );
+      });
+    };
   }, [maps, map]);
 
   useAutoFuel({
