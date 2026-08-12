@@ -8,75 +8,14 @@ const { effectiveTripLimit } = require('../lib/limits');
 // This CJS file loads them via dynamic import — each Promise resolves once and
 // is cached.
 const fuelModulePromise = import('../shared/fuel.js');
-const fuelValidationPromise = import('../shared/fuel-validation.js');
 const pdfSummaryPromise = import('../shared/pdf-summary.js');
+const tripPayloadPromise = import('../shared/trip-payload.js');
 const { authRequired } = require('../middleware/auth');
 const limits = require('../middleware/rate-limit');
 
 const router = express.Router();
 
 router.use('/api/trips', authRequired);
-
-const UPDATABLE_FIELDS = [
-  'name',
-  'description',
-  'coverEmoji',
-  'startDate',
-  'maxKmPerDay',
-  'stops',
-  'totalKm',
-  'totalDays',
-  'countries',
-  'fuelConsumption',
-  'fuelUnit',
-  'fuelPrice',
-  'fuelCurrency',
-  'fuelOverrides',
-  'tankRangeKm',
-  'tankSizeLitres',
-  'dataVersion',
-  'autoFuel',
-  'templateVisibility',
-];
-
-// Type checks for the non-fuel updatable fields — PUT must not persist
-// shapes that POST would have rejected (fuel fields go through
-// validateFuelField instead). Returns { value } or { error }, or null for
-// keys it doesn't cover.
-function validateTripField(key, value) {
-  switch (key) {
-    case 'name':
-      if (typeof value !== 'string' || !value.trim()) return { error: 'name must be a non-empty string' };
-      return { value: value.trim() };
-    case 'description':
-    case 'coverEmoji':
-      if (typeof value !== 'string') return { error: `${key} must be a string` };
-      return { value };
-    case 'startDate':
-      if (value !== null && typeof value !== 'string') return { error: 'startDate must be a string or null' };
-      return { value };
-    case 'maxKmPerDay':
-      if (typeof value !== 'number' || !(value > 0)) return { error: 'maxKmPerDay must be a positive number' };
-      return { value };
-    case 'totalKm':
-    case 'totalDays':
-    case 'dataVersion':
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return { error: `${key} must be a non-negative number` };
-      return { value };
-    case 'stops':
-    case 'countries':
-      if (!Array.isArray(value)) return { error: `${key} must be an array` };
-      return { value };
-    case 'autoFuel':
-      if (typeof value !== 'boolean') return { error: 'autoFuel must be a boolean' };
-      return { value };
-    case 'templateVisibility':
-      if (value !== 'public' && value !== 'unlisted') return { error: 'templateVisibility must be public or unlisted' };
-      return { value };
-    default:
-      return null;
-  }
-}
 
 const PIN_CATEGORIES = ['food', 'hotel', 'scenic', 'fuel', 'landmark', 'other'];
 const PIN_PRIORITIES = ['must', 'want', 'maybe'];
@@ -188,6 +127,11 @@ router.post('/api/trips', limits.tripCreate, async (req, res) => {
     }
 
     const body = req.body || {};
+    const { collectTripFields, CREATE_TRIP_EXTRA_FIELDS } = await tripPayloadPromise;
+    const extra = collectTripFields(body, CREATE_TRIP_EXTRA_FIELDS);
+    if (extra.error) {
+      return res.status(400).json({ error: extra.error, code: 'INVALID' });
+    }
     const trip = {
       ownerUid: req.uid,
       name: typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Untitled trip',
@@ -199,6 +143,7 @@ router.post('/api/trips', limits.tripCreate, async (req, res) => {
       totalKm: 0,
       totalDays: 0,
       countries: [],
+      ...extra.value,
       collaborators: [],
       shareToken: null,
       isShared: false,
@@ -261,16 +206,12 @@ router.put('/api/trips/:id', limits.tripUpdate, async (req, res) => {
     if (!canWrite(snap.data(), req.uid)) return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
 
     const body = req.body || {};
-    const { validateFuelField } = await fuelValidationPromise;
-    const update = {};
-    for (const key of UPDATABLE_FIELDS) {
-      if (!(key in body)) continue;
-      const result = validateFuelField(key, body[key]) || validateTripField(key, body[key]);
-      if (result && result.error) {
-        return res.status(400).json({ error: result.error, code: 'INVALID' });
-      }
-      update[key] = result ? result.value : body[key];
+    const { collectTripFields, UPDATABLE_TRIP_FIELDS } = await tripPayloadPromise;
+    const collected = collectTripFields(body, UPDATABLE_TRIP_FIELDS);
+    if (collected.error) {
+      return res.status(400).json({ error: collected.error, code: 'INVALID' });
     }
+    const update = collected.value;
     update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await ref.update(update);
     const updated = await ref.get();

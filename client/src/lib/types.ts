@@ -160,20 +160,22 @@ export type Trip = {
   countries?: string[];
   // Fuel cost estimator — all four optional. When consumption + price are
   // both set, the UI displays an estimated cost per day and per trip.
-  fuelConsumption?: number;
+  // `null` is an explicit clear: it survives JSON round-trips (undefined
+  // doesn't), which is how the client tells the server to blank a field.
+  fuelConsumption?: number | null;
   fuelUnit?: FuelUnit;
-  fuelPrice?: number;        // default per-litre/gallon price
+  fuelPrice?: number | null; // default per-litre/gallon price
   fuelCurrency?: string;     // 3-letter ISO code, e.g. 'EUR', 'USD'
-  fuelOverrides?: FuelOverride[];
+  fuelOverrides?: FuelOverride[] | null;
   // Approximate distance the car can cover on a full tank. Used by the
   // fuel-stop suggester (findFuelSearchTarget) and the per-day "long leg"
   // warning chip. Defaults to 500 km when unset.
-  tankRangeKm?: number;
+  tankRangeKm?: number | null;
   // Tank capacity in **litres** (canonical). MPG users see + edit this as
   // gallons in the UI but it's converted to litres for storage. Drives the
   // "approx. N fill-ups" trip-summary annotation. Optional; no fill-up
   // estimate when unset.
-  tankSizeLitres?: number;
+  tankSizeLitres?: number | null;
   /** Per-trip toggle for the auto-fuel engine. When true (or undefined for
    * existing trips), the engine reactively inserts fuel stops where the tank
    * would run low. Default-on retroactively applies to trips that pre-date

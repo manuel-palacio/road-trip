@@ -20,6 +20,8 @@ import { stopCategory } from '../lib/pin-meta';
 import { guessCategoryFromTypes, isConcretePlace } from '../lib/place-to-category';
 import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
+import { clearableFuelFields } from '../lib/fuel-payload';
+import { shouldHydrateTrip } from '../lib/trip-hydration';
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
@@ -308,11 +310,15 @@ export function Builder() {
   >(null);
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
+  const hydratedTripIdRef = useRef<string | null>(null);
 
-  // Hydrate from loaded trip
+  // Hydrate from loaded trip — once per trip. tripQuery.data also changes on
+  // refetches and on the post-save cache write; re-hydrating then would
+  // overwrite edits made while the save was in flight.
   useEffect(() => {
-    if (!isEditing || !tripQuery.data) return;
-    const t = tripQuery.data;
+    if (!isEditing || !shouldHydrateTrip(hydratedTripIdRef.current, tripQuery.data)) return;
+    const t = tripQuery.data!;
+    hydratedTripIdRef.current = t.id;
     const next: BuilderState = {
       tripId: t.id,
       name: t.name || '',
@@ -1060,19 +1066,21 @@ export function Builder() {
         countries: flagSet,
         totalKm: totals.totalKm,
         totalDays: totals.totalDays,
-        fuelConsumption: Number.isFinite(fuelConsumptionNum) && fuelConsumptionNum > 0 ? fuelConsumptionNum : undefined,
+        // Blank fuel inputs become explicit nulls so the server clears the
+        // stored values — undefined would be dropped by JSON.stringify and
+        // the old values would survive the save.
+        // state.tankSizeLitres is the canonical litres value (string for
+        // blank-vs-0 reasons). The input form converts to/from gallons
+        // for MPG users at the boundary; here it's already in litres.
+        ...clearableFuelFields({
+          fuelConsumption: fuelConsumptionNum,
+          fuelPrice: fuelPriceNum,
+          fuelOverrides: compiledOverrides,
+          tankRangeKm: state.tankRangeKm,
+          tankSizeLitres: parseFloat(state.tankSizeLitres),
+        }),
         fuelUnit: state.fuelUnit,
-        fuelPrice: Number.isFinite(fuelPriceNum) && fuelPriceNum > 0 ? fuelPriceNum : undefined,
         fuelCurrency: state.fuelCurrency || 'EUR',
-        fuelOverrides: compiledOverrides.length > 0 ? compiledOverrides : undefined,
-        tankRangeKm: state.tankRangeKm > 0 ? state.tankRangeKm : undefined,
-        tankSizeLitres: (() => {
-          // state.tankSizeLitres is the canonical litres value (string for
-          // blank-vs-0 reasons). The input form converts to/from gallons
-          // for MPG users at the boundary; here it's already in litres.
-          const litres = parseFloat(state.tankSizeLitres);
-          return Number.isFinite(litres) && litres > 0 ? litres : undefined;
-        })(),
         autoFuel: state.autoFuel,
         dataVersion: 3,
         stops: stops.map((s) => {
@@ -1112,6 +1120,10 @@ export function Builder() {
         navigate(`/builder/${saved.id}`, { replace: true });
       }
       queryClient.invalidateQueries({ queryKey: ['trips'] });
+      // Mark as hydrated before the cache write lands in tripQuery.data —
+      // on the create path the hydration effect would otherwise fire and
+      // reset local state.
+      hydratedTripIdRef.current = saved.id;
       queryClient.setQueryData(['trip', saved.id], saved);
       // Reset snapshot so the dirty check is clean — Cancel won't prompt
       snapshotRef.current = serializeSnapshot({ ...state, tripId: state.tripId || saved.id });

@@ -118,7 +118,11 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
       const from = stops[i - 1];
       const to = stops[i];
       const key = pairKey(from.id, to.id, to.routeMode);
-      if (!cache.has(key)) missing.push({ from, to, key, mode: to.routeMode });
+      // Failed entries stay in the cache so the UI can flag the leg, but
+      // they count as missing here — the next effect run (any stops edit)
+      // retries them instead of pinning km=0 until a full page reload.
+      const cached = cache.get(key);
+      if (!cached || cached.failed) missing.push({ from, to, key, mode: to.routeMode });
     }
     if (missing.length === 0) {
       setLoading(false);

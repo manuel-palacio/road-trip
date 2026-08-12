@@ -25,7 +25,7 @@ export function fuelBreakdownForLegs(
   unit: FuelUnit | undefined,
   defaultPrice: number | undefined | null,
   defaultCurrency: string | undefined,
-  overrides: FuelOverride[] | undefined,
+  overrides: FuelOverride[] | undefined | null,
 ): FuelBreakdown;
 
 export type LegCost = { amount: number; currency: string };
@@ -36,7 +36,7 @@ export function legCost(
   unit: FuelUnit | undefined,
   defaultPrice: number | undefined | null,
   defaultCurrency: string | undefined,
-  overrides: FuelOverride[] | undefined,
+  overrides: FuelOverride[] | undefined | null,
 ): LegCost | null;
 
 export function estimateFuelVolume(

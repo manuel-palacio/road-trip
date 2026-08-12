@@ -41,7 +41,7 @@ type Props = {
    * 0 (or omitted) hides the chip. */
   longLegKm?: number;
   fuelTimeline?: FuelTimeline;
-  tankRangeKm?: number;
+  tankRangeKm?: number | null;
   autoFuelWarningKm?: number;
   onOpenManualPicker?: () => void;
   trip?: { id?: string; name?: string };

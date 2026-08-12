@@ -9,11 +9,11 @@ import type { FuelOverride, FuelUnit, Stop } from '../lib/types';
 const MIN_ZOOM = 5;
 
 type FuelConfig = {
-  consumption: number | undefined;
+  consumption: number | undefined | null;
   unit: FuelUnit | undefined;
-  defaultPrice: number | undefined;
+  defaultPrice: number | undefined | null;
   defaultCurrency: string | undefined;
-  overrides: FuelOverride[] | undefined;
+  overrides: FuelOverride[] | undefined | null;
 };
 
 /** Renders a small cost chip ("€18") at the polyline midpoint of every routed

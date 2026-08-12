@@ -96,13 +96,14 @@ export function findFuelSearchTarget(
  * "long leg, consider refuel" warning chip. */
 export function longestLegOverRange(
   group: DayGroup,
-  tankRangeKm: number = DEFAULT_TANK_RANGE_KM,
+  tankRangeKm?: number | null,
 ): number {
+  const rangeKm = tankRangeKm ?? DEFAULT_TANK_RANGE_KM;
   let maxKm = 0;
   for (const { stop, index } of group.stops) {
     if (index === 0) continue;
     const km = stop.kmFromPrevious || 0;
-    if (km > tankRangeKm && km > maxKm) maxKm = km;
+    if (km > rangeKm && km > maxKm) maxKm = km;
   }
   return maxKm;
 }
