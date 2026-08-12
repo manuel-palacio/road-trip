@@ -77,13 +77,13 @@ export function DayColumn(p: Props) {
   let aaCls: string;
   let aaLabel: string;
   if (aaCount > 10) {
-    aaCls = 'bg-[rgba(214,90,63,0.18)] border border-[rgba(214,90,63,0.5)] text-[#ec8e74]';
+    aaCls = 'bg-danger-soft border border-danger/50 text-danger';
     aaLabel = `${aaCount}/10`;
   } else if (aaCount >= 9) {
-    aaCls = 'bg-[rgba(212,164,74,0.16)] border border-[rgba(212,164,74,0.4)] text-[#e0b86d]';
+    aaCls = 'bg-warn-soft border border-warn/40 text-warn';
     aaLabel = `${aaCount}/10`;
   } else {
-    aaCls = 'bg-[rgba(122,154,114,0.16)] border border-[rgba(122,154,114,0.4)] text-[#9bbf91]';
+    aaCls = 'bg-success-soft border border-success/40 text-success';
     aaLabel = `${aaCount}/10`;
   }
 
@@ -174,7 +174,7 @@ export function DayColumn(p: Props) {
             {showKmWarning && (
               <span
                 title={`Long day — ${g.km} km over ${dayMaxKm} limit`}
-                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#ec8e74] px-1.5 py-[2px] rounded border border-dashed border-[rgba(214,90,63,0.5)]"
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-danger px-1.5 py-[2px] rounded border border-dashed border-danger/50"
               >
                 Long day
               </span>
@@ -182,7 +182,7 @@ export function DayColumn(p: Props) {
             {showDriveWarning && (
               <span
                 title={`This day has ${formatDuration(g.durationSeconds)} of driving — over your ${formatDuration(p.maxDriveMinutesPerDay! * 60)} budget.`}
-                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#ec8e74] px-1.5 py-[2px] rounded border border-dashed border-[rgba(214,90,63,0.5)]"
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-danger px-1.5 py-[2px] rounded border border-dashed border-danger/50"
               >
                 Long drive
               </span>
@@ -193,7 +193,7 @@ export function DayColumn(p: Props) {
                 data-testid="suggest-hotel-chip"
                 onClick={p.onSuggestHotel}
                 title="This day ends without a place to sleep — search hotels near the day's last stop."
-                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#e0b86d] px-2 py-[6px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-warn px-2 py-[6px] rounded border border-dashed border-warn/50 inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
               >
                 <span aria-hidden>🌙</span>
                 Find hotel
@@ -202,7 +202,7 @@ export function DayColumn(p: Props) {
             {longLegKm > 0 && (
               <span
                 title="A single leg in this day exceeds your tank range — consider adding a fuel stop."
-                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#e0b86d] px-1.5 py-[2px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1"
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-warn px-1.5 py-[2px] rounded border border-dashed border-warn/50 inline-flex items-center gap-1"
               >
                 <span aria-hidden>⛽</span>
                 {longLegKm}km

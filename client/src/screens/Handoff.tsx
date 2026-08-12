@@ -226,7 +226,7 @@ export function Handoff() {
                     </button>
                   </div>
                 ) : (
-                  <div className="text-[#ec8e74] font-mono text-[10px] tracking-[0.14em] uppercase">
+                  <div className="text-danger font-mono text-[10px] tracking-[0.14em] uppercase">
                     {status === 'over'
                       ? `Too many stops (${stopsOnly.length}/${ANDROID_AUTO_MAX_STOPS_PER_DAY}) — split this day in the builder`
                       : 'No route to open'}

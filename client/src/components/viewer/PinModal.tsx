@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Pin, PinCategory, PinPriority } from '../../lib/types';
 import { PIN_CATEGORIES, PIN_CATEGORY_META, PIN_PRIORITIES, PIN_PRIORITY_META } from '../../lib/pin-meta';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { ACCENT_BTN, SECONDARY_BTN } from '../../lib/ui';
 
 export type PinDraft = {
   name: string;
@@ -39,8 +40,8 @@ type Props = {
   onSaveAsStop?: (draft: PinDraft) => void;
 };
 
-const ACCENT_BTN_CLS = 'bg-accent text-canvas border-0 rounded px-5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none';
-const SECONDARY_BTN_CLS = 'bg-transparent border border-line-strong text-paper-dim rounded px-3.5 py-2.5 font-mono text-[11px] tracking-[0.16em] uppercase cursor-pointer transition-colors hover:border-paper hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed';
+const ACCENT_BTN_CLS = ACCENT_BTN;
+const SECONDARY_BTN_CLS = SECONDARY_BTN;
 
 export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defaultPriority, defaultNotes, primaryAction, headerLabel, submitLabel, saving, onCancel, onSave, onSaveAsStop }: Props) {
   const isEdit = !!initial;
@@ -79,7 +80,7 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
         ref={trapRef}
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-[400px] max-w-[calc(100vw-32px)] bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise"
+        className="w-[400px] max-w-[calc(100vw-32px)] bg-surface border border-line-strong rounded-lg shadow-modal animate-rise"
       >
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
           <span id="pin-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
@@ -161,7 +162,7 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
                       selected
                         ? isMust
                           ? 'border-accent bg-accent-soft'
-                          : 'border-paper-dim bg-[rgba(243,236,222,0.04)]'
+                          : 'border-paper-dim bg-paper/[0.04]'
                         : 'border-line bg-canvas hover:border-paper-muted'
                     }`}
                   >

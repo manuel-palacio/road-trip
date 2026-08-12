@@ -83,9 +83,9 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
   }
 
   const aaPalette = {
-    ready: 'bg-[rgba(122,154,114,0.16)] border-[rgba(122,154,114,0.4)] text-[#9bbf91]',
-    limit: 'bg-[rgba(212,164,74,0.16)] border-[rgba(212,164,74,0.4)] text-[#e0b86d]',
-    over: 'bg-[rgba(214,90,63,0.18)] border-[rgba(214,90,63,0.5)] text-[#ec8e74]',
+    ready: 'bg-success-soft border-success/40 text-success',
+    limit: 'bg-warn-soft border-warn/40 text-warn',
+    over: 'bg-danger-soft border-danger/50 text-danger',
   }[status];
   const aaText = {
     ready: `Android Auto: Ready (${routableCount}/10 stops)`,
@@ -179,7 +179,7 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
         {longLegKm > 0 && (
           <span
             title="A single leg in this day exceeds the trip's tank range — consider a fuel stop."
-            className="inline-flex items-center gap-1 px-2 py-[3px] rounded font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#e0b86d] border border-dashed border-[rgba(212,164,74,0.5)]"
+            className="inline-flex items-center gap-1 px-2 py-[3px] rounded font-mono text-[9.5px] tracking-[0.14em] uppercase text-warn border border-dashed border-warn/50"
           >
             <span aria-hidden>⛽</span>
             {longLegKm} km without refuel
@@ -252,7 +252,7 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                     {stop.highlights.map((h) => (
                       <span
                         key={h}
-                        className="px-2 py-[2px] bg-[rgba(243,236,222,0.06)] border border-line rounded-full text-[11px] text-paper"
+                        className="px-2 py-[2px] bg-paper/[0.06] border border-line rounded-full text-[11px] text-paper"
                       >
                         {h}
                       </span>

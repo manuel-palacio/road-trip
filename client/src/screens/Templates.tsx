@@ -116,7 +116,7 @@ export function Templates() {
         )}
 
         {error && (
-          <div className="mb-6 px-4 py-2.5 rounded-md border border-[rgba(214,90,63,0.5)] bg-[rgba(214,90,63,0.12)] text-[#ec8e74] font-mono text-[11px] tracking-[0.14em] uppercase">
+          <div className="mb-6 px-4 py-2.5 rounded-md border border-danger/50 bg-[rgba(214,90,63,0.12)] text-danger font-mono text-[11px] tracking-[0.14em] uppercase">
             {error}
           </div>
         )}
@@ -125,7 +125,7 @@ export function Templates() {
           <p className="text-center font-serif italic text-paper-muted py-12">Loading templates…</p>
         ) : templates.error ? (
           <div className="text-center py-12 max-w-[480px] mx-auto">
-            <p className="font-serif italic text-[18px] text-[#ec8e74] mb-2">
+            <p className="font-serif italic text-[18px] text-danger mb-2">
               Couldn't load templates
             </p>
             <p className="text-paper-dim text-[13px] leading-snug">
@@ -212,7 +212,7 @@ function TemplateCardItem({
           {item.templateTags.slice(0, 4).map((t) => (
             <span
               key={t}
-              className="px-2 py-[2px] bg-[rgba(243,236,222,0.06)] border border-line rounded-full text-[10.5px] text-paper-dim"
+              className="px-2 py-[2px] bg-paper/[0.06] border border-line rounded-full text-[10.5px] text-paper-dim"
             >
               {t}
             </span>

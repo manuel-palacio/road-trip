@@ -187,7 +187,7 @@ export function BudgetPanel({
             <button
               type="submit"
               disabled={addPending}
-              className="flex-1 bg-accent text-white border border-accent rounded px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              className="flex-1 bg-accent text-canvas border border-accent rounded px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {addPending ? 'Adding…' : 'Add item'}
             </button>

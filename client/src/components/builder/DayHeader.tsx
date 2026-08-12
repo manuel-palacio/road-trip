@@ -53,13 +53,13 @@ export function DayHeader(p: Props) {
   let aaCls: string;
   let aaLabel: string;
   if (stopCount > 10) {
-    aaCls = 'bg-[rgba(214,90,63,0.18)] border border-[rgba(214,90,63,0.5)] text-[#ec8e74]';
+    aaCls = 'bg-danger-soft border border-danger/50 text-danger';
     aaLabel = `Android Auto: Too many stops (${stopCount}/10) · split this day`;
   } else if (stopCount >= 9) {
-    aaCls = 'bg-[rgba(212,164,74,0.16)] border border-[rgba(212,164,74,0.4)] text-[#e0b86d]';
+    aaCls = 'bg-warn-soft border border-warn/40 text-warn';
     aaLabel = `Android Auto: At limit (${stopCount}/10 stops)`;
   } else {
-    aaCls = 'bg-[rgba(122,154,114,0.16)] border border-[rgba(122,154,114,0.4)] text-[#9bbf91]';
+    aaCls = 'bg-success-soft border border-success/40 text-success';
     aaLabel = `Android Auto: Ready (${stopCount}/10 stops)`;
   }
   const showKmWarning = km > dayMaxKm;
@@ -136,14 +136,14 @@ export function DayHeader(p: Props) {
           {aaLabel}
         </span>
         {showKmWarning && (
-          <span className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#ec8e74] px-2 py-[3px] rounded border border-dashed border-[rgba(214,90,63,0.5)]">
+          <span className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-danger px-2 py-[3px] rounded border border-dashed border-danger/50">
             Long day · {km} km over {dayMaxKm} limit
           </span>
         )}
         {showDriveWarning && (
           <span
             title={`This day has ${formatDuration(durationSeconds)} of driving — over your ${formatDuration(maxDriveMinutesPerDay! * 60)} budget.`}
-            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#ec8e74] px-2 py-[3px] rounded border border-dashed border-[rgba(214,90,63,0.5)]"
+            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-danger px-2 py-[3px] rounded border border-dashed border-danger/50"
           >
             Long drive · {formatDuration(durationSeconds)} over {formatDuration(maxDriveMinutesPerDay! * 60)} budget
           </span>
@@ -151,7 +151,7 @@ export function DayHeader(p: Props) {
         {longLegKm > 0 && (
           <span
             title="A single leg in this day exceeds your tank range — consider adding a fuel stop."
-            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#e0b86d] px-2 py-[3px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1"
+            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-warn px-2 py-[3px] rounded border border-dashed border-warn/50 inline-flex items-center gap-1"
           >
             <span aria-hidden>⛽</span>
             {longLegKm} km without refuel
@@ -163,7 +163,7 @@ export function DayHeader(p: Props) {
             data-testid="suggest-hotel-chip"
             onClick={onSuggestHotel}
             title="This day ends without a place to sleep — search hotels near the day's last stop."
-            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#e0b86d] px-2 py-[3px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
+            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-warn px-2 py-[3px] rounded border border-dashed border-warn/50 inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
           >
             <span aria-hidden>🌙</span>
             No overnight · find hotel

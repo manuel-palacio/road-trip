@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, createPin, createTrip } from '../lib/api';
 import { MAX_IMPORT_STOPS, importedPointsToStops, type ParsedTripFile } from '../lib/trip-import';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { ACCENT_BTN, SECONDARY_BTN } from '../lib/ui';
 
 type Props = {
   parsed: ParsedTripFile;
@@ -62,7 +63,7 @@ export function ImportTripModal({ parsed, onClose }: Props) {
       aria-modal="true"
       aria-labelledby="import-trip-modal-title"
     >
-      <div ref={trapRef} className="w-[520px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
+      <div ref={trapRef} className="w-[520px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-modal animate-rise">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line shrink-0">
           <span id="import-trip-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
             Import route
@@ -125,7 +126,7 @@ export function ImportTripModal({ parsed, onClose }: Props) {
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="bg-transparent border border-line text-paper-dim px-3 py-[6px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
+            className={SECONDARY_BTN}
           >
             Cancel
           </button>
@@ -134,7 +135,7 @@ export function ImportTripModal({ parsed, onClose }: Props) {
             onClick={createFromImport}
             disabled={busy}
             data-testid="import-create"
-            className="bg-accent text-white px-4 py-[6px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className={ACCENT_BTN}
           >
             {busy ? 'Importing…' : 'Create trip'}
           </button>

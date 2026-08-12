@@ -23,7 +23,7 @@ export function NewTripTile({ hero = false, disabled = false, onClick, onUpgrade
         <button
           type="button"
           onClick={onUpgrade}
-          className="mt-1 inline-flex items-center gap-2 bg-accent text-canvas border-0 rounded px-4 py-2 font-mono text-[10.5px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_8px_24px_-6px_rgba(231,111,81,0.5)]"
+          className="mt-1 inline-flex items-center gap-2 bg-accent text-canvas border-0 rounded px-4 py-2 font-mono text-[10.5px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-accent-lift"
         >
           Upgrade to Pro <span aria-hidden>→</span>
         </button>

@@ -42,7 +42,7 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
             key={pin.id}
             className={`group border rounded-lg px-3 py-2.5 transition-colors ${
               isMust
-                ? 'border-[rgba(231,111,81,0.45)] bg-[rgba(231,111,81,0.06)] hover:border-accent'
+                ? 'border-[rgba(231,111,81,0.45)] bg-accent/[0.06] hover:border-accent'
                 : 'border-line bg-surface hover:border-line-strong'
             }`}
           >

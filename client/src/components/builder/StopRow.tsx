@@ -275,7 +275,7 @@ export function StopRow(p: Props) {
 
           <span
             className="px-2 py-[3px] rounded-full font-mono text-[9.5px] tracking-[0.16em] uppercase font-medium whitespace-nowrap"
-            style={{ backgroundColor: color, color: '#0d0e11' }}
+            style={{ backgroundColor: color, color: '#0d0e11' /* ink: fixed, sits on the theme-independent DAY_COLORS */ }}
           >
             Day {stop.dayNumber || 1}
           </span>
@@ -328,13 +328,13 @@ export function StopRow(p: Props) {
         {/* Highlights */}
         <div className="mt-2 flex flex-wrap gap-1.5 items-center">
           {highlights.map((text) => (
-            <span key={text} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-[3px] bg-[rgba(243,236,222,0.06)] border border-line rounded-full text-[11px] text-paper max-w-[200px]">
+            <span key={text} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-[3px] bg-paper/[0.06] border border-line rounded-full text-[11px] text-paper max-w-[200px]">
               <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={text}>{text}</span>
               <button
                 type="button"
                 aria-label="Remove note"
                 onClick={() => p.onRemoveHighlight(stop.id, text)}
-                className="bg-transparent border-0 text-paper-muted text-[13px] w-5 h-5 tap-target rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-white transition-colors"
+                className="bg-transparent border-0 text-paper-muted text-[13px] w-5 h-5 tap-target rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-canvas transition-colors"
               >
                 ×
               </button>

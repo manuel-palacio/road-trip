@@ -1378,7 +1378,7 @@ export function Builder() {
       aria-modal="true"
       aria-labelledby="trip-details-modal-title"
     >
-      <div ref={detailsTrapRef} className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
+      <div ref={detailsTrapRef} className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-modal animate-rise">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line bg-surface shrink-0">
           <span id="trip-details-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
             Trip details
@@ -1759,7 +1759,7 @@ export function Builder() {
             data-testid="modal-save-trip"
             onClick={() => { void onSave(); setDetailsOpen(false); }}
             disabled={saving || fuelHasErrors}
-            className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+            className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-accent-lift active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -1830,10 +1830,10 @@ export function Builder() {
         <div
           ref={mapStripRef}
           style={mapStripHeight !== null ? { height: mapStripHeight } : undefined}
-          className={`relative w-full ${mapStripHeight === null ? 'h-[clamp(280px,32dvh,420px)]' : ''} shrink-0 bg-[#13151a] border-b border-line`}
+          className={`relative w-full ${mapStripHeight === null ? 'h-[clamp(280px,32dvh,420px)]' : ''} shrink-0 bg-canvas border-b border-line`}
         >
           {routes.loading && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent/[0.06] overflow-hidden pointer-events-none z-[5]">
               <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
             </div>
           )}
@@ -2008,7 +2008,7 @@ export function Builder() {
               onClick={onSave}
               disabled={saving}
               data-testid="save-trip"
-              className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+              className="bg-accent text-canvas border border-accent rounded px-3 py-[5px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-accent-lift active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
@@ -2316,16 +2316,16 @@ export function Builder() {
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="bg-accent text-canvas border border-accent rounded px-3.5 py-[7px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)] active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+            className="bg-accent text-canvas border border-accent rounded px-3.5 py-[7px] text-[12px] tracking-wide font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-accent-lift active:translate-y-0 disabled:bg-surface-2 disabled:border-line disabled:text-paper-muted disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </footer>
       </aside>
 
-      <div className="relative w-full h-full bg-[#13151a]">
+      <div className="relative w-full h-full bg-canvas">
         {routes.loading && (
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent/[0.06] overflow-hidden pointer-events-none z-[5]">
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}

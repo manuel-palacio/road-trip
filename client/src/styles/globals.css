@@ -18,6 +18,11 @@
   /* Lifted canvas for elements that float over page content (cookie
    * banner, cards on the raw canvas) — solid, one step up from canvas. */
   --color-canvas-strong: 18 20 24;
+  /* Status hues for chips and inline warnings. Tuned against the dark
+   * canvas; the light theme darkens them for contrast on cream. */
+  --color-success: 155 191 145;
+  --color-warn: 224 184 109;
+  --color-danger: 236 142 116;
   /* Subtle hairlines: paper at 10% opacity over dark backgrounds. */
   --color-line: 243 236 222;
 }
@@ -33,6 +38,9 @@ html.theme-light {
   --color-paper-muted: 142 132 116;
   --color-accent: 198 88 60;
   --color-canvas-strong: 249 243 230;
+  --color-success: 74 110 66;
+  --color-warn: 150 108 26;
+  --color-danger: 176 62 38;
   /* Hairlines flip to ink at low opacity over light backgrounds. */
   --color-line: 28 26 22;
 }

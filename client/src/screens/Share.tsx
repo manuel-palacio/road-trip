@@ -8,6 +8,7 @@ import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { scheduleForStops } from '../../../shared/schedule';
+import { ACCENT_BTN } from '../lib/ui';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { flagEmoji } from '../lib/flags';
@@ -151,7 +152,7 @@ export function Share() {
       zoomControl: true,
       scaleControl: true,
       gestureHandling: 'greedy',
-      backgroundColor: '#13151a',
+      backgroundColor: theme.resolved === 'light' ? '#efe8d4' : '#13151a',
       clickableIcons: false,
     });
     infoWindowRef.current = new maps.InfoWindow();
@@ -429,7 +430,7 @@ export function Share() {
                 type="button"
                 onClick={() => navigate('/')}
                 data-testid="share-cta"
-                className="mt-3 inline-flex items-center gap-2 bg-accent text-canvas border-0 rounded px-4 py-[9px] font-mono text-[10px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)]"
+                className={`mt-3 ${ACCENT_BTN}`}
               >
                 Build your own trip <span aria-hidden>→</span>
               </button>
@@ -437,9 +438,9 @@ export function Share() {
           </div>
         </aside>
 
-        <div className="order-1 md:order-none relative h-[42vh] shrink-0 md:h-auto md:flex-1 min-w-0 bg-[#13151a] w-full">
+        <div className="order-1 md:order-none relative h-[42vh] shrink-0 md:h-auto md:flex-1 min-w-0 bg-canvas w-full">
           {routes.loading && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent/[0.06] overflow-hidden pointer-events-none z-[5]">
               <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
             </div>
           )}

@@ -84,7 +84,7 @@ export function DatePicker(p: Props) {
       ref={popoverRef}
       data-testid="date-picker-popover"
       style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left }}
-      className="z-[500] bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] p-2"
+      className="z-[500] bg-surface border border-line-strong rounded-lg shadow-modal p-2"
     >
       <DayPicker
         mode="single"

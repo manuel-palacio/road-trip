@@ -168,7 +168,7 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
               <button
                 type="button"
                 onClick={showUpgradeAlert}
-                className="bg-accent text-canvas border-0 rounded px-4 py-2 font-mono text-[10.5px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_8px_24px_-6px_rgba(231,111,81,0.5)]"
+                className="bg-accent text-canvas border-0 rounded px-4 py-2 font-mono text-[10.5px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-accent-lift"
               >
                 Subscribe → Pro
               </button>

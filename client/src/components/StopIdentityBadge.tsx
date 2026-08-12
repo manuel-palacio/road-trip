@@ -51,7 +51,7 @@ export function StopIdentityBadge({ stop, index, variant = 'card' }: Props) {
           bottom: -3,
           right: -3,
           backgroundColor: ring,
-          color: '#0d0e11',
+          color: '#0d0e11' /* ink: fixed, sits on the theme-independent DAY_COLORS */,
           fontSize: pipFont,
           border: '1px solid #f3ecde',
           lineHeight: 1,

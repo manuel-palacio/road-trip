@@ -54,7 +54,7 @@ export function PublishTemplateModal({
     >
       <div
         ref={trapRef}
-        className="bg-surface border border-line rounded-xl p-6 max-w-md w-full shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] flex flex-col gap-4"
+        className="bg-surface border border-line rounded-xl p-6 max-w-md w-full shadow-modal flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3">
@@ -86,7 +86,7 @@ export function PublishTemplateModal({
         )}
 
         {tooFewStops && !trip.isTemplate && (
-          <div className="bg-[rgba(214,90,63,0.12)] border border-[rgba(214,90,63,0.4)] text-[#ec8e74] px-3 py-2 rounded text-[12px] leading-snug">
+          <div className="bg-[rgba(214,90,63,0.12)] border border-[rgba(214,90,63,0.4)] text-danger px-3 py-2 rounded text-[12px] leading-snug">
             Templates need at least 3 stops. This trip has {stopCount}.
           </div>
         )}
@@ -196,7 +196,7 @@ export function PublishTemplateModal({
         </fieldset>
 
         {errorMessage && (
-          <div className="text-[#ec8e74] font-mono text-[10px] tracking-[0.14em] uppercase">
+          <div className="text-danger font-mono text-[10px] tracking-[0.14em] uppercase">
             {errorMessage}
           </div>
         )}
@@ -207,7 +207,7 @@ export function PublishTemplateModal({
               type="button"
               onClick={onUnpublish}
               disabled={busy}
-              className="bg-transparent border border-line text-paper-dim px-3.5 py-[7px] rounded text-[12px] tracking-wide transition-colors hover:border-[#ec8e74] hover:text-[#ec8e74] disabled:opacity-50"
+              className="bg-transparent border border-line text-paper-dim px-3.5 py-[7px] rounded text-[12px] tracking-wide transition-colors hover:border-danger hover:text-danger disabled:opacity-50"
             >
               {busy ? 'Working…' : 'Unpublish'}
             </button>

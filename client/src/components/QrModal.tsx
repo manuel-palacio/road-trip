@@ -38,7 +38,7 @@ export function QrModal({ url, title, subtitle, onClose }: Props) {
     >
       <div
         ref={trapRef}
-        className="bg-surface border border-line rounded-xl p-6 max-w-sm w-full shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
+        className="bg-surface border border-line rounded-xl p-6 max-w-sm w-full shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="mb-4 flex items-start justify-between gap-3">

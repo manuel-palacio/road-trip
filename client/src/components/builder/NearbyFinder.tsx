@@ -165,7 +165,7 @@ export function NearbyFinder({ category, fuelType, target, maps, map, onSelect, 
     >
       <div
         ref={trapRef}
-        className="bg-surface border border-line rounded-xl p-5 max-w-md w-full max-h-[85vh] flex flex-col shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
+        className="bg-surface border border-line rounded-xl p-5 max-w-md w-full max-h-[85vh] flex flex-col shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 mb-3">
@@ -195,7 +195,7 @@ export function NearbyFinder({ category, fuelType, target, maps, map, onSelect, 
           {results === null ? (
             <p className="text-center font-serif italic text-paper-muted py-8">Searching nearby…</p>
           ) : error ? (
-            <p className="text-[#ec8e74] font-mono text-[10px] tracking-[0.14em] uppercase py-8 text-center">
+            <p className="text-danger font-mono text-[10px] tracking-[0.14em] uppercase py-8 text-center">
               {error}
             </p>
           ) : results.length === 0 ? (

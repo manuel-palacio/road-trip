@@ -266,7 +266,7 @@ export function Viewer() {
       zoomControl: true,
       scaleControl: true,
       gestureHandling: 'greedy',
-      backgroundColor: '#13151a',
+      backgroundColor: theme.resolved === 'light' ? '#efe8d4' : '#13151a',
       clickableIcons: false,
     });
     stopInfoWindowRef.current = new maps.InfoWindow();
@@ -537,7 +537,7 @@ export function Viewer() {
                 </p>
                 <a
                   href="/#upgrade"
-                  className="mt-1 inline-block bg-accent text-white px-4 py-2 rounded font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-accent/90 transition-colors"
+                  className="mt-1 inline-block bg-accent text-canvas px-4 py-2 rounded font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-accent/90 transition-colors"
                 >
                   Upgrade to Pro
                 </a>
@@ -615,7 +615,7 @@ export function Viewer() {
                 onClick={() => exportTrip('pdf-branded')}
                 disabled={exporting !== null}
                 title="Download a polished branded PDF — Pro feature"
-                className="bg-transparent border border-accent text-accent px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:bg-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="bg-transparent border border-accent text-accent px-2.5 py-[5px] rounded font-mono text-[9.5px] tracking-[0.18em] uppercase hover:bg-accent hover:text-canvas disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {exporting === 'pdf-branded' ? '…' : 'PDF Pro'}
               </button>
@@ -633,9 +633,9 @@ export function Viewer() {
         </footer>
       </aside>
 
-      <div className="relative w-full h-full bg-[#13151a]">
+      <div className="relative w-full h-full bg-canvas">
         {routes.loading && (
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent/[0.06] overflow-hidden pointer-events-none z-[5]">
             <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
           </div>
         )}

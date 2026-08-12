@@ -42,7 +42,7 @@ export function HeaderNav({ children }: { children: React.ReactNode }) {
         {open && (
           <div
             data-testid="header-menu-panel"
-            className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[180px] flex flex-col items-stretch gap-2 p-3 rounded-lg border border-line-strong bg-canvas-strong shadow-[0_20px_50px_-12px_rgba(0,0,0,0.6)]"
+            className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[180px] flex flex-col items-stretch gap-2 p-3 rounded-lg border border-line-strong bg-canvas-strong shadow-pop"
             onClick={() => setOpen(false)}
           >
             {children}
