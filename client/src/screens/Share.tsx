@@ -57,8 +57,6 @@ export function Share() {
   const stops = useMemo<Stop[]>(() => trip?.stops || [], [trip]);
 
   const [activeTab, setActiveTab] = useState<'days' | 'pins' | 'budget'>('days');
-  // Mobile drawer state — sidebar slides in from left below md (768px).
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hiddenDays, setHiddenDays] = useState<Set<number>>(new Set());
   function toggleDay(day: number) {
     setHiddenDays((prev) => {
@@ -299,14 +297,17 @@ export function Share() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Top banner */}
-      <div className="flex items-center justify-between gap-4 px-6 py-2.5 border-b border-line bg-canvas/85 backdrop-blur-md">
+    <div className="flex flex-col min-h-screen md:h-screen">
+      {/* Owner byline. The sign-up ask lives at the end of the itinerary
+          (issue #122) — a recipient came here to read a trip, not to
+          sign up, so the header stays quiet and the CTA follows the
+          content it's selling. */}
+      <div className="flex items-center justify-between gap-4 px-4 md:px-6 py-2.5 border-b border-line bg-canvas/85 backdrop-blur-md">
         <div className="flex items-center gap-3 min-w-0">
           {owner?.photoURL ? (
-            <img src={owner.photoURL} alt="" className="w-7 h-7 rounded-full object-cover border border-line" />
+            <img src={owner.photoURL} alt="" className="w-7 h-7 rounded-full object-cover border border-line shrink-0" />
           ) : (
-            <span className="w-7 h-7 rounded-full bg-surface-2 border border-line inline-flex items-center justify-center font-mono text-[10px] text-paper-dim">
+            <span className="w-7 h-7 shrink-0 rounded-full bg-surface-2 border border-line inline-flex items-center justify-center font-mono text-[10px] text-paper-dim">
               {(owner?.displayName || 'A').slice(0, 1).toUpperCase()}
             </span>
           )}
@@ -319,27 +320,18 @@ export function Share() {
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-2 bg-accent text-canvas border-0 rounded px-3.5 py-[7px] font-mono text-[10px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)]"
+          className="shrink-0 inline-flex items-center gap-1.5 bg-transparent border border-line-strong text-paper-dim rounded px-3 py-[7px] font-mono text-[10px] tracking-[0.18em] uppercase cursor-pointer transition-colors hover:text-paper hover:border-paper-dim"
         >
-          Sign in to build your own <span aria-hidden>→</span>
+          Sign in <span aria-hidden>→</span>
         </button>
       </div>
 
-      <section className="relative flex flex-1 min-h-0 overflow-hidden">
-        {sidebarOpen && (
-          <div
-            className="md:hidden fixed inset-0 bg-black/55 z-30 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden
-          />
-        )}
+      {/* Mobile stacks map over itinerary; md+ keeps the sidebar + map
+          split. No drawer on phones — the itinerary is the point. */}
+      <section className="relative flex flex-col md:flex-row flex-1 min-h-0 md:overflow-hidden">
         <aside
-          className={`bg-canvas border-r border-line flex flex-col overflow-hidden
-            fixed md:static inset-y-0 left-0 z-40
-            w-[85vw] max-w-[360px] md:w-[360px] md:max-w-none md:shrink-0
-            transition-transform duration-300 ease-out-soft
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          `}
+          className="order-2 md:order-none bg-canvas md:border-r border-line flex flex-col
+            w-full md:w-[360px] md:shrink-0 md:overflow-hidden"
         >
           <header className="flex items-center gap-3 px-5 py-4 border-b border-line">
             <span className="text-[24px] leading-none">{trip.coverEmoji || '🚗'}</span>
@@ -395,7 +387,7 @@ export function Share() {
             onChange={setActiveTab}
           />
 
-          <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] px-4 py-3 flex flex-col gap-2.5">
+          <div className="md:flex-1 md:overflow-y-auto [scrollbar-gutter:stable] px-4 py-3 flex flex-col gap-2.5">
             {activeTab === 'days' ? (
               groups.length === 0 ? (
                 <p className="px-2 py-6 text-center font-serif italic text-[14px] text-paper-muted">
@@ -424,23 +416,33 @@ export function Share() {
             ) : (
               <PinList pins={pins} />
             )}
+
+            {/* The ask, after the goods. */}
+            <div className="mt-2 mb-1 p-4 rounded-lg border border-line bg-surface/50 text-center">
+              <p className="font-serif italic text-[14px] text-paper leading-[1.45]">
+                Planning something like this?
+              </p>
+              <p className="mt-1 font-serif italic text-[12.5px] text-paper-dim leading-[1.45]">
+                Map your own route, and let the days, fuel and stops work themselves out.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                data-testid="share-cta"
+                className="mt-3 inline-flex items-center gap-2 bg-accent text-canvas border-0 rounded px-4 py-[9px] font-mono text-[10px] tracking-[0.18em] uppercase font-medium cursor-pointer transition-all duration-200 ease-out-soft hover:-translate-y-px hover:shadow-[0_6px_22px_-6px_rgba(231,111,81,0.5)]"
+              >
+                Build your own trip <span aria-hidden>→</span>
+              </button>
+            </div>
           </div>
         </aside>
 
-        <div className="relative flex-1 min-w-0 bg-[#13151a] w-full">
+        <div className="order-1 md:order-none relative h-[42vh] shrink-0 md:h-auto md:flex-1 min-w-0 bg-[#13151a] w-full">
           {routes.loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[rgba(231,111,81,0.06)] overflow-hidden pointer-events-none z-[5]">
               <div className="absolute inset-y-0 left-0 w-2/5 bg-gradient-to-r from-transparent via-accent to-transparent animate-drift" />
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-            className="md:hidden absolute top-3 left-3 z-20 bg-canvas/85 backdrop-blur border border-line text-paper-dim w-10 h-10 rounded-md text-[18px] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:text-paper hover:border-paper-dim transition-colors"
-          >
-            ☰
-          </button>
           {/* absolute inset-0 sidesteps any flex/grid height-propagation
               quirks — the map fills its positioned parent regardless. */}
           <div ref={setMapDiv} className="absolute inset-0" />
