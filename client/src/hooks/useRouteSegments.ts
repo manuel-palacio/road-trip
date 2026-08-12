@@ -14,11 +14,16 @@ type Segment = {
    Cleared automatically by browser on full page refresh. */
 const cache = new Map<string, Segment>();
 
-function pairKey(fromId: string, toId: string, mode: StopRouteMode | undefined) {
-  // Mode is part of the cache key so flipping a leg between fastest/scenic
-  // triggers a fresh fetch with the right routeModifiers instead of
-  // serving a stale path.
-  return `${fromId}::${toId}::${mode || 'fastest'}`;
+function viaSignature(viaPoints: { lat: number; lng: number }[] | undefined): string {
+  if (!viaPoints || viaPoints.length === 0) return '';
+  return viaPoints.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
+}
+
+function pairKey(fromId: string, toId: string, to: Pick<Stop, 'routeMode' | 'viaPoints'>) {
+  // Mode and via-points are part of the cache key so flipping a leg between
+  // fastest/scenic or dragging a via-point triggers a fresh fetch instead
+  // of serving a stale path (issue #117).
+  return `${fromId}::${toId}::${to.routeMode || 'fastest'}::${viaSignature(to.viaPoints)}`;
 }
 
 function routeModifiersFor(mode: StopRouteMode | undefined) {
@@ -44,6 +49,7 @@ type RoutesLibrary = {
       travelMode: string;
       fields: string[];
       routeModifiers?: { avoidHighways?: boolean; avoidTolls?: boolean; avoidFerries?: boolean };
+      intermediates?: { lat: number; lng: number }[];
     }) => Promise<{ routes?: RouteResponse[] }>;
   };
 };
@@ -74,7 +80,7 @@ function seedCacheFromPersistedPaths(stops: readonly Stop[]): boolean {
   for (let i = 1; i < stops.length; i++) {
     const from = stops[i - 1];
     const to = stops[i];
-    const key = pairKey(from.id, to.id, to.routeMode);
+    const key = pairKey(from.id, to.id, to);
     if (cache.has(key)) continue;
     const path = to.routePath;
     if (!path || path.length < 2) continue;
@@ -117,7 +123,7 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
     for (let i = 1; i < stops.length; i++) {
       const from = stops[i - 1];
       const to = stops[i];
-      const key = pairKey(from.id, to.id, to.routeMode);
+      const key = pairKey(from.id, to.id, to);
       // Failed entries stay in the cache so the UI can flag the leg, but
       // they count as missing here — the next effect run (any stops edit)
       // retries them instead of pinning km=0 until a full page reload.
@@ -143,12 +149,16 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
         if (cancelled || reqRef.current !== myReq) break;
         try {
           const modifiers = routeModifiersFor(mode);
+          const viaPoints = to.viaPoints || [];
           const { routes } = await Route.computeRoutes({
             origin: { lat: from.lat, lng: from.lng },
             destination: { lat: to.lat, lng: to.lng },
             travelMode: 'DRIVING',
             fields: ['distanceMeters', 'durationMillis', 'path'],
             ...(modifiers ? { routeModifiers: modifiers } : {}),
+            ...(viaPoints.length > 0
+              ? { intermediates: viaPoints.map((p) => ({ lat: p.lat, lng: p.lng })) }
+              : {}),
           });
           const route = routes?.[0];
           if (!route) throw new Error('No route returned');
@@ -184,7 +194,7 @@ export function useRouteSegments(stops: Stop[], maps: typeof google.maps | null)
         };
       }
       const prev = stops[i - 1];
-      const seg = cache.get(pairKey(prev.id, stop.id, stop.routeMode));
+      const seg = cache.get(pairKey(prev.id, stop.id, stop));
       if (!seg) return stop;
       return {
         ...stop,

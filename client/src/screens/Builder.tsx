@@ -24,6 +24,8 @@ import { clearableFuelFields } from '../lib/fuel-payload';
 import { shouldHydrateTrip } from '../lib/trip-hydration';
 import { scheduleForStops } from '../../../shared/schedule';
 import { dayEndTarget, dayNeedsOvernightSuggestion } from '../lib/overnight-suggest';
+
+const MAX_VIA_POINTS = 3;
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
@@ -896,21 +898,108 @@ export function Builder() {
     };
   }, [maps, map, dayedStops]);
 
-  // Sync polylines per segment in day color
+  // Sync polylines per segment in day color. Each leg polyline is a drag
+  // surface: mousedown starts a via-point drag (issue #117) — a ghost
+  // marker follows the cursor and the drop point becomes an intermediate
+  // on that leg's route.
   useEffect(() => {
     if (!maps || !map) return;
     polylinesRef.current.forEach((p) => p.setMap(null));
     polylinesRef.current = [];
+    const listeners: google.maps.MapsEventListener[] = [];
+
+    function beginViaDrag(stop: Stop, startAt: google.maps.LatLng) {
+      if ((stop.viaPoints || []).length >= MAX_VIA_POINTS) return;
+      map!.setOptions({ draggable: false });
+      polylinesRef.current.forEach((p) => p.setOptions({ clickable: false }));
+      const ghost = new maps!.Marker({
+        position: startAt,
+        map,
+        zIndex: 60,
+        icon: {
+          path: maps!.SymbolPath.CIRCLE,
+          scale: 6,
+          fillColor: '#e76f51',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        },
+      });
+      let last = startAt;
+      const moveListener = map!.addListener('mousemove', (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          last = e.latLng;
+          ghost.setPosition(e.latLng);
+        }
+      });
+      function finish() {
+        window.removeEventListener('mouseup', finish);
+        moveListener.remove();
+        ghost.setMap(null);
+        map!.setOptions({ draggable: true });
+        polylinesRef.current.forEach((p) => p.setOptions({ clickable: true }));
+        addViaPoint(stop.id, { lat: last.lat(), lng: last.lng() });
+      }
+      window.addEventListener('mouseup', finish);
+    }
+
     for (let i = 1; i < dayedStops.length; i++) {
-      const path = getStopPath(dayedStops[i]);
+      const stop = dayedStops[i];
+      const path = getStopPath(stop);
       if (!path || path.length === 0) continue;
       const polyline = new maps.Polyline({
         path,
         map,
-        ...polylineOptionsFor(dayedStops[i].routeMode, dayColor(dayedStops[i].dayNumber)),
+        ...polylineOptionsFor(stop.routeMode, dayColor(stop.dayNumber)),
       });
+      listeners.push(
+        polyline.addListener('mousedown', (e: google.maps.MapMouseEvent) => {
+          if (e.latLng) beginViaDrag(stop, e.latLng);
+        }),
+      );
       polylinesRef.current.push(polyline);
     }
+    return () => {
+      listeners.forEach((l) => l.remove());
+    };
+  }, [maps, map, dayedStops]);
+
+  // Via-point markers — draggable beads on the route; drag to move the
+  // via, right-click to remove it and restore the leg.
+  const viaMarkersRef = useRef<google.maps.Marker[]>([]);
+  useEffect(() => {
+    if (!maps || !map) return;
+    viaMarkersRef.current.forEach((m) => m.setMap(null));
+    viaMarkersRef.current = [];
+    for (const stop of dayedStops) {
+      (stop.viaPoints || []).forEach((point, index) => {
+        const marker = new maps.Marker({
+          position: point,
+          map,
+          draggable: true,
+          zIndex: 55,
+          title: 'Via point — drag to move, right-click to remove',
+          icon: {
+            path: maps.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: '#e76f51',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 1.5,
+          },
+        });
+        marker.addListener('dragend', () => {
+          const pos = marker.getPosition();
+          if (pos) moveViaPoint(stop.id, index, { lat: pos.lat(), lng: pos.lng() });
+        });
+        marker.addListener('rightclick', () => removeViaPoint(stop.id, index));
+        viaMarkersRef.current.push(marker);
+      });
+    }
+    return () => {
+      viaMarkersRef.current.forEach((m) => m.setMap(null));
+      viaMarkersRef.current = [];
+    };
   }, [maps, map, dayedStops]);
 
   // Cleanup on unmount
@@ -934,6 +1023,48 @@ export function Builder() {
   }
   function removeStop(id: string) {
     setState((s) => ({ ...s, stops: reassignTypes(removeStopById(s.stops, id)) }));
+  }
+  // Via-point editing (issue #117). Editing strips the stop's persisted
+  // routePath — it describes the OLD geometry and would otherwise be
+  // seeded into the segment cache under the new via signature.
+  function addViaPoint(id: string, point: { lat: number; lng: number }) {
+    setState((s) => ({
+      ...s,
+      stops: s.stops.map((x) => {
+        if (x.id !== id) return x;
+        const existing = x.viaPoints || [];
+        if (existing.length >= MAX_VIA_POINTS) return x;
+        return markUserTouched({ ...x, viaPoints: [...existing, point], routePath: undefined });
+      }),
+    }));
+  }
+  function moveViaPoint(id: string, index: number, point: { lat: number; lng: number }) {
+    setState((s) => ({
+      ...s,
+      stops: s.stops.map((x) =>
+        x.id === id
+          ? markUserTouched({
+              ...x,
+              viaPoints: (x.viaPoints || []).map((v, i) => (i === index ? point : v)),
+              routePath: undefined,
+            })
+          : x,
+      ),
+    }));
+  }
+  function removeViaPoint(id: string, index: number) {
+    setState((s) => ({
+      ...s,
+      stops: s.stops.map((x) =>
+        x.id === id
+          ? markUserTouched({
+              ...x,
+              viaPoints: (x.viaPoints || []).filter((_, i) => i !== index),
+              routePath: undefined,
+            })
+          : x,
+      ),
+    }));
   }
   function setStopStayMinutes(id: string, minutes: number) {
     setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? markUserTouched({ ...x, stayMinutes: minutes || undefined }) : x)) }));
@@ -1080,6 +1211,7 @@ export function Builder() {
         forceDayStart: x.forceDayStart === true,
         highlights: x.highlights || [],
         routeMode: x.routeMode || 'fastest',
+        viaPoints: x.viaPoints || [],
         category: x.category || '',
         priority: x.priority || '',
         notes: x.notes || '',
@@ -1151,6 +1283,7 @@ export function Builder() {
             durationFromPrevious: s.durationFromPrevious || '',
             durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
             ...(s.routeMode ? { routeMode: s.routeMode } : {}),
+            ...(s.viaPoints && s.viaPoints.length > 0 ? { viaPoints: s.viaPoints } : {}),
             ...(s.category ? { category: s.category } : {}),
             ...(s.priority ? { priority: s.priority } : {}),
             ...(s.notes ? { notes: s.notes } : {}),

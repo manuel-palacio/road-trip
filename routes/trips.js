@@ -351,10 +351,17 @@ function buildGpx(trip, pins) {
   // suggestions, not turn points.
   const rtepts = stops
     .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number' && !isFuelStop(s))
-    .map(
-      (s) =>
+    .map((s) => {
+      // Via-points (issue #117) shape the leg ENDING at this stop, so they
+      // precede it in route order.
+      const vias = (Array.isArray(s.viaPoints) ? s.viaPoints : [])
+        .filter((v) => v && typeof v.lat === 'number' && typeof v.lng === 'number')
+        .map((v) => `    <rtept lat="${v.lat}" lon="${v.lng}"><name>via</name></rtept>`);
+      return [
+        ...vias,
         `    <rtept lat="${s.lat}" lon="${s.lng}"><name>${escapeXml(s.label || s.name || '')}</name></rtept>`,
-    )
+      ].join('\n');
+    })
     .join('\n');
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',

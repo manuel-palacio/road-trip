@@ -5,11 +5,11 @@ import type { Stop } from '../../lib/types';
 
 // The hook's routes-library import is memoized module-wide, so every test
 // shares this fake. Swap `computeRoutesImpl` per test to control outcomes.
-let computeRoutesImpl: () => Promise<{ routes?: unknown[] }>;
+let computeRoutesImpl: (req?: unknown) => Promise<{ routes?: unknown[] }>;
 const fakeMaps = {
   importLibrary: () =>
     Promise.resolve({
-      Route: { computeRoutes: () => computeRoutesImpl() },
+      Route: { computeRoutes: (req: unknown) => computeRoutesImpl(req) },
     }),
 } as unknown as NonNullable<Parameters<typeof useRouteSegments>[1]>;
 
@@ -54,6 +54,38 @@ describe('useRouteSegments', () => {
 
     await waitFor(() => expect(result.current.enriched[1].kmFromPrevious).toBe(100));
     expect(result.current.enriched[1].routingFailed).toBe(false);
+  });
+
+  it('routes through via-points, caches per via signature, and restores the direct route on removal', async () => {
+    const requests: { intermediates?: { lat: number; lng: number }[] }[] = [];
+    computeRoutesImpl = (req) => {
+      requests.push(req as (typeof requests)[0]);
+      return Promise.resolve(okRoute(100));
+    };
+    const a = mkStop('via-a', 5, 5);
+    const b = mkStop('via-b', 6, 6);
+
+    const { result, rerender } = renderHook(
+      ({ s }: { s: Stop[] }) => useRouteSegments(s, fakeMaps),
+      { initialProps: { s: [a, b] } },
+    );
+    await waitFor(() => expect(result.current.enriched[1].kmFromPrevious).toBe(100));
+    expect(requests).toHaveLength(1);
+    expect(requests[0].intermediates).toBeUndefined();
+
+    computeRoutesImpl = (req) => {
+      requests.push(req as (typeof requests)[0]);
+      return Promise.resolve(okRoute(150));
+    };
+    const via = { lat: 5.5, lng: 5.9 };
+    rerender({ s: [a, { ...b, viaPoints: [via] }] });
+    await waitFor(() => expect(result.current.enriched[1].kmFromPrevious).toBe(150));
+    expect(requests).toHaveLength(2);
+    expect(requests[1].intermediates).toEqual([via]);
+
+    rerender({ s: [a, { ...b }] });
+    await waitFor(() => expect(result.current.enriched[1].kmFromPrevious).toBe(100));
+    expect(requests).toHaveLength(2);
   });
 
   it('does not refetch legs that already resolved successfully', async () => {

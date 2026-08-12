@@ -51,6 +51,10 @@ export type Stop = {
   kmFromPrevious?: number;
   durationFromPrevious?: string;
   durationSecondsFromPrevious?: number;
+  /** Route-shaping via-points for the leg ENDING at this stop (issue #117).
+   * Dropped by dragging the leg polyline; sent to computeRoutes as
+   * `intermediates`. Max 3 per leg. */
+  viaPoints?: { lat: number; lng: number }[];
   // Time-of-day scheduling (issue #114). stayMinutes = planned visit length,
   // feeds the arrival-time clock. nights (overnight stops only) = how many
   // day numbers the stay consumes; default 1.
