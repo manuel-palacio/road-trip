@@ -51,12 +51,17 @@ export function fuelVolumeForLegs(
   unit: FuelUnit | undefined,
 ): number;
 
-export function formatVolume(volume: number | null | undefined, unit: FuelUnit | undefined): string | null;
+export function formatVolume(
+  volume: number | null | undefined,
+  unit: FuelUnit | undefined,
+  fuelType?: string | null,
+): string | null;
 
 export function formatFillUps(
   volume: number | null | undefined,
   tankSizeLitres: number | null | undefined,
   unit: FuelUnit | undefined,
+  fuelType?: string | null,
 ): string | null;
 
 export function formatCurrency(

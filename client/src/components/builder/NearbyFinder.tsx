@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FuelSearchTarget } from '../../lib/fuel-stops';
 import { PIN_CATEGORY_META } from '../../lib/pin-meta';
-import { placeTypeForCategory } from '../../lib/nearby-search';
+import { nearbySearchFilterFor } from '../../lib/nearby-search';
 import { measureDetour } from '../../lib/route-detour';
 import { claimNearbySearch } from '../../lib/api';
 import type { PinCategory } from '../../lib/types';
@@ -22,6 +22,9 @@ type Props = {
    * filter, the modal heading + button labels, and the empty-state
    * copy. The legacy fuel-stop flow passes 'fuel'. */
   category: PinCategory;
+  /** Trip's vehicle kind — 'ev' makes the fuel category search charging
+   * stations instead of gas stations (issue #118). */
+  fuelType?: string | null;
   target: FuelSearchTarget;
   // Google Maps SDK + a map instance for the legacy PlacesService.
   maps: typeof google.maps;
@@ -55,12 +58,12 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
  * surrounding UI copy so the same component handles fuel / food /
  * hotel / scenic etc. Uses the legacy PlacesService API which is
  * stable; Place.searchNearby() would also work. */
-export function NearbyFinder({ category, target, maps, map, onSelect, onClose, detourCapKm, legPolyline }: Props) {
+export function NearbyFinder({ category, fuelType, target, maps, map, onSelect, onClose, detourCapKm, legPolyline }: Props) {
   const [results, setResults] = useState<NearbyResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
   const meta = PIN_CATEGORY_META[category];
-  const placeType = placeTypeForCategory(category);
+  const searchFilter = nearbySearchFilterFor(category, fuelType);
   const defaultMode: SelectMode = category === 'fuel' ? 'stop' : 'pin';
   const otherMode: SelectMode = defaultMode === 'stop' ? 'pin' : 'stop';
 
@@ -106,7 +109,7 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
       const request: google.maps.places.PlaceSearchRequest = {
         location: target.midpoint,
         radius: SEARCH_RADIUS_M,
-        ...(placeType ? { type: placeType } : {}),
+        ...searchFilter,
       };
       service.nearbySearch(request, (raw, status) => {
       if (status !== maps.places.PlacesServiceStatus.OK || !raw) {
@@ -142,7 +145,7 @@ export function NearbyFinder({ category, target, maps, map, onSelect, onClose, d
       setResults(filtered);
     });
     })();
-  }, [maps, map, target.midpoint, placeType, meta.label]);
+  }, [maps, map, target.midpoint, searchFilter.type, searchFilter.keyword, meta.label]);
 
   const startName = target.legStart.label || target.legStart.name || 'start';
   const endName = target.legEnd.label || target.legEnd.name || 'end';

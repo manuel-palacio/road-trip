@@ -1,4 +1,4 @@
-import { TYPE_FOR_CATEGORY, placeTypeForCategory } from '../nearby-search';
+import { TYPE_FOR_CATEGORY, nearbySearchFilterFor, placeTypeForCategory } from '../nearby-search';
 
 describe('TYPE_FOR_CATEGORY (issue #71)', () => {
   it('maps fuel → gas_station (preserves the legacy FuelStopFinder behaviour)', () => {
@@ -28,5 +28,28 @@ describe('placeTypeForCategory', () => {
   });
   it('returns null for categories without a backing type', () => {
     expect(placeTypeForCategory('other')).toBeNull();
+  });
+});
+
+describe('placeTypeForCategory — EV (issue #118)', () => {
+  it('searches charging stations for fuel on EV trips, gas stations otherwise', () => {
+    expect(placeTypeForCategory('fuel', 'ev')).toBe('electric_vehicle_charging_station');
+    expect(placeTypeForCategory('fuel')).toBe('gas_station');
+    expect(placeTypeForCategory('fuel', 'diesel')).toBe('gas_station');
+    expect(placeTypeForCategory('hotel', 'ev')).toBe('lodging');
+  });
+});
+
+describe('nearbySearchFilterFor — EV keyword fallback (issue #118)', () => {
+  it('adds a keyword for EV fuel searches — legacy PlacesService ignores the new EV type', () => {
+    expect(nearbySearchFilterFor('fuel', 'ev')).toEqual({
+      type: 'electric_vehicle_charging_station',
+      keyword: 'EV charging station',
+    });
+  });
+  it('keeps plain type filters for everything else', () => {
+    expect(nearbySearchFilterFor('fuel')).toEqual({ type: 'gas_station' });
+    expect(nearbySearchFilterFor('hotel', 'ev')).toEqual({ type: 'lodging' });
+    expect(nearbySearchFilterFor('other')).toEqual({});
   });
 });

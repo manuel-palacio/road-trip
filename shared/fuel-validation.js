@@ -53,6 +53,16 @@ export function validateFuelUnit(raw) {
   return { value: raw };
 }
 
+const FUEL_TYPES = new Set(['gasoline', 'diesel', 'ev']);
+
+export function validateFuelType(raw) {
+  if (raw === null) return { value: null };
+  if (typeof raw !== 'string' || !FUEL_TYPES.has(raw)) {
+    return { error: `fuelType: must be one of ${[...FUEL_TYPES].join(', ')}` };
+  }
+  return { value: raw };
+}
+
 export function validateFuelCurrency(raw) {
   if (raw === null) return { value: null };
   if (typeof raw !== 'string') return { error: 'fuelCurrency: must be a string' };
@@ -72,6 +82,7 @@ export function validateFuelField(key, raw) {
     case 'tankRangeKm':     return validatePositiveNumber('tankRangeKm', raw);
     case 'tankSizeLitres':  return validatePositiveNumber('tankSizeLitres', raw);
     case 'fuelUnit':        return validateFuelUnit(raw);
+    case 'fuelType':        return validateFuelType(raw);
     case 'fuelCurrency':    return validateFuelCurrency(raw);
     default:                return null;
   }

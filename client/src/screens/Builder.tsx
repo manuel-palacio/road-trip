@@ -24,6 +24,7 @@ import { clearableFuelFields } from '../lib/fuel-payload';
 import { shouldHydrateTrip } from '../lib/trip-hydration';
 import { scheduleForStops } from '../../../shared/schedule';
 import { dayEndTarget, dayNeedsOvernightSuggestion } from '../lib/overnight-suggest';
+import { nearbySearchFilterFor } from '../lib/nearby-search';
 
 const MAX_VIA_POINTS = 3;
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
@@ -31,7 +32,7 @@ import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
 import { removeStopById, spliceStopAt } from '../lib/stop-ops';
 import { defaultCurrencyForLocale } from '../lib/locale';
-import type { FuelOverride, FuelUnit, PinCategory, Stop, Trip } from '../lib/types';
+import type { FuelOverride, FuelType, FuelUnit, PinCategory, Stop, Trip } from '../lib/types';
 import { CollaboratorList } from '../components/builder/CollaboratorList';
 import { CountryOverrideRow } from '../components/builder/CountryOverrideRow';
 import { FUEL_BOUNDS, validateConsumption, validatePrice, validateTankRange, validateTankSize } from '../lib/fuel-bounds';
@@ -64,6 +65,7 @@ type BuilderState = {
   stops: Stop[];
   fuelConsumption: string;    // strings so blank fields don't collapse to 0
   fuelUnit: FuelUnit;
+  fuelType: FuelType;
   fuelPrice: string;
   fuelCurrency: string;
   fuelOverrides: FuelOverrideDraft[];
@@ -130,6 +132,7 @@ const empty = (): BuilderState => ({
   stops: [],
   fuelConsumption: '',
   fuelUnit: 'L/100km',
+  fuelType: 'gasoline',
   fuelPrice: '',
   // New trips seed the fuel currency from the browser locale (sv-SE → SEK,
   // en-US → USD, etc.). Loaded trips keep their stored currency; trips
@@ -339,6 +342,7 @@ export function Builder() {
       stops: Array.isArray(t.stops) ? migrateLegacyStopTypes(t.stops, t.dataVersion) : [],
       fuelConsumption: typeof t.fuelConsumption === 'number' ? String(t.fuelConsumption) : '',
       fuelUnit: t.fuelUnit === 'MPG' ? 'MPG' : 'L/100km',
+      fuelType: t.fuelType === 'ev' || t.fuelType === 'diesel' ? t.fuelType : 'gasoline',
       fuelPrice: typeof t.fuelPrice === 'number' ? String(t.fuelPrice) : '',
       fuelCurrency: t.fuelCurrency || 'EUR',
       fuelOverrides: Array.isArray(t.fuelOverrides)
@@ -513,7 +517,7 @@ export function Builder() {
       return new Promise<import('../components/builder/NearbyFinder').NearbyResult[]>((resolve) => {
         const svc = new maps.places.PlacesService(map);
         svc.nearbySearch(
-          { location, radius: radiusMeters, type: 'gas_station' },
+          { location, radius: radiusMeters, ...nearbySearchFilterFor('fuel', state.fuelType) },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (raw: any, status: any) => {
             if (status !== maps.places.PlacesServiceStatus.OK || !raw) return resolve([]);
@@ -649,12 +653,12 @@ export function Builder() {
   }, [dayedStops, fuelConsumptionNum, fuelPriceNum, state.fuelUnit, state.fuelCurrency, compiledOverrides]);
   const totalFuelVolumeStr = useMemo(() => {
     const v = fuelVolumeForLegs(dayedStops, fuelConsumptionNum, state.fuelUnit);
-    return formatVolume(v, state.fuelUnit);
+    return formatVolume(v, state.fuelUnit, state.fuelType);
   }, [dayedStops, fuelConsumptionNum, state.fuelUnit]);
   const totalFillUpsStr = useMemo(() => {
     const v = fuelVolumeForLegs(dayedStops, fuelConsumptionNum, state.fuelUnit);
     const tank = parseFloat(state.tankSizeLitres);
-    return formatFillUps(v, Number.isFinite(tank) ? tank : null, state.fuelUnit);
+    return formatFillUps(v, Number.isFinite(tank) ? tank : null, state.fuelUnit, state.fuelType);
   }, [dayedStops, fuelConsumptionNum, state.fuelUnit, state.tankSizeLitres]);
   // Compact "× N" form for the summary chip — the verbose
   // "approx. N fill-ups" is preserved for the title (tooltip), the day
@@ -686,7 +690,7 @@ export function Builder() {
   }
   function fuelVolumeForStops(stops: Stop[]): string | null {
     const v = fuelVolumeForLegs(stops, fuelConsumptionNum, state.fuelUnit);
-    return formatVolume(v, state.fuelUnit);
+    return formatVolume(v, state.fuelUnit, state.fuelType);
   }
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],
@@ -1190,6 +1194,7 @@ export function Builder() {
       maxKmPerDay: s.maxKmPerDay || 600,
       fuelConsumption: s.fuelConsumption || '',
       fuelUnit: s.fuelUnit || 'L/100km',
+      fuelType: s.fuelType || 'gasoline',
       fuelPrice: s.fuelPrice || '',
       fuelCurrency: s.fuelCurrency || 'EUR',
       fuelOverrides: (s.fuelOverrides || []).map((o) => ({
@@ -1254,6 +1259,7 @@ export function Builder() {
           tankSizeLitres: parseFloat(state.tankSizeLitres),
         }),
         fuelUnit: state.fuelUnit,
+        fuelType: state.fuelType,
         fuelCurrency: state.fuelCurrency || 'EUR',
         autoFuel: state.autoFuel,
         suggestHotels: state.suggestHotels,
@@ -1508,9 +1514,26 @@ export function Builder() {
               className="w-full bg-transparent border-0 border-b border-line text-paper-dim font-serif italic text-[14px] py-1 outline-none resize-none min-h-[38px] transition-colors focus:border-accent placeholder:text-paper-muted placeholder:italic"
             />
           </label>
+          <label className="block max-w-[180px]">
+            <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Vehicle</span>
+            <select
+              value={state.fuelType}
+              onChange={(e) => {
+                const fuelType = e.target.value as FuelType;
+                // EV consumption reuses the L/100km math as kWh/100km — MPG
+                // conversions would corrupt the number, so pin the unit.
+                setState((s) => ({ ...s, fuelType, ...(fuelType === 'ev' ? { fuelUnit: 'L/100km' as FuelUnit } : {}) }));
+              }}
+              className="w-full bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent"
+            >
+              <option value="gasoline">Petrol</option>
+              <option value="diesel">Diesel</option>
+              <option value="ev">Electric (EV)</option>
+            </select>
+          </label>
           <div className="grid grid-cols-[1fr_auto_1fr_1fr] gap-3 items-end">
             <label className="block min-w-0 relative">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Fuel</span>
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">{state.fuelType === 'ev' ? 'Consumption' : 'Fuel'}</span>
               <input
                 type="number"
                 min={state.fuelUnit === 'MPG' ? FUEL_BOUNDS.consumptionMpg.min : FUEL_BOUNDS.consumptionL.min}
@@ -1526,17 +1549,21 @@ export function Builder() {
             </label>
             <label className="block">
               <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5 invisible">.</span>
-              <select
-                value={state.fuelUnit}
-                onChange={(e) => setState((s) => ({ ...s, fuelUnit: e.target.value as FuelUnit }))}
-                className="bg-transparent border-0 border-b border-line text-paper text-[12px] py-1 pr-3 outline-none cursor-pointer transition-colors focus:border-accent"
-              >
-                <option value="L/100km">L/100km</option>
-                <option value="MPG">MPG</option>
-              </select>
+              {state.fuelType === 'ev' ? (
+                <span className="block text-paper-dim text-[12px] py-1">kWh/100km</span>
+              ) : (
+                <select
+                  value={state.fuelUnit}
+                  onChange={(e) => setState((s) => ({ ...s, fuelUnit: e.target.value as FuelUnit }))}
+                  className="bg-transparent border-0 border-b border-line text-paper text-[12px] py-1 pr-3 outline-none cursor-pointer transition-colors focus:border-accent"
+                >
+                  <option value="L/100km">L/100km</option>
+                  <option value="MPG">MPG</option>
+                </select>
+              )}
             </label>
             <label className="block min-w-0 relative">
-              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Price</span>
+              <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">{state.fuelType === 'ev' ? 'Price / kWh' : 'Price'}</span>
               <input
                 type="number"
                 min={FUEL_BOUNDS.price.min}
@@ -1566,9 +1593,11 @@ export function Builder() {
           <label className="block min-w-0 relative max-w-[180px]">
             <span
               className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
-              title="Tank capacity — used for the 'approx. N fill-ups' estimate. Optional."
+              title={state.fuelType === 'ev'
+                ? "Battery capacity in kWh — used for the 'approx. N charges' estimate. Optional."
+                : "Tank capacity — used for the 'approx. N fill-ups' estimate. Optional."}
             >
-              Tank size
+              {state.fuelType === 'ev' ? 'Battery' : 'Tank size'}
             </span>
             <input
               type="number"
@@ -1596,7 +1625,7 @@ export function Builder() {
               className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-8 outline-none transition-colors focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
             />
             <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">
-              {state.fuelUnit === 'MPG' ? 'gal' : 'L'}
+              {state.fuelType === 'ev' ? 'kWh' : state.fuelUnit === 'MPG' ? 'gal' : 'L'}
             </span>
             {tankSizeErr && <p className="text-red-400 text-[11.5px] mt-0.5">{tankSizeErr}</p>}
           </label>
@@ -1739,6 +1768,7 @@ export function Builder() {
       {nearbyOpen && maps && map && (
         <NearbyFinder
           category={nearbyOpen.category}
+          fuelType={state.fuelType}
           target={nearbyOpen.target}
           maps={maps}
           map={map}

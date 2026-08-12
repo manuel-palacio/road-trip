@@ -209,15 +209,15 @@ export function Viewer() {
   }
   function fuelVolumeFor(stopsForDay: Stop[]): string | null {
     const v = fuelVolumeForLegs(stopsForDay, trip?.fuelConsumption, trip?.fuelUnit);
-    return formatVolume(v, trip?.fuelUnit);
+    return formatVolume(v, trip?.fuelUnit, trip?.fuelType);
   }
   const totalFuelVolumeStr = useMemo(() => {
     const v = fuelVolumeForLegs(dayedStops, trip?.fuelConsumption, trip?.fuelUnit);
-    return formatVolume(v, trip?.fuelUnit);
+    return formatVolume(v, trip?.fuelUnit, trip?.fuelType);
   }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit]);
   const totalFillUpsStr = useMemo(() => {
     const v = fuelVolumeForLegs(dayedStops, trip?.fuelConsumption, trip?.fuelUnit);
-    return formatFillUps(v, trip?.tankSizeLitres, trip?.fuelUnit);
+    return formatFillUps(v, trip?.tankSizeLitres, trip?.fuelUnit, trip?.fuelType);
   }, [dayedStops, trip?.fuelConsumption, trip?.fuelUnit, trip?.tankSizeLitres]);
   const flagSet = useMemo(
     () => [...new Set(dayedStops.map((s) => flagEmoji(s.countryCode)).filter(Boolean))],

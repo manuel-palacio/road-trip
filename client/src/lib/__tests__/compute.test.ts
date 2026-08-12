@@ -722,3 +722,15 @@ describe('applyDays — multi-night stays (issue #114)', () => {
     expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 1]);
   });
 });
+
+describe('EV formatting (issue #118)', () => {
+  it('formats volume as kWh for EV trips', () => {
+    expect(formatVolume(52.4, 'L/100km', 'ev')).toBe('52 kWh');
+    expect(formatVolume(52.4, 'L/100km')).toBe('52L');
+  });
+  it('counts charges instead of fill-ups for EV trips', () => {
+    expect(formatFillUps(100, 60, 'L/100km', 'ev')).toBe('approx. 2 charges');
+    expect(formatFillUps(50, 60, 'L/100km', 'ev')).toBe('approx. 1 charge');
+    expect(formatFillUps(100, 60, 'L/100km')).toBe('approx. 2 fill-ups');
+  });
+});

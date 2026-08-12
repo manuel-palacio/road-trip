@@ -444,9 +444,9 @@ function makeFuelHelpers(fuel, trip) {
   );
   const breakdownToStr = (b) => fuel.formatBreakdown(b, 'en-US');
   const volumeForStops = (stops) => fuel.fuelVolumeForLegs(stops, trip.fuelConsumption, trip.fuelUnit);
-  const volumeToStr = (stops) => fuel.formatVolume(volumeForStops(stops), trip.fuelUnit);
+  const volumeToStr = (stops) => fuel.formatVolume(volumeForStops(stops), trip.fuelUnit, trip.fuelType);
   const fillUpsForStops = (stops) => fuel.formatFillUps(
-    volumeForStops(stops), trip.tankSizeLitres, trip.fuelUnit,
+    volumeForStops(stops), trip.tankSizeLitres, trip.fuelUnit, trip.fuelType,
   );
   return { breakdownForStops, breakdownToStr, volumeForStops, volumeToStr, fillUpsForStops };
 }

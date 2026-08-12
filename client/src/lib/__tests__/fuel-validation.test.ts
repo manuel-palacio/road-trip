@@ -152,3 +152,16 @@ describe('validateFuelCurrency', () => {
     expect(validateFuelCurrency(null)).toEqual({ value: null });
   });
 });
+
+describe('validateFuelField — fuelType (issue #118)', () => {
+  it('accepts the vehicle kinds and null as a clear', () => {
+    expect(validateFuelField('fuelType', 'gasoline')).toEqual({ value: 'gasoline' });
+    expect(validateFuelField('fuelType', 'diesel')).toEqual({ value: 'diesel' });
+    expect(validateFuelField('fuelType', 'ev')).toEqual({ value: 'ev' });
+    expect(validateFuelField('fuelType', null)).toEqual({ value: null });
+  });
+  it('rejects unknown kinds', () => {
+    expect(validateFuelField('fuelType', 'rocket')).toHaveProperty('error');
+    expect(validateFuelField('fuelType', 7)).toHaveProperty('error');
+  });
+});

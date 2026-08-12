@@ -82,3 +82,11 @@ describe('suggestHotels toggle (issue #115)', () => {
     expect(collectTripFields({ suggestHotels: 'yes' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/suggestHotels/);
   });
 });
+
+describe('fuelType (issue #118)', () => {
+  it('accepts fuelType on create and update', () => {
+    expect(collectTripFields({ fuelType: 'ev' }, CREATE_TRIP_EXTRA_FIELDS).value).toEqual({ fuelType: 'ev' });
+    expect(collectTripFields({ fuelType: null }, UPDATABLE_TRIP_FIELDS).value).toEqual({ fuelType: null });
+    expect(collectTripFields({ fuelType: 'nuclear' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/fuelType/);
+  });
+});

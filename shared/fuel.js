@@ -72,18 +72,27 @@ export function fuelVolumeForLegs(stops, consumption, unit) {
 
 /** Format a volume amount for display. Litres render as `138L`, gallons as
  * `36 gal`. Caller decides which unit context to pass. */
-export function formatVolume(volume, unit) {
+export function formatVolume(volume, unit, fuelType) {
   if (volume == null || !Number.isFinite(volume) || volume <= 0) return null;
   const rounded = Math.round(volume);
+  // EV consumption reuses the L/100km math with kWh semantics (issue #118).
+  if (fuelType === 'ev') return `${rounded} kWh`;
   return unit === 'MPG' ? `${rounded} gal` : `${rounded}L`;
 }
 
 /** "approx. N fill-ups" string. `tankSizeLitres` is the canonical storage
  * unit (litres) so we convert to gallons for MPG callers. Returns null
  * when tank size isn't set or the math doesn't yield at least 1 fill-up. */
-export function formatFillUps(volume, tankSizeLitres, unit) {
+export function formatFillUps(volume, tankSizeLitres, unit, fuelType) {
   if (!volume || volume <= 0) return null;
   if (!tankSizeLitres || !Number.isFinite(tankSizeLitres) || tankSizeLitres <= 0) return null;
+  // EV: tankSizeLitres stores battery kWh, volume is kWh — no unit
+  // conversion, and the count reads as charges (issue #118).
+  if (fuelType === 'ev') {
+    const charges = Math.ceil(volume / tankSizeLitres);
+    if (charges < 1) return null;
+    return `approx. ${charges} charge${charges === 1 ? '' : 's'}`;
+  }
   const tankInUnit = unit === 'MPG' ? tankSizeLitres / LITRES_PER_GALLON : tankSizeLitres;
   const fillUps = Math.ceil(volume / tankInUnit);
   if (fillUps < 1) return null;

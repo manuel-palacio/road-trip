@@ -6,6 +6,7 @@ export function validateFuelOverrides(raw: unknown): ValidationResult<FuelOverri
 export function validatePositiveNumber(field: string, raw: unknown): ValidationResult<number | null>;
 export function validateFuelUnit(raw: unknown): ValidationResult<'L/100km' | 'MPG' | null>;
 export function validateFuelCurrency(raw: unknown): ValidationResult<string | null>;
+export function validateFuelType(raw: unknown): ValidationResult<'gasoline' | 'diesel' | 'ev' | null>;
 export function validateFuelField(
   key: string,
   raw: unknown,

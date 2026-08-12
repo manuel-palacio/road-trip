@@ -143,6 +143,7 @@ export type Favorite = {
 };
 
 export type FuelUnit = 'L/100km' | 'MPG';
+export type FuelType = 'gasoline' | 'diesel' | 'ev';
 
 // Per-country fuel override. Consumption stays trip-wide (the car has one
 // mileage), but price + currency can differ per country crossed.
@@ -173,6 +174,11 @@ export type Trip = {
   // doesn't), which is how the client tells the server to blank a field.
   fuelConsumption?: number | null;
   fuelUnit?: FuelUnit;
+  /** Vehicle kind (issue #118). 'ev' switches the fuel engine to kWh
+   * semantics — consumption kWh/100km, price per kWh, tankSizeLitres
+   * read as battery kWh — and auto-fuel searches charging stations.
+   * undefined behaves like gasoline. */
+  fuelType?: FuelType | null;
   fuelPrice?: number | null; // default per-litre/gallon price
   fuelCurrency?: string;     // 3-letter ISO code, e.g. 'EUR', 'USD'
   fuelOverrides?: FuelOverride[] | null;
