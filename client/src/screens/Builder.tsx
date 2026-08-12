@@ -243,10 +243,12 @@ export function Builder() {
   const [autoFuelWarnings, setAutoFuelWarnings] = useState<Record<number, number>>({});
   const [autoFuelToast, setAutoFuelToast] = useState<{ message: string } | null>(null);
   const undoSnapshotRef = useRef<Stop[] | null>(null);
-  // Trip-details disclosure. Expanded by default for brand-new trips so
-  // first-time users see all the fields; collapsed by default when
-  // editing an existing trip so the stop list gets more vertical room.
-  const [detailsOpen, setDetailsOpen] = useState(!isEditing);
+  // Trip-details disclosure — closed by default, including for brand-new
+  // trips (issue #121). Opening a config form before a single stop exists
+  // asks questions the user can't answer yet (max km/day, tank range);
+  // the day-header "Set fuel" nudges pull people back here once there's a
+  // route to price.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // Window-level Escape listener while the trip-details modal is open.
   // onKeyDown on the modal's outer div doesn't fire because non-focusable
   // elements don't receive key events; pattern mirrors PinModal.
@@ -787,6 +789,9 @@ export function Builder() {
     });
     setMap(m);
     if (searchInputRef.current) {
+      // A brand-new trip starts in the one place the user can act:
+      // naming their first stop (issue #121).
+      if (!isEditing) searchInputRef.current.focus();
       if (autocompleteRef.current) {
         maps.event.clearInstanceListeners(autocompleteRef.current);
       }

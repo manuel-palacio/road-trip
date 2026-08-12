@@ -61,9 +61,15 @@ type Props = {
 export function StopList(p: Props) {
   if (p.stops.length === 0) {
     return (
-      <p className="px-6 py-5 text-center font-serif italic text-[14px] text-paper-muted leading-[1.5]">
-        Search above to add your first stop.
-      </p>
+      <div className="px-6 py-6 text-center">
+        <p className="font-serif italic text-[15px] text-paper-dim leading-[1.5]">
+          Search for where the trip starts.
+        </p>
+        <p className="mt-2 font-serif italic text-[13px] text-paper-muted leading-[1.5]">
+          Add stops as you go — distances, days and fuel costs work themselves
+          out. You can set dates and your car in Trip details whenever you like.
+        </p>
+      </div>
     );
   }
   const groups = groupByDay(p.stops);
