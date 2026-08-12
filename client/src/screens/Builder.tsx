@@ -23,6 +23,7 @@ import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatB
 import { clearableFuelFields } from '../lib/fuel-payload';
 import { shouldHydrateTrip } from '../lib/trip-hydration';
 import { scheduleForStops } from '../../../shared/schedule';
+import { dayEndTarget, dayNeedsOvernightSuggestion } from '../lib/overnight-suggest';
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
@@ -67,6 +68,7 @@ type BuilderState = {
   tankRangeKm: number;
   tankSizeLitres: string;     // string for the same blank-vs-0 reason
   autoFuel: boolean;
+  suggestHotels: boolean;
   driveStartTime: string;         // "HH:MM"; '' = scheduling off
   maxDriveMinutesPerDay: string;  // string for the blank-vs-0 reason
 };
@@ -135,6 +137,7 @@ const empty = (): BuilderState => ({
   tankRangeKm: 500,
   tankSizeLitres: '',
   autoFuel: true,
+  suggestHotels: true,
   driveStartTime: '',
   maxDriveMinutesPerDay: '',
 });
@@ -349,6 +352,7 @@ export function Builder() {
         ? String(t.tankSizeLitres)
         : '',
       autoFuel: t.autoFuel ?? true,
+      suggestHotels: t.suggestHotels ?? true,
       driveStartTime: t.driveStartTime || '',
       maxDriveMinutesPerDay:
         typeof t.maxDriveMinutesPerDay === 'number' && t.maxDriveMinutesPerDay > 0
@@ -563,6 +567,13 @@ export function Builder() {
       : dayStartTarget(g);
     if (!target) return;
     setNearbyOpen({ category, target });
+  }
+  function openHotelSuggestForDay(day: number) {
+    const g = dayGroups.find((x) => x.day === day);
+    if (!g) return;
+    const target = dayEndTarget(g);
+    if (!target) return;
+    setNearbyOpen({ category: 'hotel', target });
   }
   async function onNearbyResultSelected(result: NearbyResult, mode: SelectMode) {
     if (!nearbyOpen) return;
@@ -1058,6 +1069,7 @@ export function Builder() {
       tankRangeKm: s.tankRangeKm || 500,
       tankSizeLitres: s.tankSizeLitres || '',
       autoFuel: s.autoFuel ?? true,
+      suggestHotels: s.suggestHotels ?? true,
       driveStartTime: s.driveStartTime || '',
       maxDriveMinutesPerDay: s.maxDriveMinutesPerDay || '',
       stops: (s.stops || []).map((x) => ({
@@ -1112,6 +1124,7 @@ export function Builder() {
         fuelUnit: state.fuelUnit,
         fuelCurrency: state.fuelCurrency || 'EUR',
         autoFuel: state.autoFuel,
+        suggestHotels: state.suggestHotels,
         driveStartTime: state.driveStartTime || null,
         maxDriveMinutesPerDay: (() => {
           const minutes = parseFloat(state.maxDriveMinutesPerDay);
@@ -1338,6 +1351,20 @@ export function Builder() {
               <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">h</span>
             </label>
           </div>
+          <label className="flex items-start gap-2 -mt-1">
+            <input
+              type="checkbox"
+              checked={state.suggestHotels !== false}
+              onChange={(e) => setState((s) => ({ ...s, suggestHotels: e.target.checked }))}
+              className="mt-0.5 accent-accent"
+            />
+            <span className="flex-1">
+              <span className="text-paper text-[13px]">Suggest overnight stops</span>
+              <span className="block text-paper-muted text-[11.5px] mt-0.5">
+                Days that end without a place to sleep get a "find hotel" chip. Nothing is added without your pick.
+              </span>
+            </span>
+          </label>
           <label className="block">
             <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Description</span>
             <textarea
@@ -1866,6 +1893,11 @@ export function Builder() {
                   schedule={stopSchedule}
                   onChangeStayMinutes={setStopStayMinutes}
                   onChangeNights={setStopNights}
+                  onSuggestHotel={
+                    state.suggestHotels !== false && dayNeedsOvernightSuggestion(g)
+                      ? () => openHotelSuggestForDay(g.day)
+                      : undefined
+                  }
                   fuelTimeline={fuelTimeline}
                   autoFuelWarningKm={autoFuelWarnings[g.day]}
                   onOpenManualPicker={() => {
@@ -2048,6 +2080,7 @@ export function Builder() {
               schedule={stopSchedule}
               onChangeStayMinutes={setStopStayMinutes}
               onChangeNights={setStopNights}
+              onSuggestHotelForDay={state.suggestHotels !== false ? openHotelSuggestForDay : undefined}
             />
           </div>
         </div>

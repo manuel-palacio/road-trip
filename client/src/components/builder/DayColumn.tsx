@@ -56,6 +56,9 @@ type Props = {
   onChangeNights?: (id: string, nights: number) => void;
   /** Drive-time warning threshold; chip only shows when set. */
   maxDriveMinutesPerDay?: number | null;
+  /** Opens the hotel NearbyFinder at this day's end (issue #115). Passed
+   * only when the toggle is on AND the day ends without a sleepable stop. */
+  onSuggestHotel?: () => void;
 };
 
 export function DayColumn(p: Props) {
@@ -182,6 +185,18 @@ export function DayColumn(p: Props) {
               >
                 Long drive
               </span>
+            )}
+            {p.onSuggestHotel && (
+              <button
+                type="button"
+                data-testid="suggest-hotel-chip"
+                onClick={p.onSuggestHotel}
+                title="This day ends without a place to sleep — search hotels near the day's last stop."
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#e0b86d] px-1.5 py-[2px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
+              >
+                <span aria-hidden>🌙</span>
+                Find hotel
+              </button>
             )}
             {longLegKm > 0 && (
               <span

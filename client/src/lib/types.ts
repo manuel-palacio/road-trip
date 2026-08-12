@@ -181,6 +181,10 @@ export type Trip = {
   // "approx. N fill-ups" trip-summary annotation. Optional; no fill-up
   // estimate when unset.
   tankSizeLitres?: number | null;
+  /** Per-trip toggle for overnight-stop suggestions (issue #115). Days
+   * ending without an overnight/destination stop show a "find hotel" chip
+   * in the Builder. Default on (undefined = on). */
+  suggestHotels?: boolean;
   // Time-of-day scheduling (issue #114). driveStartTime "HH:MM" opts the
   // trip into arrival-time display; maxDriveMinutesPerDay is a warning
   // threshold like maxKmPerDay (never an auto-split). null = cleared.

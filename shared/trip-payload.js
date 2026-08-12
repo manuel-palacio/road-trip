@@ -23,6 +23,7 @@ export const UPDATABLE_TRIP_FIELDS = [
   'tankSizeLitres',
   'dataVersion',
   'autoFuel',
+  'suggestHotels',
   'driveStartTime',
   'maxDriveMinutesPerDay',
   'templateVisibility',
@@ -44,6 +45,7 @@ export const CREATE_TRIP_EXTRA_FIELDS = [
   'tankSizeLitres',
   'dataVersion',
   'autoFuel',
+  'suggestHotels',
   'driveStartTime',
   'maxDriveMinutesPerDay',
 ];
@@ -77,7 +79,8 @@ export function validateTripField(key, value) {
       if (!Array.isArray(value)) return { error: `${key} must be an array` };
       return { value };
     case 'autoFuel':
-      if (typeof value !== 'boolean') return { error: 'autoFuel must be a boolean' };
+    case 'suggestHotels':
+      if (typeof value !== 'boolean') return { error: `${key} must be a boolean` };
       return { value };
     case 'driveStartTime':
       if (value === null) return { value: null };

@@ -39,10 +39,14 @@ type Props = {
   /** True when the day has no within-day leg to anchor a fuel search to.
    * Disables the Fuel entry in the menu without hiding the whole menu. */
   fuelDisabled?: boolean;
+  /** When set, the day ends without a place to sleep — renders a "find
+   * hotel" chip that opens the hotel NearbyFinder at the day's end
+   * (issue #115). Builder passes it only when the trip toggle is on. */
+  onSuggestHotel?: () => void;
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, maxDriveMinutesPerDay, onDropAtStart, onPickCategory, fuelDisabled } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, maxDriveMinutesPerDay, onDropAtStart, onPickCategory, fuelDisabled, onSuggestHotel } = p;
   const dayMaxKm = maxKmPerDay && maxKmPerDay > 0 ? maxKmPerDay : 800;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
@@ -152,6 +156,18 @@ export function DayHeader(p: Props) {
             <span aria-hidden>⛽</span>
             {longLegKm} km without refuel
           </span>
+        )}
+        {onSuggestHotel && (
+          <button
+            type="button"
+            data-testid="suggest-hotel-chip"
+            onClick={onSuggestHotel}
+            title="This day ends without a place to sleep — search hotels near the day's last stop."
+            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#e0b86d] px-2 py-[3px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
+          >
+            <span aria-hidden>🌙</span>
+            No overnight · find hotel
+          </button>
         )}
         {onPickCategory && (
           <div className="ml-auto">

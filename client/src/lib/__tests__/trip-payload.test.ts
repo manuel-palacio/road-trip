@@ -74,3 +74,11 @@ describe('schedule fields (issue #114)', () => {
     expect(collectTripFields({ maxDriveMinutesPerDay: 0 }, UPDATABLE_TRIP_FIELDS).error).toMatch(/maxDriveMinutesPerDay/);
   });
 });
+
+describe('suggestHotels toggle (issue #115)', () => {
+  it('accepts the boolean on create and update, rejects non-booleans', () => {
+    expect(collectTripFields({ suggestHotels: false }, CREATE_TRIP_EXTRA_FIELDS).value).toEqual({ suggestHotels: false });
+    expect(collectTripFields({ suggestHotels: true }, UPDATABLE_TRIP_FIELDS).value).toEqual({ suggestHotels: true });
+    expect(collectTripFields({ suggestHotels: 'yes' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/suggestHotels/);
+  });
+});

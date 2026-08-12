@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { groupByDay } from '../../lib/compute';
 import { longestLegOverRange } from '../../lib/fuel-stops';
+import { dayNeedsOvernightSuggestion } from '../../lib/overnight-suggest';
 import type { PinCategory, Stop, StopRouteMode } from '../../lib/types';
 import { DayHeader } from './DayHeader';
 import { StopRow } from './StopRow';
@@ -50,6 +51,10 @@ type Props = {
   onChangeNights?: (id: string, nights: number) => void;
   /** Drive-time warning threshold forwarded to DayHeader. */
   maxDriveMinutesPerDay?: number | null;
+  /** Opens the hotel NearbyFinder at the given day's end (issue #115).
+   * Builder passes it only when the trip's suggestHotels toggle is on;
+   * the chip renders only for days that end without a sleepable stop. */
+  onSuggestHotelForDay?: (day: number) => void;
 };
 
 export function StopList(p: Props) {
@@ -82,6 +87,11 @@ export function StopList(p: Props) {
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
             onPickCategory={p.onFindCategoryForDay ? (cat) => p.onFindCategoryForDay!(g.day, cat) : undefined}
             fuelDisabled={p.canFindFuelForDay ? !p.canFindFuelForDay(g.day) : false}
+            onSuggestHotel={
+              p.onSuggestHotelForDay && dayNeedsOvernightSuggestion(g)
+                ? () => p.onSuggestHotelForDay!(g.day)
+                : undefined
+            }
           />
           {g.stops.map(({ stop, index }) => (
             <StopRow
