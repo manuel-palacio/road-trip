@@ -10,6 +10,8 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { PublishTemplateModal } from '../components/PublishTemplateModal';
 import { TripCard } from '../components/TripCard';
 import { NewTripTile } from '../components/NewTripTile';
+import { ImportTripModal } from '../components/ImportTripModal';
+import { parseTripFile, type ParsedTripFile } from '../lib/trip-import';
 import { useDeleteTrip, useTrips } from '../hooks/useTrips';
 
 function initials(name: string) {
@@ -34,6 +36,18 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
   const isFree = me.plan === 'free';
   const isPro = me.plan === 'pro';
   const atLimit = me.tripCount >= me.tripLimit;
+
+  const [importPreview, setImportPreview] = useState<ParsedTripFile | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  async function onImportFile(file: File | undefined) {
+    if (!file) return;
+    setImportError(null);
+    try {
+      setImportPreview(parseTripFile(await file.text()));
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not read that file.');
+    }
+  }
 
   const [templateTrip, setTemplateTrip] = useState<Trip | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
@@ -188,12 +202,38 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
           />
         </div>
 
+        <div className="mt-4 flex items-center gap-3">
+          <label
+            className={`inline-flex items-center gap-1.5 px-3 py-[6px] rounded border border-line font-mono text-[9.5px] tracking-[0.18em] uppercase transition-colors ${
+              atLimit ? 'text-paper-muted opacity-50 cursor-not-allowed' : 'text-paper-dim hover:text-paper hover:border-paper-dim cursor-pointer'
+            }`}
+          >
+            <span aria-hidden>⇪</span>
+            Import GPX / KML
+            <input
+              type="file"
+              accept=".gpx,.kml,application/gpx+xml,application/vnd.google-earth.kml+xml"
+              disabled={atLimit}
+              className="hidden"
+              data-testid="import-file-input"
+              onChange={(e) => {
+                void onImportFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {importError && <span className="text-red-400 text-[12px]">{importError}</span>}
+        </div>
+
         {isEmpty && (
           <p className="mt-7 mx-auto max-w-[560px] text-center font-serif italic text-[16px] leading-[1.55] text-paper-dim">
             Your road trips will live here. Start by plotting your first route — pick a starting point, add stops along the way, and the days will sort themselves out.
           </p>
         )}
       </main>
+      {importPreview && (
+        <ImportTripModal parsed={importPreview} onClose={() => setImportPreview(null)} />
+      )}
       {templateTrip && (
         <PublishTemplateModal
           trip={templateTrip}
