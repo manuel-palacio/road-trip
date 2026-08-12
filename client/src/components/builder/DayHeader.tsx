@@ -63,6 +63,9 @@ export function DayHeader(p: Props) {
     aaLabel = `Android Auto: Ready (${stopCount}/10 stops)`;
   }
   const showKmWarning = km > dayMaxKm;
+  // Only surface the Android Auto chip when it needs a decision (issue
+  // #125); "Ready" is the default and outranked the itinerary.
+  const showAaBadge = stopCount >= 9;
   const showDriveWarning =
     !!maxDriveMinutesPerDay && durationSeconds / 60 > maxDriveMinutesPerDay;
 
@@ -131,10 +134,12 @@ export function DayHeader(p: Props) {
         )}
       </div>
       <div className="mt-2 flex items-center gap-2 flex-wrap">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.14em] uppercase font-medium ${aaCls}`}>
-          <span className="text-[11px]">🚗</span>
-          {aaLabel}
-        </span>
+        {showAaBadge && (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.14em] uppercase font-medium ${aaCls}`}>
+            <span className="text-[11px]" aria-hidden>🚗</span>
+            {aaLabel}
+          </span>
+        )}
         {showKmWarning && (
           <span className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-danger px-2 py-[3px] rounded border border-dashed border-danger/50">
             Long day · {km} km over {dayMaxKm} limit

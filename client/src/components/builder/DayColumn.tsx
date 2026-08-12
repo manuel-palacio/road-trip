@@ -62,6 +62,9 @@ type Props = {
   onSuggestHotel?: () => void;
 };
 
+/** A single day as a kanban column. Columns grow to share the row when a
+ * trip has only a day or two, rather than leaving most of the viewport
+ * empty (issue #125); max-w keeps them from becoming unwieldy. */
 export function DayColumn(p: Props) {
   const { group: g } = p;
   const [over, setOver] = useState(false);
@@ -71,6 +74,7 @@ export function DayColumn(p: Props) {
   const longLegKm = longestLegOverRange(g, p.tankRangeKm);
   const dayMaxKm = p.maxKmPerDay && p.maxKmPerDay > 0 ? p.maxKmPerDay : 800;
   const showKmWarning = g.km > dayMaxKm;
+  const showAaBadge = aaCount >= 9;
   const showDriveWarning =
     !!p.maxDriveMinutesPerDay && g.durationSeconds / 60 > p.maxDriveMinutesPerDay;
 
@@ -92,7 +96,7 @@ export function DayColumn(p: Props) {
       id={`day-col-${g.day}`}
       data-day={g.day}
       data-testid="day-column"
-      className="relative flex flex-col bg-canvas border border-line rounded-lg overflow-hidden w-[340px] shrink-0 shadow-[0_2px_18px_-12px_rgba(0,0,0,0.25)]"
+      className="relative flex flex-col bg-canvas border border-line rounded-lg overflow-hidden w-[340px] shrink-0 grow max-w-[560px] shadow-[0_2px_18px_-12px_rgba(0,0,0,0.25)]"
       style={{ borderLeft: `4px solid ${color}` }}
     >
       {/* Sticky inner header — pins to top of the column when its
@@ -164,13 +168,15 @@ export function DayColumn(p: Props) {
             )}
           </div>
           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-            <span
-              title={`Android Auto: ${aaCount}/10 stops`}
-              className={`inline-flex items-center gap-1 px-2 py-[2px] rounded-full font-mono text-[9px] tracking-[0.12em] uppercase font-medium ${aaCls}`}
-            >
-              <span className="text-[10px]">🚗</span>
-              {aaLabel}
-            </span>
+            {showAaBadge && (
+              <span
+                title={`Android Auto: ${aaCount}/10 stops`}
+                className={`inline-flex items-center gap-1 px-2 py-[2px] rounded-full font-mono text-[9px] tracking-[0.12em] uppercase font-medium ${aaCls}`}
+              >
+                <span className="text-[10px]" aria-hidden>🚗</span>
+                {aaLabel}
+              </span>
+            )}
             {showKmWarning && (
               <span
                 title={`Long day — ${g.km} km over ${dayMaxKm} limit`}

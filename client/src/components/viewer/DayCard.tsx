@@ -82,6 +82,10 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
     setTimeout(() => setShareLabel(null), 1600);
   }
 
+  // The "Ready" state is the default for almost every day — showing a
+  // badge for it put a technical export detail above the itinerary
+  // (issue #125). Only surface the states that need a decision.
+  const showAaBadge = status !== 'ready';
   const aaPalette = {
     ready: 'bg-success-soft border-success/40 text-success',
     limit: 'bg-warn-soft border-warn/40 text-warn',
@@ -170,12 +174,14 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
       </header>
 
       <div className="px-4 pb-3 -mt-1 flex flex-wrap items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.14em] uppercase font-medium border ${aaPalette}`}
-        >
-          <span className="text-[11px]">🚗</span>
-          {aaText}
-        </span>
+        {showAaBadge && (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9.5px] tracking-[0.14em] uppercase font-medium border ${aaPalette}`}
+          >
+            <span className="text-[11px]" aria-hidden>🚗</span>
+            {aaText}
+          </span>
+        )}
         {longLegKm > 0 && (
           <span
             title="A single leg in this day exceeds the trip's tank range — consider a fuel stop."

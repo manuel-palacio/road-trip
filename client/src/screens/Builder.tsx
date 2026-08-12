@@ -2020,11 +2020,20 @@ export function Builder() {
             than fit on the screen. */}
         <div className="flex-1 overflow-x-auto overflow-y-hidden bg-canvas">
           {dayGroups.length === 0 ? (
-            <p className="text-center font-serif italic text-paper-muted py-12 px-6 text-[14px]">
-              Search above to add your first stop.
-            </p>
+            <div className="text-center py-12 px-6">
+              <p className="font-serif italic text-paper-dim text-[15px]">
+                Search for where the trip starts.
+              </p>
+              <p className="mt-2 font-serif italic text-paper-muted text-[13px]">
+                Days appear here as you add stops.
+              </p>
+            </div>
           ) : (
-            <div className="flex gap-3 px-6 py-4 h-full items-stretch">
+            <div className={`flex gap-3 px-6 py-4 h-full items-stretch ${dayGroups.length <= 3 ? 'justify-center' : ''}`}>
+              {/* Short trips centre their columns instead of hugging the
+                  left edge with a screen of empty canvas beside them
+                  (issue #125). Centring is only applied while the row
+                  can't overflow, hence the day-count gate above. */}
               {dayGroups.map((g, gi) => (
                 <DayColumn
                   key={g.day}

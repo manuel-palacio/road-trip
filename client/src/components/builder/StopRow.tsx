@@ -74,6 +74,10 @@ export function StopRow(p: Props) {
   const [chipDraft, setChipDraft] = useState('');
   const [dropZone, setDropZone] = useState<'above' | 'below' | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Progressive disclosure (issue #125): a stop card carried 8+ controls
+  // at equal weight. Identity and the numbers stay visible; the editing
+  // controls sit behind a per-row toggle.
+  const [editing, setEditing] = useState(false);
   const { favoriteIdForStop, addPending, removePending } = useFavorites();
   const favoriteId = favoriteIdForStop(stop);
 
@@ -217,7 +221,7 @@ export function StopRow(p: Props) {
               {p.schedule.departure ? <span>–{p.schedule.departure}</span> : null}
             </span>
           )}
-          {index > 0 && p.onChangeRouteMode && (
+          {editing && index > 0 && p.onChangeRouteMode && (
             <select
               value={stop.routeMode || 'fastest'}
               onChange={(e) => p.onChangeRouteMode!(stop.id, e.target.value as StopRouteMode)}
@@ -236,7 +240,7 @@ export function StopRow(p: Props) {
             </select>
           )}
 
-          {p.onChangeStayMinutes && p.schedule !== undefined && index > 0 && stop.type !== 'overnight' && (
+          {editing && p.onChangeStayMinutes && p.schedule !== undefined && index > 0 && stop.type !== 'overnight' && (
             <select
               value={stop.stayMinutes || 0}
               onChange={(e) => p.onChangeStayMinutes!(stop.id, parseInt(e.target.value, 10) || 0)}
@@ -254,7 +258,7 @@ export function StopRow(p: Props) {
               ))}
             </select>
           )}
-          {p.onChangeNights && stop.type === 'overnight' && (
+          {editing && p.onChangeNights && stop.type === 'overnight' && (
             <select
               value={stop.nights || 1}
               onChange={(e) => p.onChangeNights!(stop.id, parseInt(e.target.value, 10) || 1)}
@@ -280,7 +284,7 @@ export function StopRow(p: Props) {
             Day {stop.dayNumber || 1}
           </span>
 
-          {p.onDemote && (
+          {editing && p.onDemote && (
             <button
               type="button"
               onClick={() => p.onDemote!(stop)}
@@ -293,6 +297,7 @@ export function StopRow(p: Props) {
             </button>
           )}
 
+          {editing && (
           <span className="inline-flex items-center gap-1 ml-1">
             <button
               type="button"
@@ -323,9 +328,23 @@ export function StopRow(p: Props) {
               +
             </button>
           </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-expanded={editing}
+            data-testid="stop-edit-toggle"
+            title={editing ? 'Hide stop controls' : 'Edit this stop'}
+            className="ml-auto inline-flex items-center gap-1 px-1.5 py-[3px] rounded border border-line text-paper-muted font-mono text-[9.5px] tracking-[0.16em] uppercase hover:text-accent hover:border-accent transition-colors"
+          >
+            {editing ? 'Done' : 'Edit'}
+          </button>
         </div>
 
-        {/* Highlights */}
+        {/* Highlights — always show existing ones; the input appears with
+            the editing controls. */}
+        {(editing || highlights.length > 0) && (
         <div className="mt-2 flex flex-wrap gap-1.5 items-center">
           {highlights.map((text) => (
             <span key={text} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-[3px] bg-paper/[0.06] border border-line rounded-full text-[11px] text-paper max-w-[200px]">
@@ -340,6 +359,7 @@ export function StopRow(p: Props) {
               </button>
             </span>
           ))}
+          {editing && (
           <input
             type="text"
             placeholder={highlights.length ? 'add another…' : 'add a note…'}
@@ -354,7 +374,9 @@ export function StopRow(p: Props) {
             }}
             className="flex-1 min-w-[90px] bg-transparent border-0 border-b border-dotted border-line-strong text-paper font-serif italic text-[12px] py-0.5 outline-none placeholder:text-paper-muted placeholder:italic transition-colors focus:border-accent focus:border-solid"
           />
+          )}
         </div>
+        )}
       </div>
 
       {p.onFavoriteAdd && p.onFavoriteRemove && (
