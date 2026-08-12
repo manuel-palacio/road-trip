@@ -22,6 +22,7 @@ import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { clearableFuelFields } from '../lib/fuel-payload';
 import { shouldHydrateTrip } from '../lib/trip-hydration';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { scheduleForStops } from '../../../shared/schedule';
 import { dayEndTarget, dayNeedsOvernightSuggestion } from '../lib/overnight-suggest';
 import { nearbySearchFilterFor } from '../lib/nearby-search';
@@ -249,17 +250,8 @@ export function Builder() {
   // the day-header "Set fuel" nudges pull people back here once there's a
   // route to price.
   const [detailsOpen, setDetailsOpen] = useState(false);
-  // Window-level Escape listener while the trip-details modal is open.
-  // onKeyDown on the modal's outer div doesn't fire because non-focusable
-  // elements don't receive key events; pattern mirrors PinModal.
-  useEffect(() => {
-    if (!detailsOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setDetailsOpen(false);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [detailsOpen]);
+  // Focus management for the trip-details modal lives in useFocusTrap
+  // (Escape, Tab containment, focus restore) — see issue #123.
   // Mobile bottom-sheet snap state. Below md (768px) the sidebar lives
   // at the bottom of the screen with three heights: peek (only the
   // handle + summary visible), normal (~55dvh, both map and stops
@@ -326,6 +318,7 @@ export function Builder() {
   const snapshotRef = useRef<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
   const hydratedTripIdRef = useRef<string | null>(null);
+  const detailsTrapRef = useFocusTrap<HTMLDivElement>(() => setDetailsOpen(false));
 
   // Hydrate from loaded trip — once per trip. tripQuery.data also changes on
   // refetches and on the post-save cache write; re-hydrating then would
@@ -1385,7 +1378,7 @@ export function Builder() {
       aria-modal="true"
       aria-labelledby="trip-details-modal-title"
     >
-      <div className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
+      <div ref={detailsTrapRef} className="w-[640px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line bg-surface shrink-0">
           <span id="trip-details-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
             Trip details
@@ -1995,6 +1988,7 @@ export function Builder() {
               type="text"
               autoComplete="off"
               placeholder="Search for a city or place…"
+              aria-label="Search for a place to add as a stop"
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[7px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />
           </div>
@@ -2210,6 +2204,7 @@ export function Builder() {
               type="text"
               autoComplete="off"
               placeholder="Search for a city or place…"
+              aria-label="Search for a place to add as a stop"
               onFocus={() => setSheetState('full')}
               className="w-full bg-transparent border border-line rounded-md text-paper text-[14px] pl-[38px] pr-3.5 py-[11px] outline-none transition-colors focus:border-accent placeholder:text-paper-muted"
             />

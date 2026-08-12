@@ -99,7 +99,20 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
         visible ? '' : 'opacity-50'
       }`}
     >
-      <header className="flex items-center gap-2.5 px-4 pt-3.5 pb-3 cursor-pointer select-none" onClick={() => setExpanded((e) => !e)}>
+      <header
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`Day ${group.day} — ${expanded ? 'collapse' : 'expand'} stops`}
+        onClick={() => setExpanded((e) => !e)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+        className="flex items-center gap-2.5 px-4 pt-3.5 pb-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-t-lg"
+      >
         <span
           className="w-1.5 h-6 rounded-full shrink-0"
           style={{ backgroundColor: color }}

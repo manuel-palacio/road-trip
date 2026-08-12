@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 type Props = {
   url: string;
@@ -15,14 +16,7 @@ type Props = {
  * for camera friendliness regardless of the surrounding dark theme. */
 export function QrModal({ url, title, subtitle, onClose }: Props) {
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const trapRef = useFocusTrap<HTMLDivElement>(onClose);
 
   async function copy() {
     try {
@@ -43,6 +37,7 @@ export function QrModal({ url, title, subtitle, onClose }: Props) {
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         className="bg-surface border border-line rounded-xl p-6 max-w-sm w-full shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -57,7 +52,7 @@ export function QrModal({ url, title, subtitle, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-base flex items-center justify-center hover:border-paper-dim hover:text-paper transition-colors shrink-0"
+            className="bg-transparent border border-line text-paper-dim w-9 h-9 rounded text-base flex items-center justify-center hover:border-paper-dim hover:text-paper transition-colors shrink-0"
           >
             ×
           </button>

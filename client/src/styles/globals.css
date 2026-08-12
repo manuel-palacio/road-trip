@@ -123,3 +123,32 @@ html.theme-light {
 .pac-item-query { color: theme('colors.paper'); font-size: 14px; padding-right: 4px; }
 .pac-matched { color: theme('colors.accent'); }
 .pac-icon { display: none; }
+
+/* Invisible tap-target expansion (issue #123). Keeps a control's visual
+ * size while giving it a comfortable touch area. Overlaps are harmless:
+ * adjacent controls that both use it stay individually hittable at their
+ * own centres. */
+@layer utilities {
+  .tap-target { position: relative; }
+  .tap-target::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}
+
+/* Respect the OS "reduce motion" setting app-wide (issue #123). Covers
+ * the keyframe animations (rise, drift, pulse) and the hover lifts and
+ * drawer/sheet transitions, which are otherwise unguarded. Motion is
+ * reduced to an instant state change rather than removed, so nothing
+ * depends on a transitionend that never fires. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

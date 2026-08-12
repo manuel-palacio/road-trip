@@ -193,7 +193,7 @@ export function DayColumn(p: Props) {
                 data-testid="suggest-hotel-chip"
                 onClick={p.onSuggestHotel}
                 title="This day ends without a place to sleep — search hotels near the day's last stop."
-                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#e0b86d] px-1.5 py-[2px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#e0b86d] px-2 py-[6px] rounded border border-dashed border-[rgba(212,164,74,0.5)] inline-flex items-center gap-1 hover:text-paper hover:border-paper-dim transition-colors"
               >
                 <span aria-hidden>🌙</span>
                 Find hotel

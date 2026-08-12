@@ -168,6 +168,7 @@ export function StopRow(p: Props) {
         <div className="mt-2 flex items-center flex-wrap gap-y-1.5 gap-x-2">
           <select
             value={stop.type}
+            aria-label={`Stop type for ${stop.label || stop.name}`}
             onChange={(e) => p.onChangeType(stop.id, e.target.value as Stop['type'])}
             className="bg-transparent border border-line rounded text-paper-dim font-mono text-[9.5px] tracking-[0.18em] uppercase px-1.5 py-[3px] pr-[18px] appearance-none cursor-pointer hover:border-paper-dim hover:text-paper focus:outline-none focus:border-accent"
             style={{
@@ -303,7 +304,7 @@ export function StopRow(p: Props) {
               }
               disabled={isFirst || !isForced}
               onClick={() => p.onSetForceDayStart(stop.id, false)}
-              className="w-[18px] h-[18px] bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
+              className="w-[26px] h-[26px] tap-target bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
             >
               −
             </button>
@@ -317,7 +318,7 @@ export function StopRow(p: Props) {
               }
               disabled={isFirst || isForced}
               onClick={() => p.onSetForceDayStart(stop.id, true)}
-              className="w-[18px] h-[18px] bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
+              className="w-[26px] h-[26px] tap-target bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
             >
               +
             </button>
@@ -333,7 +334,7 @@ export function StopRow(p: Props) {
                 type="button"
                 aria-label="Remove note"
                 onClick={() => p.onRemoveHighlight(stop.id, text)}
-                className="bg-transparent border-0 text-paper-muted text-[13px] w-4 h-4 rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-white transition-colors"
+                className="bg-transparent border-0 text-paper-muted text-[13px] w-5 h-5 tap-target rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-white transition-colors"
               >
                 ×
               </button>
@@ -370,7 +371,7 @@ export function StopRow(p: Props) {
         type="button"
         aria-label="Remove stop"
         onClick={() => p.onRemove(stop.id)}
-        className="absolute top-1.5 right-1.5 w-[22px] h-[22px] bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
+        className="absolute top-1.5 right-1.5 w-[30px] h-[30px] tap-target bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
       >
         ×
       </button>

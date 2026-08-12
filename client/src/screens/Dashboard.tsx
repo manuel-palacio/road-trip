@@ -83,6 +83,12 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
 
   return (
     <div className="min-h-screen relative">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:px-3 focus:py-2 focus:rounded focus:border focus:border-accent focus:bg-canvas-strong focus:text-paper focus:font-mono focus:text-[11px]"
+      >
+        Skip to content
+      </a>
       <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-4 md:px-9 py-4 md:py-5 border-b border-line bg-canvas/85 backdrop-blur-md gap-3">
         <Brand size="sm" />
         <div className="flex items-center gap-2 md:gap-[18px] min-w-0">
@@ -140,13 +146,13 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
           </HeaderNav>
         </div>
       </header>
-      <main className="max-w-[1100px] mx-auto pt-[100px] md:pt-[140px] px-4 md:px-9 pb-20">
+      <main id="main" className="max-w-[1100px] mx-auto pt-[100px] md:pt-[140px] px-4 md:px-9 pb-20">
         <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted mb-3.5">
           Workspace <span className="text-accent mx-1.5">·</span> trips <span className="text-accent mx-1.5">·</span> {list.length}
         </div>
-        <h2 className="font-serif italic font-normal text-[clamp(48px,7vw,76px)] tracking-tight leading-none">
+        <h1 className="font-serif italic font-normal text-[clamp(48px,7vw,76px)] tracking-tight leading-none">
           Your trips
-        </h2>
+        </h1>
 
         {isFree && (
           atLimit ? (

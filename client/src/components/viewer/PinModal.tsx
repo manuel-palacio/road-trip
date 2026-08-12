@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Pin, PinCategory, PinPriority } from '../../lib/types';
 import { PIN_CATEGORIES, PIN_CATEGORY_META, PIN_PRIORITIES, PIN_PRIORITY_META } from '../../lib/pin-meta';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 export type PinDraft = {
   name: string;
@@ -48,18 +49,12 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
   const [priority, setPriority] = useState<PinPriority>(initial?.priority || defaultPriority || 'want');
   const [notes, setNotes] = useState(initial?.notes || defaultNotes || '');
   const nameRef = useRef<HTMLInputElement>(null);
+  // Traps Tab, closes on Escape, and restores focus to the opener.
+  const trapRef = useFocusTrap<HTMLFormElement>(onCancel);
 
   useEffect(() => {
     nameRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,14 +71,18 @@ export function PinModal({ initial, lat, lng, defaultName, defaultCategory, defa
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pin-modal-title"
     >
       <form
+        ref={trapRef}
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
         className="w-[400px] max-w-[calc(100vw-32px)] bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise"
       >
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
-          <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
+          <span id="pin-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
             {headerLabel ?? (isEdit ? 'Edit pin' : 'New pin')}
           </span>
           <button

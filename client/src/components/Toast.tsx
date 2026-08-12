@@ -34,6 +34,8 @@ export function Toast({
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={`fixed bottom-6 right-6 z-[200] rounded-md px-4 py-2.5 font-mono text-[11px] tracking-wide max-w-[360px] shadow-[0_12px_30px_-8px_rgba(0,0,0,0.5)] border flex items-center gap-3 ${colorCls}`}
     >
       <span>{message}</span>

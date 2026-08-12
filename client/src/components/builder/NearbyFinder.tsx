@@ -5,6 +5,7 @@ import { nearbySearchFilterFor } from '../../lib/nearby-search';
 import { measureDetour } from '../../lib/route-detour';
 import { claimNearbySearch } from '../../lib/api';
 import type { PinCategory } from '../../lib/types';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 export type NearbyResult = {
   placeId: string;
@@ -68,6 +69,7 @@ export function NearbyFinder({ category, fuelType, target, maps, map, onSelect, 
   const otherMode: SelectMode = defaultMode === 'stop' ? 'pin' : 'stop';
 
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(onClose);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -162,6 +164,7 @@ export function NearbyFinder({ category, fuelType, target, maps, map, onSelect, 
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         className="bg-surface border border-line rounded-xl p-5 max-w-md w-full max-h-[85vh] flex flex-col shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -182,7 +185,7 @@ export function NearbyFinder({ category, fuelType, target, maps, map, onSelect, 
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="bg-transparent border border-line text-paper-dim w-7 h-7 rounded text-base flex items-center justify-center hover:border-paper-dim hover:text-paper transition-colors shrink-0"
+            className="bg-transparent border border-line text-paper-dim w-9 h-9 rounded text-base flex items-center justify-center hover:border-paper-dim hover:text-paper transition-colors shrink-0"
           >
             ×
           </button>

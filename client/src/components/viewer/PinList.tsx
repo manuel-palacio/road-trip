@@ -52,7 +52,7 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
                   type="button"
                   onClick={() => onFocus(pin)}
                   aria-label={`Show ${pin.name} on the map`}
-                  className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2 transition-transform hover:scale-110"
+                  className="shrink-0 mt-0.5 w-9 h-9 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2 transition-transform hover:scale-110"
                   style={{ borderColor: ringColor }}
                 >
                   <span aria-hidden>{meta.emoji}</span>
@@ -60,7 +60,7 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
               ) : (
                 <span
                   aria-hidden
-                  className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2"
+                  className="shrink-0 mt-0.5 w-9 h-9 rounded-full bg-canvas flex items-center justify-center text-[15px] leading-none border-2"
                   style={{ borderColor: ringColor }}
                 >
                   {meta.emoji}
@@ -108,7 +108,7 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
                       onClick={() => onEdit(pin)}
                       aria-label={`Edit ${pin.name}`}
                       title="Edit"
-                      className="w-7 h-7 rounded text-paper-muted hover:text-paper hover:bg-surface-2 text-[12px] leading-none flex items-center justify-center transition-colors"
+                      className="w-9 h-9 rounded text-paper-muted hover:text-paper hover:bg-surface-2 text-[12px] leading-none flex items-center justify-center transition-colors"
                     >
                       ✎
                     </button>
@@ -119,7 +119,7 @@ export function PinList({ pins, onEdit, onDelete, onFocus, onPromote, promotingP
                       onClick={() => onDelete(pin)}
                       aria-label={`Delete ${pin.name}`}
                       title="Delete"
-                      className="w-7 h-7 rounded text-paper-muted hover:text-accent hover:bg-surface-2 text-[14px] leading-none flex items-center justify-center transition-colors"
+                      className="w-9 h-9 rounded text-paper-muted hover:text-accent hover:bg-surface-2 text-[14px] leading-none flex items-center justify-center transition-colors"
                     >
                       ×
                     </button>

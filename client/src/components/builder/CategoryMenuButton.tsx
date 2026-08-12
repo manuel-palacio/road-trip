@@ -78,7 +78,7 @@ export function CategoryMenuButton({ disabledCategories = [], onPick }: Props) {
         aria-expanded={open}
         data-testid="category-menu-trigger"
         title="Find nearby places to add"
-        className="inline-flex items-center gap-1 bg-transparent border border-line text-paper-dim px-1.5 py-[2px] rounded font-mono text-[9px] tracking-[0.12em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
+        className="inline-flex items-center gap-1 bg-transparent border border-line text-paper-dim px-2 py-[6px] rounded font-mono text-[9px] tracking-[0.12em] uppercase hover:text-paper hover:border-paper-dim transition-colors"
       >
         <span aria-hidden>+</span>
         <span>Find</span>

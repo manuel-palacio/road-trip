@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, createPin, createTrip } from '../lib/api';
 import { MAX_IMPORT_STOPS, importedPointsToStops, type ParsedTripFile } from '../lib/trip-import';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 type Props = {
   parsed: ParsedTripFile;
@@ -21,6 +22,7 @@ export function ImportTripModal({ parsed, onClose }: Props) {
   const [extrasAsPins, setExtrasAsPins] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(() => { if (!busy) onClose(); });
 
   async function createFromImport() {
     if (busy) return;
@@ -60,7 +62,7 @@ export function ImportTripModal({ parsed, onClose }: Props) {
       aria-modal="true"
       aria-labelledby="import-trip-modal-title"
     >
-      <div className="w-[520px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
+      <div ref={trapRef} className="w-[520px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col bg-surface border border-line-strong rounded-lg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] animate-rise">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line shrink-0">
           <span id="import-trip-modal-title" className="font-mono text-[10px] tracking-[0.22em] uppercase text-paper-muted">
             Import route
