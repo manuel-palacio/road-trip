@@ -55,3 +55,22 @@ describe('collectTripFields', () => {
     expect(collectTripFields({ name: '  Alps  ' }, UPDATABLE_TRIP_FIELDS).value).toEqual({ name: 'Alps' });
   });
 });
+
+describe('schedule fields (issue #114)', () => {
+  it('accepts driveStartTime and maxDriveMinutesPerDay on create and update', () => {
+    const body = { driveStartTime: '08:30', maxDriveMinutesPerDay: 420 };
+    expect(collectTripFields(body, CREATE_TRIP_EXTRA_FIELDS).value).toEqual(body);
+    expect(collectTripFields(body, UPDATABLE_TRIP_FIELDS).value).toEqual(body);
+  });
+
+  it('accepts null as an explicit clear for both schedule fields', () => {
+    const body = { driveStartTime: null, maxDriveMinutesPerDay: null };
+    expect(collectTripFields(body, UPDATABLE_TRIP_FIELDS).value).toEqual(body);
+  });
+
+  it('rejects malformed drive start times and non-positive budgets', () => {
+    expect(collectTripFields({ driveStartTime: '25:00' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/driveStartTime/);
+    expect(collectTripFields({ driveStartTime: 'morning' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/driveStartTime/);
+    expect(collectTripFields({ maxDriveMinutesPerDay: 0 }, UPDATABLE_TRIP_FIELDS).error).toMatch(/maxDriveMinutesPerDay/);
+  });
+});

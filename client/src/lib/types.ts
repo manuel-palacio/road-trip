@@ -51,6 +51,11 @@ export type Stop = {
   kmFromPrevious?: number;
   durationFromPrevious?: string;
   durationSecondsFromPrevious?: number;
+  // Time-of-day scheduling (issue #114). stayMinutes = planned visit length,
+  // feeds the arrival-time clock. nights (overnight stops only) = how many
+  // day numbers the stay consumes; default 1.
+  stayMinutes?: number;
+  nights?: number;
   // Routing strategy for the leg from the previous stop. First stop in a
   // trip has no inbound leg and ignores this value.
   routeMode?: StopRouteMode;
@@ -176,6 +181,11 @@ export type Trip = {
   // "approx. N fill-ups" trip-summary annotation. Optional; no fill-up
   // estimate when unset.
   tankSizeLitres?: number | null;
+  // Time-of-day scheduling (issue #114). driveStartTime "HH:MM" opts the
+  // trip into arrival-time display; maxDriveMinutesPerDay is a warning
+  // threshold like maxKmPerDay (never an auto-split). null = cleared.
+  driveStartTime?: string | null;
+  maxDriveMinutesPerDay?: number | null;
   /** Per-trip toggle for the auto-fuel engine. When true (or undefined for
    * existing trips), the engine reactively inserts fuel stops where the tank
    * would run low. Default-on retroactively applies to trips that pre-date

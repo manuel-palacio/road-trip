@@ -22,6 +22,7 @@ import { useTheme } from '../hooks/useTheme';
 import { applyDays, clampMapStripHeight, compileFuelOverrides, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripCountriesFromStops, tripTotals } from '../lib/compute';
 import { clearableFuelFields } from '../lib/fuel-payload';
 import { shouldHydrateTrip } from '../lib/trip-hydration';
+import { scheduleForStops } from '../../../shared/schedule';
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
@@ -66,6 +67,8 @@ type BuilderState = {
   tankRangeKm: number;
   tankSizeLitres: string;     // string for the same blank-vs-0 reason
   autoFuel: boolean;
+  driveStartTime: string;         // "HH:MM"; '' = scheduling off
+  maxDriveMinutesPerDay: string;  // string for the blank-vs-0 reason
 };
 
 // Curated currency dropdown — covers Europe + the usual road-trip suspects.
@@ -132,6 +135,8 @@ const empty = (): BuilderState => ({
   tankRangeKm: 500,
   tankSizeLitres: '',
   autoFuel: true,
+  driveStartTime: '',
+  maxDriveMinutesPerDay: '',
 });
 
 /** One-shot per-version migrations applied on read. v2 normalised legacy
@@ -344,6 +349,11 @@ export function Builder() {
         ? String(t.tankSizeLitres)
         : '',
       autoFuel: t.autoFuel ?? true,
+      driveStartTime: t.driveStartTime || '',
+      maxDriveMinutesPerDay:
+        typeof t.maxDriveMinutesPerDay === 'number' && t.maxDriveMinutesPerDay > 0
+          ? String(t.maxDriveMinutesPerDay)
+          : '',
     };
     setState(next);
     snapshotRef.current = serializeSnapshot(next);
@@ -457,6 +467,16 @@ export function Builder() {
     [routes.enriched, state.maxKmPerDay],
   );
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
+  // Arrival/departure clock times (issue #114) — undefined when the trip has
+  // no drive start time, which hides the time chips + stay editors entirely.
+  const stopSchedule = useMemo(
+    () => (state.driveStartTime ? scheduleForStops(dayedStops, state.driveStartTime) : undefined),
+    [dayedStops, state.driveStartTime],
+  );
+  const maxDriveMinutes = useMemo(() => {
+    const minutes = parseFloat(state.maxDriveMinutesPerDay);
+    return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+  }, [state.maxDriveMinutesPerDay]);
   // Per-day groupings — used by the StopList's render path AND by the
   // gas-station picker to find the longest leg of a given day.
   const dayGroups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
@@ -904,6 +924,12 @@ export function Builder() {
   function removeStop(id: string) {
     setState((s) => ({ ...s, stops: reassignTypes(removeStopById(s.stops, id)) }));
   }
+  function setStopStayMinutes(id: string, minutes: number) {
+    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? markUserTouched({ ...x, stayMinutes: minutes || undefined }) : x)) }));
+  }
+  function setStopNights(id: string, nights: number) {
+    setState((s) => ({ ...s, stops: s.stops.map((x) => (x.id === id ? markUserTouched({ ...x, nights: nights > 1 ? nights : undefined }) : x)) }));
+  }
   function setForceDayStart(id: string, value: boolean) {
     setState((s) => ({
       ...s,
@@ -1032,6 +1058,8 @@ export function Builder() {
       tankRangeKm: s.tankRangeKm || 500,
       tankSizeLitres: s.tankSizeLitres || '',
       autoFuel: s.autoFuel ?? true,
+      driveStartTime: s.driveStartTime || '',
+      maxDriveMinutesPerDay: s.maxDriveMinutesPerDay || '',
       stops: (s.stops || []).map((x) => ({
         id: x.id, name: x.name, label: x.label,
         lat: x.lat, lng: x.lng,
@@ -1043,6 +1071,8 @@ export function Builder() {
         category: x.category || '',
         priority: x.priority || '',
         notes: x.notes || '',
+        stayMinutes: x.stayMinutes || 0,
+        nights: x.nights || 1,
       })),
     });
   }
@@ -1082,6 +1112,11 @@ export function Builder() {
         fuelUnit: state.fuelUnit,
         fuelCurrency: state.fuelCurrency || 'EUR',
         autoFuel: state.autoFuel,
+        driveStartTime: state.driveStartTime || null,
+        maxDriveMinutesPerDay: (() => {
+          const minutes = parseFloat(state.maxDriveMinutesPerDay);
+          return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+        })(),
         dataVersion: 3,
         stops: stops.map((s) => {
           // Persist the polyline path so viewer / share / next-builder-open
@@ -1106,6 +1141,8 @@ export function Builder() {
             ...(s.category ? { category: s.category } : {}),
             ...(s.priority ? { priority: s.priority } : {}),
             ...(s.notes ? { notes: s.notes } : {}),
+            ...(s.stayMinutes && s.stayMinutes > 0 ? { stayMinutes: s.stayMinutes } : {}),
+            ...(s.nights && s.nights > 1 ? { nights: s.nights } : {}),
             ...(s.forceDayStart ? { forceDayStart: true } : {}),
             ...(persistablePath ? { routePath: persistablePath } : {}),
           };
@@ -1259,6 +1296,48 @@ export function Builder() {
               </span>
             </span>
           </label>
+          <div className="grid grid-cols-3 gap-[18px]">
+            <label className="block min-w-0">
+              <span
+                className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
+                title="When you usually hit the road each morning. Setting this shows arrival times on every stop."
+              >
+                Drive start
+              </span>
+              <input
+                type="time"
+                value={state.driveStartTime}
+                onChange={(e) => setState((s) => ({ ...s, driveStartTime: e.target.value }))}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 outline-none transition-colors focus:border-accent [color-scheme:dark]"
+              />
+            </label>
+            <label className="block min-w-0 relative">
+              <span
+                className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
+                title="Warning threshold — days with more driving than this get a 'Long drive' chip. Never moves stops around."
+              >
+                Drive / day
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={16}
+                step={0.5}
+                inputMode="decimal"
+                placeholder="—"
+                value={state.maxDriveMinutesPerDay ? String(parseFloat(state.maxDriveMinutesPerDay) / 60) : ''}
+                onChange={(e) => {
+                  const hours = parseFloat(e.target.value);
+                  setState((s) => ({
+                    ...s,
+                    maxDriveMinutesPerDay: Number.isFinite(hours) && hours > 0 ? String(Math.round(hours * 60)) : '',
+                  }));
+                }}
+                className="w-full bg-transparent border-0 border-b border-line text-paper text-[14px] py-1 pr-7 outline-none transition-colors focus:border-accent [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-paper-muted"
+              />
+              <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">h</span>
+            </label>
+          </div>
           <label className="block">
             <span className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5">Description</span>
             <textarea
@@ -1783,6 +1862,10 @@ export function Builder() {
                   fuelDisabled={fuelTargetForDay(g.day) === null}
                   tankRangeKm={state.tankRangeKm}
                   maxKmPerDay={state.maxKmPerDay}
+                  maxDriveMinutesPerDay={maxDriveMinutes}
+                  schedule={stopSchedule}
+                  onChangeStayMinutes={setStopStayMinutes}
+                  onChangeNights={setStopNights}
                   fuelTimeline={fuelTimeline}
                   autoFuelWarningKm={autoFuelWarnings[g.day]}
                   onOpenManualPicker={() => {
@@ -1961,6 +2044,10 @@ export function Builder() {
               canFindFuelForDay={(day) => fuelTargetForDay(day) !== null}
               tankRangeKm={state.tankRangeKm}
               maxKmPerDay={state.maxKmPerDay}
+              maxDriveMinutesPerDay={maxDriveMinutes}
+              schedule={stopSchedule}
+              onChangeStayMinutes={setStopStayMinutes}
+              onChangeNights={setStopNights}
             />
           </div>
         </div>

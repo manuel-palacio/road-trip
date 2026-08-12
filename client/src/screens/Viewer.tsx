@@ -14,6 +14,7 @@ import { useBudget } from '../hooks/useBudget';
 import { useFxRates } from '../hooks/useFxRates';
 import { BudgetPanel } from '../components/viewer/BudgetPanel';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { scheduleForStops } from '../../../shared/schedule';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { flagEmoji } from '../lib/flags';
@@ -131,6 +132,10 @@ export function Viewer() {
     [routes.enriched, trip?.maxKmPerDay],
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  const stopSchedule = useMemo(
+    () => (trip?.driveStartTime ? scheduleForStops(dayedStops, trip.driveStartTime) : undefined),
+    [dayedStops, trip?.driveStartTime],
+  );
 
   // Auto-seed fuel budget items from existing fuel cost calc on first load.
   // A localStorage flag per trip prevents re-seeding after the user deletes them.
@@ -505,6 +510,7 @@ export function Viewer() {
                   fuelTimeline={fuelTimeline}
                   tankRangeKm={trip.tankRangeKm}
                   trip={{ id: trip.id, name: trip.name }}
+                  schedule={stopSchedule}
                 />
               ))
             )

@@ -45,9 +45,12 @@ type Props = {
   autoFuelWarningKm?: number;
   onOpenManualPicker?: () => void;
   trip?: { id?: string; name?: string };
+  /** Per-stop arrival/departure clock times indexed by global stop index
+   * (issue #114). undefined = trip has no drive start time set. */
+  schedule?: ({ arrival: string | null; departure: string | null } | null)[];
 };
 
-export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, getYourGuidePartnerId, viatorPartnerId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker, trip }: Props) {
+export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, bookingAffiliateId, getYourGuidePartnerId, viatorPartnerId, longLegKm = 0, fuelTimeline, tankRangeKm, autoFuelWarningKm, onOpenManualPicker, trip, schedule }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState<string | null>(null);
@@ -190,7 +193,9 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
 
       {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-2.5">
-          {stopsOnly.map((stop, i) => (
+          {stopsOnly.map((stop, i) => {
+            const eta = schedule?.[group.stops[i].index] ?? null;
+            return (
             <div key={stop.id} className="flex items-start gap-2.5">
               <div className="mt-0.5">
                 <StopIdentityBadge stop={stop} index={group.stops[i].index} variant="compact" />
@@ -200,6 +205,16 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                   <span className="text-[13px] text-paper [overflow-wrap:anywhere]">{stop.label || stop.name}</span>
                   {flagEmoji(stop.countryCode) && (
                     <span className="text-[13px] leading-none">{flagEmoji(stop.countryCode)}</span>
+                  )}
+                  {eta?.arrival && (
+                    <span
+                      data-testid="daycard-eta"
+                      title={`Arrives ${eta.arrival}${eta.departure ? ` · leaves ${eta.departure}` : ''}`}
+                      className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-paper-dim"
+                    >
+                      @ <span className="text-paper font-medium">{eta.arrival}</span>
+                      {eta.departure ? `–${eta.departure}` : ''}
+                    </span>
                   )}
                 </div>
                 {(stop.kmFromPrevious || stop.durationFromPrevious) && i > 0 && (
@@ -302,7 +317,8 @@ export function DayCard({ group, startDate, visible, onToggleVisibility, fuelCos
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
 
           {url ? (
             <div className="mt-1 flex items-center gap-1.5">

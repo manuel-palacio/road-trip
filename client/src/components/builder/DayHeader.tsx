@@ -27,6 +27,9 @@ type Props = {
    * when this day's total km exceeds it. Optional — defaults to 800
    * for trips that haven't set one. */
   maxKmPerDay?: number;
+  /** Drive-time budget (issue #114). Unlike maxKmPerDay there is no
+   * default — the chip only appears when the user set a budget. */
+  maxDriveMinutesPerDay?: number | null;
   // When set, the header becomes a drop target — a drop inserts the
   // dragged stop just before the first stop currently in this day.
   onDropAtStart?: () => void;
@@ -39,7 +42,7 @@ type Props = {
 };
 
 export function DayHeader(p: Props) {
-  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, onDropAtStart, onPickCategory, fuelDisabled } = p;
+  const { day, stopCount, km, durationSeconds, startDate, isFirst, fuelCost, fuelVolume, fuelConfigPartial, onConfigureFuel, longLegKm = 0, maxKmPerDay, maxDriveMinutesPerDay, onDropAtStart, onPickCategory, fuelDisabled } = p;
   const dayMaxKm = maxKmPerDay && maxKmPerDay > 0 ? maxKmPerDay : 800;
   const [over, setOver] = useState(false);
   const date = formatDayDate(day, startDate);
@@ -56,6 +59,8 @@ export function DayHeader(p: Props) {
     aaLabel = `Android Auto: Ready (${stopCount}/10 stops)`;
   }
   const showKmWarning = km > dayMaxKm;
+  const showDriveWarning =
+    !!maxDriveMinutesPerDay && durationSeconds / 60 > maxDriveMinutesPerDay;
 
   return (
     <div
@@ -129,6 +134,14 @@ export function DayHeader(p: Props) {
         {showKmWarning && (
           <span className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#ec8e74] px-2 py-[3px] rounded border border-dashed border-[rgba(214,90,63,0.5)]">
             Long day · {km} km over {dayMaxKm} limit
+          </span>
+        )}
+        {showDriveWarning && (
+          <span
+            title={`This day has ${formatDuration(durationSeconds)} of driving — over your ${formatDuration(maxDriveMinutesPerDay! * 60)} budget.`}
+            className="font-mono text-[9.5px] tracking-[0.14em] uppercase text-[#ec8e74] px-2 py-[3px] rounded border border-dashed border-[rgba(214,90,63,0.5)]"
+          >
+            Long drive · {formatDuration(durationSeconds)} over {formatDuration(maxDriveMinutesPerDay! * 60)} budget
           </span>
         )}
         {longLegKm > 0 && (

@@ -692,3 +692,33 @@ describe('formatCurrency', () => {
     expect(s).not.toMatch(/\.4/);
   });
 });
+
+describe('applyDays — multi-night stays (issue #114)', () => {
+  it('an overnight stop with nights:3 consumes 3 day numbers', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', kmFromPrevious: 100, type: 'overnight', nights: 3 }),
+      stop({ id: 'c', kmFromPrevious: 100 }),
+    ];
+    const out = applyDays(stops, 600);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 4]);
+  });
+  it('nights defaults to 1 — existing trips are unchanged', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', kmFromPrevious: 100, type: 'overnight' }),
+      stop({ id: 'c', kmFromPrevious: 100 }),
+    ];
+    const out = applyDays(stops, 600);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 2]);
+  });
+  it('nights is ignored on non-overnight stops', () => {
+    const stops = [
+      stop({ id: 'a', type: 'start' }),
+      stop({ id: 'b', kmFromPrevious: 100, nights: 5 }),
+      stop({ id: 'c', kmFromPrevious: 100 }),
+    ];
+    const out = applyDays(stops, 600);
+    expect(out.map((s) => s.dayNumber)).toEqual([1, 1, 1]);
+  });
+});

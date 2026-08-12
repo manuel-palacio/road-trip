@@ -11,6 +11,12 @@ type Props = {
   stop: Stop;
   index: number;
   isFirst: boolean;
+  /** Arrival/departure clock times for this stop (issue #114). undefined =
+   * scheduling off for the trip (no drive start time set) — the stay editor
+   * and time chip stay hidden. */
+  schedule?: { arrival: string | null; departure: string | null } | null;
+  onChangeStayMinutes?: (id: string, minutes: number) => void;
+  onChangeNights?: (id: string, nights: number) => void;
   onChangeType: (id: string, type: Stop['type']) => void;
   onChangeRouteMode?: (id: string, mode: StopRouteMode) => void;
   onRemove: (id: string) => void;
@@ -35,6 +41,21 @@ const ROUTE_MODE_OPTIONS: { value: StopRouteMode; label: string; glyph: string }
   { value: 'no-tolls',        label: 'No tolls',         glyph: '🛣' },
   { value: 'scenic-no-tolls', label: 'Scenic · no tolls', glyph: '🌲🛣' },
 ];
+
+const STAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'no stay' },
+  { value: 15, label: '15m stay' },
+  { value: 30, label: '30m stay' },
+  { value: 45, label: '45m stay' },
+  { value: 60, label: '1h stay' },
+  { value: 90, label: '1.5h stay' },
+  { value: 120, label: '2h stay' },
+  { value: 180, label: '3h stay' },
+  { value: 240, label: '4h stay' },
+  { value: 360, label: '6h stay' },
+];
+
+const NIGHTS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
 const TYPE_OPTIONS: { value: Stop['type']; label: string }[] = [
   { value: 'start', label: 'Start' },
@@ -167,6 +188,16 @@ export function StopRow(p: Props) {
               {stop.durationFromPrevious ? <span> · {stop.durationFromPrevious}</span> : null}
             </span>
           ) : null}
+          {p.schedule?.arrival && (
+            <span
+              data-testid="stop-eta"
+              title={`Arrives ${p.schedule.arrival}${p.schedule.departure ? ` · leaves ${p.schedule.departure}` : ''}`}
+              className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-paper-dim"
+            >
+              @ <span className="text-paper font-medium">{p.schedule.arrival}</span>
+              {p.schedule.departure ? <span>–{p.schedule.departure}</span> : null}
+            </span>
+          )}
           {index > 0 && p.onChangeRouteMode && (
             <select
               value={stop.routeMode || 'fastest'}
@@ -182,6 +213,43 @@ export function StopRow(p: Props) {
             >
               {ROUTE_MODE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.glyph} {o.label}</option>
+              ))}
+            </select>
+          )}
+
+          {p.onChangeStayMinutes && p.schedule !== undefined && index > 0 && stop.type !== 'overnight' && (
+            <select
+              value={stop.stayMinutes || 0}
+              onChange={(e) => p.onChangeStayMinutes!(stop.id, parseInt(e.target.value, 10) || 0)}
+              title="How long you plan to spend here — shifts later arrival times"
+              className="bg-transparent border border-line rounded text-paper-dim font-mono text-[9.5px] tracking-[0.16em] uppercase px-1.5 py-[3px] pr-[18px] appearance-none cursor-pointer hover:border-paper-dim hover:text-paper focus:outline-none focus:border-accent"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path fill='%239b9080' d='M0 0l4 5 4-5z'/></svg>\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 6px center',
+              }}
+            >
+              {STAY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          )}
+          {p.onChangeNights && stop.type === 'overnight' && (
+            <select
+              value={stop.nights || 1}
+              onChange={(e) => p.onChangeNights!(stop.id, parseInt(e.target.value, 10) || 1)}
+              title="Nights spent here — each night consumes a trip day"
+              className="bg-transparent border border-line rounded text-paper-dim font-mono text-[9.5px] tracking-[0.16em] uppercase px-1.5 py-[3px] pr-[18px] appearance-none cursor-pointer hover:border-paper-dim hover:text-paper focus:outline-none focus:border-accent"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path fill='%239b9080' d='M0 0l4 5 4-5z'/></svg>\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 6px center',
+              }}
+            >
+              {NIGHTS_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n} night{n === 1 ? '' : 's'}</option>
               ))}
             </select>
           )}

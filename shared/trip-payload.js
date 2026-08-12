@@ -2,6 +2,7 @@
 // POST /api/trips and PUT /api/trips/:id so both accept the same field set —
 // create previously dropped fuel/tank/autoFuel silently.
 import { validateFuelField } from './fuel-validation.js';
+import { parseClockTime } from './schedule.js';
 
 export const UPDATABLE_TRIP_FIELDS = [
   'name',
@@ -22,6 +23,8 @@ export const UPDATABLE_TRIP_FIELDS = [
   'tankSizeLitres',
   'dataVersion',
   'autoFuel',
+  'driveStartTime',
+  'maxDriveMinutesPerDay',
   'templateVisibility',
 ];
 
@@ -41,6 +44,8 @@ export const CREATE_TRIP_EXTRA_FIELDS = [
   'tankSizeLitres',
   'dataVersion',
   'autoFuel',
+  'driveStartTime',
+  'maxDriveMinutesPerDay',
 ];
 
 // Type checks for the non-fuel updatable fields — PUT must not persist
@@ -73,6 +78,16 @@ export function validateTripField(key, value) {
       return { value };
     case 'autoFuel':
       if (typeof value !== 'boolean') return { error: 'autoFuel must be a boolean' };
+      return { value };
+    case 'driveStartTime':
+      if (value === null) return { value: null };
+      if (parseClockTime(value) === null) return { error: 'driveStartTime must be "HH:MM" or null' };
+      return { value };
+    case 'maxDriveMinutesPerDay':
+      if (value === null) return { value: null };
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        return { error: 'maxDriveMinutesPerDay must be a positive number or null' };
+      }
       return { value };
     case 'templateVisibility':
       if (value !== 'public' && value !== 'unlisted') return { error: 'templateVisibility must be public or unlisted' };

@@ -77,9 +77,15 @@ export function applyDays(stops: Stop[], _maxKm: number): Stop[] {
       result.push({ ...stop, dayNumber: 1 });
       continue;
     }
-    const prevOvernight = stops[i - 1].type === 'overnight';
+    const prev = stops[i - 1];
     const forced = stop.forceDayStart === true;
-    if (forced || prevOvernight) day++;
+    if (prev.type === 'overnight') {
+      // Multi-night stays (issue #114): 3 nights at a stop consume 3 day
+      // numbers, so the next leg starts on the following calendar day.
+      day += Math.max(1, Math.round(prev.nights || 1));
+    } else if (forced) {
+      day++;
+    }
     result.push({ ...stop, dayNumber: day });
   }
   return result;

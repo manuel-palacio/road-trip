@@ -43,6 +43,13 @@ type Props = {
   /** Trip's max-km-per-day target. Forwarded to each DayHeader for the
    * "Long day" warning chip. Defaults to 800 in DayHeader if absent. */
   maxKmPerDay?: number;
+  /** Per-stop arrival/departure times, indexed by global stop index (issue
+   * #114). undefined = scheduling off. */
+  schedule?: ({ arrival: string | null; departure: string | null } | null)[];
+  onChangeStayMinutes?: (id: string, minutes: number) => void;
+  onChangeNights?: (id: string, nights: number) => void;
+  /** Drive-time warning threshold forwarded to DayHeader. */
+  maxDriveMinutesPerDay?: number | null;
 };
 
 export function StopList(p: Props) {
@@ -71,6 +78,7 @@ export function StopList(p: Props) {
             onConfigureFuel={p.onConfigureFuel}
             longLegKm={longestLegOverRange(g, p.tankRangeKm)}
             maxKmPerDay={p.maxKmPerDay}
+            maxDriveMinutesPerDay={p.maxDriveMinutesPerDay}
             onDropAtStart={p.onDropAtDayStart && gi > 0 ? () => p.onDropAtDayStart!(g.day) : undefined}
             onPickCategory={p.onFindCategoryForDay ? (cat) => p.onFindCategoryForDay!(g.day, cat) : undefined}
             fuelDisabled={p.canFindFuelForDay ? !p.canFindFuelForDay(g.day) : false}
@@ -81,6 +89,9 @@ export function StopList(p: Props) {
               stop={stop}
               index={index}
               isFirst={index === 0}
+              schedule={p.schedule ? p.schedule[index] : undefined}
+              onChangeStayMinutes={p.onChangeStayMinutes}
+              onChangeNights={p.onChangeNights}
               onChangeType={p.onChangeType}
               onChangeRouteMode={p.onChangeRouteMode}
               onRemove={p.onRemove}

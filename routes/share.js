@@ -49,6 +49,7 @@ router.get('/api/share/:shareToken', limits.publicShare, async (req, res) => {
       description: data.description || '',
       coverEmoji: data.coverEmoji || '🚗',
       startDate: data.startDate || null,
+      driveStartTime: data.driveStartTime || null,
       maxKmPerDay: data.maxKmPerDay || 600,
       stops: Array.isArray(data.stops) ? data.stops : [],
       totalKm: data.totalKm || 0,

@@ -49,6 +49,13 @@ type Props = {
   fuelTimeline?: FuelTimeline;
   autoFuelWarningKm?: number;
   onOpenManualPicker?: () => void;
+  /** Per-stop arrival/departure times, indexed by global stop index (issue
+   * #114). undefined = scheduling off. */
+  schedule?: ({ arrival: string | null; departure: string | null } | null)[];
+  onChangeStayMinutes?: (id: string, minutes: number) => void;
+  onChangeNights?: (id: string, nights: number) => void;
+  /** Drive-time warning threshold; chip only shows when set. */
+  maxDriveMinutesPerDay?: number | null;
 };
 
 export function DayColumn(p: Props) {
@@ -60,6 +67,8 @@ export function DayColumn(p: Props) {
   const longLegKm = longestLegOverRange(g, p.tankRangeKm);
   const dayMaxKm = p.maxKmPerDay && p.maxKmPerDay > 0 ? p.maxKmPerDay : 800;
   const showKmWarning = g.km > dayMaxKm;
+  const showDriveWarning =
+    !!p.maxDriveMinutesPerDay && g.durationSeconds / 60 > p.maxDriveMinutesPerDay;
 
   let aaCls: string;
   let aaLabel: string;
@@ -166,6 +175,14 @@ export function DayColumn(p: Props) {
                 Long day
               </span>
             )}
+            {showDriveWarning && (
+              <span
+                title={`This day has ${formatDuration(g.durationSeconds)} of driving — over your ${formatDuration(p.maxDriveMinutesPerDay! * 60)} budget.`}
+                className="font-mono text-[9px] tracking-[0.12em] uppercase text-[#ec8e74] px-1.5 py-[2px] rounded border border-dashed border-[rgba(214,90,63,0.5)]"
+              >
+                Long drive
+              </span>
+            )}
             {longLegKm > 0 && (
               <span
                 title="A single leg in this day exceeds your tank range — consider adding a fuel stop."
@@ -213,6 +230,9 @@ export function DayColumn(p: Props) {
             stop={stop}
             index={index}
             isFirst={index === 0}
+            schedule={p.schedule ? p.schedule[index] : undefined}
+            onChangeStayMinutes={p.onChangeStayMinutes}
+            onChangeNights={p.onChangeNights}
             onChangeType={p.onChangeType}
             onChangeRouteMode={p.onChangeRouteMode}
             onRemove={p.onRemove}

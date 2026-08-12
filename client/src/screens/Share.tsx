@@ -7,6 +7,7 @@ import { useRouteSegments, getStopPath } from '../hooks/useRouteSegments';
 import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
+import { scheduleForStops } from '../../../shared/schedule';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { flagEmoji } from '../lib/flags';
@@ -74,6 +75,10 @@ export function Share() {
     [routes.enriched, trip?.maxKmPerDay],
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
+  const stopSchedule = useMemo(
+    () => (trip?.driveStartTime ? scheduleForStops(dayedStops, trip.driveStartTime) : undefined),
+    [dayedStops, trip?.driveStartTime],
+  );
   const fuelTimeline = useMemo(
     () => computeFuelTimeline(dayedStops, trip?.tankRangeKm || 0),
     [dayedStops, trip?.tankRangeKm],
@@ -412,6 +417,7 @@ export function Share() {
                     longLegKm={longestLegOverRange(g, trip.tankRangeKm)}
                     fuelTimeline={fuelTimeline}
                     tankRangeKm={trip.tankRangeKm}
+                    schedule={stopSchedule}
                   />
                 ))
               )
