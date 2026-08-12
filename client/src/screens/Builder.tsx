@@ -968,8 +968,9 @@ export function Builder() {
     };
   }, [maps, map, dayedStops]);
 
-  // Via-point markers — draggable beads on the route; drag to move the
-  // via, right-click to remove it and restore the leg.
+  // Via-point markers — draggable beads on the route. Drag moves the via;
+  // a plain click (no drag) removes it. Click, not right-click, so the
+  // control works on touch and without a context menu.
   const viaMarkersRef = useRef<google.maps.Marker[]>([]);
   useEffect(() => {
     if (!maps || !map) return;
@@ -982,19 +983,27 @@ export function Builder() {
           map,
           draggable: true,
           zIndex: 55,
-          title: 'Via point — drag to move, right-click to remove',
+          title: 'Via point — drag to move, tap to remove',
           icon: {
             path: maps.SymbolPath.CIRCLE,
-            scale: 5,
+            scale: 7,
             fillColor: '#e76f51',
             fillOpacity: 1,
             strokeColor: '#ffffff',
-            strokeWeight: 1.5,
+            strokeWeight: 2,
           },
         });
+        // A drag fires click on release in some browsers; the flag keeps a
+        // move from also deleting the point.
+        let dragged = false;
+        marker.addListener('dragstart', () => { dragged = true; });
         marker.addListener('dragend', () => {
           const pos = marker.getPosition();
           if (pos) moveViaPoint(stop.id, index, { lat: pos.lat(), lng: pos.lng() });
+          setTimeout(() => { dragged = false; }, 0);
+        });
+        marker.addListener('click', () => {
+          if (!dragged) removeViaPoint(stop.id, index);
         });
         marker.addListener('rightclick', () => removeViaPoint(stop.id, index));
         viaMarkersRef.current.push(marker);
@@ -2056,6 +2065,7 @@ export function Builder() {
                   schedule={stopSchedule}
                   onChangeStayMinutes={setStopStayMinutes}
                   onChangeNights={setStopNights}
+                  onRemoveViaPoint={removeViaPoint}
                   onSuggestHotel={
                     state.suggestHotels !== false && dayNeedsOvernightSuggestion(g)
                       ? () => openHotelSuggestForDay(g.day)
@@ -2243,6 +2253,7 @@ export function Builder() {
               schedule={stopSchedule}
               onChangeStayMinutes={setStopStayMinutes}
               onChangeNights={setStopNights}
+              onRemoveViaPoint={removeViaPoint}
               onSuggestHotelForDay={state.suggestHotels !== false ? openHotelSuggestForDay : undefined}
             />
           </div>

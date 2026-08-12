@@ -17,6 +17,10 @@ type Props = {
   schedule?: { arrival: string | null; departure: string | null } | null;
   onChangeStayMinutes?: (id: string, minutes: number) => void;
   onChangeNights?: (id: string, nights: number) => void;
+  /** Removes the via-point at `index` from the leg ending at this stop
+   * (issue #120). The map beads are mouse-only; this chip is the touch +
+   * keyboard path. */
+  onRemoveViaPoint?: (id: string, index: number) => void;
   onChangeType: (id: string, type: Stop['type']) => void;
   onChangeRouteMode?: (id: string, mode: StopRouteMode) => void;
   onRemove: (id: string) => void;
@@ -188,6 +192,20 @@ export function StopRow(p: Props) {
               {stop.durationFromPrevious ? <span> · {stop.durationFromPrevious}</span> : null}
             </span>
           ) : null}
+          {p.onRemoveViaPoint && (stop.viaPoints || []).map((_, viaIndex) => (
+            <button
+              key={viaIndex}
+              type="button"
+              data-testid="via-chip"
+              onClick={() => p.onRemoveViaPoint!(stop.id, viaIndex)}
+              title="Remove this via-point and restore the direct route"
+              className="inline-flex items-center gap-1 px-1.5 py-[3px] rounded border border-line text-paper-muted font-mono text-[9.5px] tracking-[0.16em] uppercase hover:text-accent hover:border-accent transition-colors"
+            >
+              <span aria-hidden>⟿</span>
+              Via {(stop.viaPoints || []).length > 1 ? viaIndex + 1 : ''}
+              <span aria-hidden>×</span>
+            </button>
+          ))}
           {p.schedule?.arrival && (
             <span
               data-testid="stop-eta"

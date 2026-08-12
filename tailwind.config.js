@@ -8,6 +8,7 @@ export default {
         // dark theme is the default (set on :root); light mode is
         // applied by adding .theme-light to <html>.
         canvas: 'rgb(var(--color-canvas) / <alpha-value>)',
+        'canvas-strong': 'rgb(var(--color-canvas-strong) / <alpha-value>)',
         surface: 'rgb(var(--color-surface) / <alpha-value>)',
         'surface-2': 'rgb(var(--color-surface-2) / <alpha-value>)',
         paper: 'rgb(var(--color-paper) / <alpha-value>)',

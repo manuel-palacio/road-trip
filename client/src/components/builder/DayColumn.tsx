@@ -54,6 +54,7 @@ type Props = {
   schedule?: ({ arrival: string | null; departure: string | null } | null)[];
   onChangeStayMinutes?: (id: string, minutes: number) => void;
   onChangeNights?: (id: string, nights: number) => void;
+  onRemoveViaPoint?: (id: string, index: number) => void;
   /** Drive-time warning threshold; chip only shows when set. */
   maxDriveMinutesPerDay?: number | null;
   /** Opens the hotel NearbyFinder at this day's end (issue #115). Passed
@@ -248,6 +249,7 @@ export function DayColumn(p: Props) {
             schedule={p.schedule ? p.schedule[index] : undefined}
             onChangeStayMinutes={p.onChangeStayMinutes}
             onChangeNights={p.onChangeNights}
+            onRemoveViaPoint={p.onRemoveViaPoint}
             onChangeType={p.onChangeType}
             onChangeRouteMode={p.onChangeRouteMode}
             onRemove={p.onRemove}

@@ -15,6 +15,9 @@
   --color-paper-dim: 155 144 128;
   --color-paper-muted: 93 86 77;
   --color-accent: 231 111 81;
+  /* Lifted canvas for elements that float over page content (cookie
+   * banner, cards on the raw canvas) — solid, one step up from canvas. */
+  --color-canvas-strong: 18 20 24;
   /* Subtle hairlines: paper at 10% opacity over dark backgrounds. */
   --color-line: 243 236 222;
 }
@@ -29,6 +32,7 @@ html.theme-light {
   --color-paper-dim: 92 85 72;
   --color-paper-muted: 142 132 116;
   --color-accent: 198 88 60;
+  --color-canvas-strong: 249 243 230;
   /* Hairlines flip to ink at low opacity over light backgrounds. */
   --color-line: 28 26 22;
 }

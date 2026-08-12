@@ -241,7 +241,7 @@ function BudgetRow({
         type="button"
         onClick={onDelete}
         aria-label={`Delete ${item.label}`}
-        className="opacity-0 group-hover:opacity-100 text-paper-muted hover:text-accent w-5 h-5 flex items-center justify-center flex-shrink-0 transition-opacity text-[12px]"
+        className="text-paper-muted hover:text-accent focus-visible:text-accent w-9 h-9 -my-2 flex items-center justify-center flex-shrink-0 transition-colors text-[14px]"
       >
         ×
       </button>

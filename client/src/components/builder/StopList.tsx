@@ -49,6 +49,7 @@ type Props = {
   schedule?: ({ arrival: string | null; departure: string | null } | null)[];
   onChangeStayMinutes?: (id: string, minutes: number) => void;
   onChangeNights?: (id: string, nights: number) => void;
+  onRemoveViaPoint?: (id: string, index: number) => void;
   /** Drive-time warning threshold forwarded to DayHeader. */
   maxDriveMinutesPerDay?: number | null;
   /** Opens the hotel NearbyFinder at the given day's end (issue #115).
@@ -102,6 +103,7 @@ export function StopList(p: Props) {
               schedule={p.schedule ? p.schedule[index] : undefined}
               onChangeStayMinutes={p.onChangeStayMinutes}
               onChangeNights={p.onChangeNights}
+              onRemoveViaPoint={p.onRemoveViaPoint}
               onChangeType={p.onChangeType}
               onChangeRouteMode={p.onChangeRouteMode}
               onRemove={p.onRemove}

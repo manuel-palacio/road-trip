@@ -10,6 +10,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { PublishTemplateModal } from '../components/PublishTemplateModal';
 import { TripCard } from '../components/TripCard';
 import { NewTripTile } from '../components/NewTripTile';
+import { HeaderNav } from '../components/HeaderNav';
 import { ImportTripModal } from '../components/ImportTripModal';
 import { parseTripFile, type ParsedTripFile } from '../lib/trip-import';
 import { useDeleteTrip, useTrips } from '../hooks/useTrips';
@@ -103,6 +104,7 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
             {/* Hide name on phones — avatar carries the identity */}
             <span className="hidden md:inline-block text-[14px] max-w-[180px] truncate">{me.displayName || me.email}</span>
           </div>
+          <HeaderNav>
           <button
             type="button"
             onClick={() => navigate('/templates')}
@@ -135,6 +137,7 @@ export function Dashboard({ me, config }: { me: MeResponse; config: AppConfig })
           >
             Sign out
           </button>
+          </HeaderNav>
         </div>
       </header>
       <main className="max-w-[1100px] mx-auto pt-[100px] md:pt-[140px] px-4 md:px-9 pb-20">
