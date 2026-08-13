@@ -90,3 +90,15 @@ describe('fuelType (issue #118)', () => {
     expect(collectTripFields({ fuelType: 'nuclear' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/fuelType/);
   });
 });
+
+describe('paceFactor (issue #126)', () => {
+  it('accepts a usable multiplier on create and update, and null as a clear', () => {
+    expect(collectTripFields({ paceFactor: 1.2 }, CREATE_TRIP_EXTRA_FIELDS).value).toEqual({ paceFactor: 1.2 });
+    expect(collectTripFields({ paceFactor: null }, UPDATABLE_TRIP_FIELDS).value).toEqual({ paceFactor: null });
+  });
+  it('rejects factors outside the sane range', () => {
+    expect(collectTripFields({ paceFactor: 0.1 }, UPDATABLE_TRIP_FIELDS).error).toMatch(/paceFactor/);
+    expect(collectTripFields({ paceFactor: 5 }, UPDATABLE_TRIP_FIELDS).error).toMatch(/paceFactor/);
+    expect(collectTripFields({ paceFactor: 'fast' }, UPDATABLE_TRIP_FIELDS).error).toMatch(/paceFactor/);
+  });
+});

@@ -15,6 +15,7 @@ import { useFxRates } from '../hooks/useFxRates';
 import { BudgetPanel } from '../components/viewer/BudgetPanel';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelConfigState, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { scheduleForStops } from '../../../shared/schedule';
+import { applyPace } from '../../../shared/pace';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { flagEmoji } from '../lib/flags';
@@ -128,8 +129,8 @@ export function Viewer() {
 
   const routes = useRouteSegments(stops, maps);
   const dayedStops = useMemo(
-    () => applyDays(routes.enriched, trip?.maxKmPerDay || 600),
-    [routes.enriched, trip?.maxKmPerDay],
+    () => applyDays(applyPace(routes.enriched, trip?.paceFactor), trip?.maxKmPerDay || 600),
+    [routes.enriched, trip?.paceFactor, trip?.maxKmPerDay],
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
   const stopSchedule = useMemo(

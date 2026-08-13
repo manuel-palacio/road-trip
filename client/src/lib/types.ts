@@ -60,6 +60,10 @@ export type Stop = {
   // day numbers the stay consumes; default 1.
   stayMinutes?: number;
   nights?: number;
+  /** Routed duration before the trip's pace multiplier (issue #126).
+   * Derivation-time only — saves write the raw value from here so pace
+   * never compounds across reloads. */
+  baseDurationSeconds?: number;
   // Routing strategy for the leg from the previous stop. First stop in a
   // trip has no inbound leg and ignores this value.
   routeMode?: StopRouteMode;
@@ -200,6 +204,9 @@ export type Trip = {
   // threshold like maxKmPerDay (never an auto-split). null = cleared.
   driveStartTime?: string | null;
   maxDriveMinutesPerDay?: number | null;
+  /** Personal driving speed relative to the routing average (issue #126).
+   * 1 = average, 1.2 = 20% faster. null/undefined = average. */
+  paceFactor?: number | null;
   /** Per-trip toggle for the auto-fuel engine. When true (or undefined for
    * existing trips), the engine reactively inserts fuel stops where the tank
    * would run low. Default-on retroactively applies to trips that pre-date

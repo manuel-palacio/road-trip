@@ -24,10 +24,22 @@ import { clearableFuelFields } from '../lib/fuel-payload';
 import { shouldHydrateTrip } from '../lib/trip-hydration';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { scheduleForStops } from '../../../shared/schedule';
+import { applyPace } from '../../../shared/pace';
 import { dayEndTarget, dayNeedsOvernightSuggestion } from '../lib/overnight-suggest';
 import { nearbySearchFilterFor } from '../lib/nearby-search';
 
 const MAX_VIA_POINTS = 3;
+
+// Speed relative to the routing average (issue #126). Phrased as driving
+// style rather than percentages, which is how people actually think about
+// their own pace; the factor divides the routed duration.
+const PACE_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
+  { value: 0.8,  label: 'Relaxed — 20% slower' },
+  { value: 0.9,  label: 'Easy — 10% slower' },
+  { value: 1,    label: 'Average pace' },
+  { value: 1.1,  label: 'Brisk — 10% faster' },
+  { value: 1.2,  label: 'Fast — 20% faster' },
+];
 import { dayStartTarget, findLongestLegTarget, type FuelSearchTarget } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
 import { downsamplePath, MAX_ROUTE_PATH_POINTS } from '../lib/route-path';
@@ -74,6 +86,7 @@ type BuilderState = {
   tankSizeLitres: string;     // string for the same blank-vs-0 reason
   autoFuel: boolean;
   suggestHotels: boolean;
+  paceFactor: number;             // speed multiplier; 1 = routing average
   driveStartTime: string;         // "HH:MM"; '' = scheduling off
   maxDriveMinutesPerDay: string;  // string for the blank-vs-0 reason
 };
@@ -144,6 +157,7 @@ const empty = (): BuilderState => ({
   tankSizeLitres: '',
   autoFuel: true,
   suggestHotels: true,
+  paceFactor: 1,
   driveStartTime: '',
   maxDriveMinutesPerDay: '',
 });
@@ -354,6 +368,7 @@ export function Builder() {
         : '',
       autoFuel: t.autoFuel ?? true,
       suggestHotels: t.suggestHotels ?? true,
+      paceFactor: typeof t.paceFactor === 'number' ? t.paceFactor : 1,
       driveStartTime: t.driveStartTime || '',
       maxDriveMinutesPerDay:
         typeof t.maxDriveMinutesPerDay === 'number' && t.maxDriveMinutesPerDay > 0
@@ -467,9 +482,15 @@ export function Builder() {
   // Enrich stops with km/duration/path from Directions API
   const routes = useRouteSegments(state.stops, maps);
   // Compute day numbers based on enriched km + max km/day setting
+  // Pace scales leg durations before days/schedule/totals derive from
+  // them, so every downstream number reflects it (issue #126).
+  const pacedStops = useMemo(
+    () => applyPace(routes.enriched, state.paceFactor),
+    [routes.enriched, state.paceFactor],
+  );
   const dayedStops = useMemo(
-    () => applyDays(routes.enriched, state.maxKmPerDay || 600),
-    [routes.enriched, state.maxKmPerDay],
+    () => applyDays(pacedStops, state.maxKmPerDay || 600),
+    [pacedStops, state.maxKmPerDay],
   );
   const totals = useMemo(() => tripTotals(dayedStops), [dayedStops]);
   // Arrival/departure clock times (issue #114) — undefined when the trip has
@@ -1213,6 +1234,7 @@ export function Builder() {
       tankSizeLitres: s.tankSizeLitres || '',
       autoFuel: s.autoFuel ?? true,
       suggestHotels: s.suggestHotels ?? true,
+      paceFactor: s.paceFactor ?? 1,
       driveStartTime: s.driveStartTime || '',
       maxDriveMinutesPerDay: s.maxDriveMinutesPerDay || '',
       stops: (s.stops || []).map((x) => ({
@@ -1270,6 +1292,7 @@ export function Builder() {
         fuelCurrency: state.fuelCurrency || 'EUR',
         autoFuel: state.autoFuel,
         suggestHotels: state.suggestHotels,
+        paceFactor: state.paceFactor === 1 ? null : state.paceFactor,
         driveStartTime: state.driveStartTime || null,
         maxDriveMinutesPerDay: (() => {
           const minutes = parseFloat(state.maxDriveMinutesPerDay);
@@ -1293,8 +1316,11 @@ export function Builder() {
             dayNumber: s.dayNumber || 1,
             highlights: s.highlights || [],
             kmFromPrevious: s.kmFromPrevious || 0,
-            durationFromPrevious: s.durationFromPrevious || '',
-            durationSecondsFromPrevious: s.durationSecondsFromPrevious || 0,
+            // Persist the routed duration, not the paced one — the segment
+            // cache re-seeds from these, so saving adjusted values would
+            // compound the multiplier on every reload.
+            durationFromPrevious: formatDuration(s.baseDurationSeconds ?? s.durationSecondsFromPrevious ?? 0),
+            durationSecondsFromPrevious: s.baseDurationSeconds ?? s.durationSecondsFromPrevious ?? 0,
             ...(s.routeMode ? { routeMode: s.routeMode } : {}),
             ...(s.viaPoints && s.viaPoints.length > 0 ? { viaPoints: s.viaPoints } : {}),
             ...(s.category ? { category: s.category } : {}),
@@ -1497,6 +1523,24 @@ export function Builder() {
               <span className="absolute right-0 bottom-2 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-muted pointer-events-none">h</span>
             </label>
           </div>
+          <label className="block max-w-[260px]">
+            <span
+              className="block font-mono text-[9.5px] tracking-[0.22em] uppercase text-paper-muted mb-1.5"
+              title="Routing gives an average driver's time. If you're consistently quicker or slower, set it here and every duration, arrival time and day total follows."
+            >
+              My pace
+            </span>
+            <select
+              value={String(state.paceFactor)}
+              data-testid="pace-select"
+              onChange={(e) => setState((s) => ({ ...s, paceFactor: parseFloat(e.target.value) }))}
+              className="w-full bg-transparent border-0 border-b border-line text-paper text-[13px] py-1 outline-none cursor-pointer transition-colors focus:border-accent"
+            >
+              {PACE_OPTIONS.map((o) => (
+                <option key={o.value} value={String(o.value)}>{o.label}</option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-start gap-2 -mt-1">
             <input
               type="checkbox"

@@ -44,12 +44,9 @@ export function isFuelStop(s: Stop): boolean {
   return s.type === 'fuel' || (s.type === 'waypoint' && s.category === 'fuel');
 }
 
-export function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0) return '';
-  const hours = seconds / 3600;
-  if (hours < 1) return `${Math.round(seconds / 60)}m`;
-  return `~${hours.toFixed(1)}h`;
-}
+// Re-exported so the existing `from '../lib/compute'` import surface keeps
+// working; the implementation is shared with pace + the PDF export.
+export { formatDuration } from '../../../shared/duration';
 
 /** Computes dayNumber for each stop based on explicit user intent only:
  *   - Stop's type === 'overnight'  → next stop starts a new day

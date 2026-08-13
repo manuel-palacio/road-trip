@@ -10,6 +10,7 @@ const { effectiveTripLimit } = require('../lib/limits');
 const fuelModulePromise = import('../shared/fuel.js');
 const pdfSummaryPromise = import('../shared/pdf-summary.js');
 const schedulePromise = import('../shared/schedule.js');
+const pacePromise = import('../shared/pace.js');
 const tripPayloadPromise = import('../shared/trip-payload.js');
 const { authRequired } = require('../middleware/auth');
 const limits = require('../middleware/rate-limit');
@@ -840,7 +841,13 @@ router.get('/api/trips/:id/export/pdf', limits.pdfExport, async (req, res) => {
     // Arrival times from the same shared engine the app renders with
     // (issue #114) — keyed by stop id for the two PDF formatters.
     const { scheduleForStops } = await schedulePromise;
-    const stops = Array.isArray(trip.stops) ? trip.stops : [];
+    const { applyPace } = await pacePromise;
+    // Same transform the app applies, so printed durations and arrival
+    // times match the screen (issue #126). The formatters read
+    // `trip.stops` themselves, so pace has to be baked into the trip they
+    // receive — not just into the schedule.
+    const stops = applyPace(Array.isArray(trip.stops) ? trip.stops : [], trip.paceFactor);
+    const pacedTrip = { ...trip, stops };
     const schedule = scheduleForStops(stops, trip.driveStartTime);
     const arrivalsByStopId = new Map(stops.map((s, i) => [s.id, schedule[i]]));
 
@@ -853,9 +860,9 @@ router.get('/api/trips/:id/export/pdf', limits.pdfExport, async (req, res) => {
 
     if (format === 'branded') {
       const { brandedSummaryRows } = await pdfSummaryPromise;
-      formatBranded(doc, trip, pins, fuelHelpers, brandedSummaryRows, arrivalsByStopId);
+      formatBranded(doc, pacedTrip, pins, fuelHelpers, brandedSummaryRows, arrivalsByStopId);
     } else {
-      formatPlain(doc, trip, pins, fuelHelpers, arrivalsByStopId);
+      formatPlain(doc, pacedTrip, pins, fuelHelpers, arrivalsByStopId);
     }
 
     doc.end();

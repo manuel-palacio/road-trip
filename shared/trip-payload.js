@@ -3,6 +3,7 @@
 // create previously dropped fuel/tank/autoFuel silently.
 import { validateFuelField } from './fuel-validation.js';
 import { parseClockTime } from './schedule.js';
+import { MAX_PACE, MIN_PACE } from './pace.js';
 
 export const UPDATABLE_TRIP_FIELDS = [
   'name',
@@ -27,6 +28,7 @@ export const UPDATABLE_TRIP_FIELDS = [
   'suggestHotels',
   'driveStartTime',
   'maxDriveMinutesPerDay',
+  'paceFactor',
   'templateVisibility',
 ];
 
@@ -50,6 +52,7 @@ export const CREATE_TRIP_EXTRA_FIELDS = [
   'suggestHotels',
   'driveStartTime',
   'maxDriveMinutesPerDay',
+  'paceFactor',
 ];
 
 // Type checks for the non-fuel updatable fields — PUT must not persist
@@ -87,6 +90,12 @@ export function validateTripField(key, value) {
     case 'driveStartTime':
       if (value === null) return { value: null };
       if (parseClockTime(value) === null) return { error: 'driveStartTime must be "HH:MM" or null' };
+      return { value };
+    case 'paceFactor':
+      if (value === null) return { value: null };
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < MIN_PACE || value > MAX_PACE) {
+        return { error: `paceFactor must be between ${MIN_PACE} and ${MAX_PACE}, or null` };
+      }
       return { value };
     case 'maxDriveMinutesPerDay':
       if (value === null) return { value: null };

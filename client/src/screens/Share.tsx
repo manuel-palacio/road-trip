@@ -8,6 +8,7 @@ import { useLegCostMarkers } from '../hooks/useLegCostMarkers';
 import { getSharedTrip } from '../lib/api';
 import { applyDays, dayColor, formatBreakdown, formatDuration, formatFillUps, formatVolume, fuelBreakdownForLegs, fuelVolumeForLegs, groupByDay, tripTotals } from '../lib/compute';
 import { scheduleForStops } from '../../../shared/schedule';
+import { applyPace } from '../../../shared/pace';
 import { ACCENT_BTN } from '../lib/ui';
 import { longestLegOverRange } from '../lib/fuel-stops';
 import { computeFuelTimeline } from '../lib/fuel-timeline';
@@ -70,8 +71,8 @@ export function Share() {
 
   const routes = useRouteSegments(stops, maps);
   const dayedStops = useMemo(
-    () => applyDays(routes.enriched, trip?.maxKmPerDay || 600),
-    [routes.enriched, trip?.maxKmPerDay],
+    () => applyDays(applyPace(routes.enriched, trip?.paceFactor), trip?.maxKmPerDay || 600),
+    [routes.enriched, trip?.paceFactor, trip?.maxKmPerDay],
   );
   const groups = useMemo(() => groupByDay(dayedStops), [dayedStops]);
   const stopSchedule = useMemo(
