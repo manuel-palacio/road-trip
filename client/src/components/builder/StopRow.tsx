@@ -309,7 +309,7 @@ export function StopRow(p: Props) {
               }
               disabled={isFirst || !isForced}
               onClick={() => p.onSetForceDayStart(stop.id, false)}
-              className="w-[26px] h-[26px] tap-target bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
+              className="w-[26px] h-[26px] bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
             >
               −
             </button>
@@ -323,7 +323,7 @@ export function StopRow(p: Props) {
               }
               disabled={isFirst || isForced}
               onClick={() => p.onSetForceDayStart(stop.id, true)}
-              className="w-[26px] h-[26px] tap-target bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
+              className="w-[26px] h-[26px] bg-transparent border border-line-strong rounded text-paper-muted font-mono text-[11px] cursor-pointer flex items-center justify-center transition-colors hover:text-accent hover:border-accent disabled:opacity-35 disabled:cursor-not-allowed"
             >
               +
             </button>
@@ -353,7 +353,7 @@ export function StopRow(p: Props) {
                 type="button"
                 aria-label="Remove note"
                 onClick={() => p.onRemoveHighlight(stop.id, text)}
-                className="bg-transparent border-0 text-paper-muted text-[13px] w-5 h-5 tap-target rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-canvas transition-colors"
+                className="bg-transparent border-0 text-paper-muted text-[13px] w-5 h-5 rounded-full p-0 flex items-center justify-center cursor-pointer hover:bg-accent hover:text-canvas transition-colors"
               >
                 ×
               </button>
@@ -379,24 +379,27 @@ export function StopRow(p: Props) {
         )}
       </div>
 
-      {p.onFavoriteAdd && p.onFavoriteRemove && (
-        <div className="absolute top-1.5 right-8">
+      {/* Star and remove share one row so their hit areas can't overlap —
+          they were separately positioned with hardcoded right offsets,
+          which let the larger remove button cover the star. */}
+      <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5">
+        {p.onFavoriteAdd && p.onFavoriteRemove && (
           <FavoriteToggle
             isFavorited={!!favoriteId}
             pending={addPending || removePending}
             onAdd={() => p.onFavoriteAdd!(stop)}
             onRemove={() => favoriteId && p.onFavoriteRemove!(favoriteId)}
           />
-        </div>
-      )}
-      <button
-        type="button"
-        aria-label="Remove stop"
-        onClick={() => p.onRemove(stop.id)}
-        className="absolute top-1.5 right-1.5 w-[30px] h-[30px] tap-target bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
-      >
-        ×
-      </button>
+        )}
+        <button
+          type="button"
+          aria-label="Remove stop"
+          onClick={() => p.onRemove(stop.id)}
+          className="w-[30px] h-[30px] shrink-0 bg-transparent border-0 text-paper-muted text-[16px] rounded flex items-center justify-center cursor-pointer hover:text-accent hover:bg-accent-soft"
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }
