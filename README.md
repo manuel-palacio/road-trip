@@ -274,7 +274,7 @@ All of these come from `.env` locally and from Cloud Run env vars (or Secret Man
 
 ```bash
 gcloud run services update road-trip --region=europe-north1 \
-  --update-env-vars ALLOWED_EMAILS=emanuel.palacio@gmail.com,friend@example.com
+  --update-env-vars ALLOWED_EMAILS=you@example.com,friend@example.com
 ```
 
 The friend has to sign in with the **exact** Google account email — `@gmail.com` and `@googlemail.com` aliases don't match.
@@ -293,7 +293,7 @@ Per-user override: set `users/{uid}.tripLimit = N` in Firestore to give a specif
 **Via the bundled script** (recommended):
 
 ```bash
-node scripts/set-user-plan.js emanuel.palacio@gmail.com pro
+node scripts/set-user-plan.js you@example.com pro
 node scripts/set-user-plan.js friend@example.com free   # demote
 ```
 
